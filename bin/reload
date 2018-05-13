@@ -1,0 +1,2 @@
+#!/bin/bash
+pkill -USR1 -x sxhkd;~/.config/bspwm/bspwmrc

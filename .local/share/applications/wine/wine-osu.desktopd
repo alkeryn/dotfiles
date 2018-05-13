@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Osu!
+Comment=Osu!
+
+Exec=/home/alkeryn/.local/share/applications/Scripts/Osu.sh
+#Exec=env WINEPREFIX=/home/alkeryn/App/wine/Osu WINEARCH=win32 wine /home/alkeryn/App/wine/Osu/drive_c/Program\ Files/osu\!/osu\!.exe

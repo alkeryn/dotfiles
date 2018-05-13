@@ -1,0 +1,2 @@
+#!/bin/sh
+while true;do  grep MHz /proc/cpuinfo;sleep 0.5;clear;done

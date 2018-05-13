@@ -1,0 +1,94 @@
+#!/bin/bash
+imgpath=$(cat ~/.fehbg | awk '{print $3}' | tail -c +3 | head -c -2) #Don't work with witespace
+#imgtarget=~/.config/misc/flock.png
+imgtarget=/tmp/canvas.png
+imgpaste=/tmp/paste.png
+command=imgstretch
+
+imgcreate() {
+    TSRX=0
+    TSRY=0
+    SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
+    for RES in $SR
+    do
+        SRX=$(echo $RES | cut -d'x' -f 1)                   # x pos
+        SRY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
+	TSRX+=$SRX
+	TSRY+=$SRY
+    done
+convert -size $TSRX'x'$TSRY xc:black $imgtarget 
+}
+
+imgfill() {
+echo te
+}
+
+imgmax() {
+echo te
+
+}
+imgcenter() {
+convert $imgpath -resize $SRX'x'$SRY $imgpaste # resize one of the two keep ratio no additional border
+echo te
+
+}
+imgstretch() {
+convert $imgpath -resize $SRX'x'$SRY! $imgpaste
+}
+
+imgtile() {
+echo te
+
+}
+
+#CODE
+    PX=0
+    PY=0
+    # lockscreen image info
+    R=$(file $imgpaste | grep -o '[0-9]* x [0-9]*')
+    RX=$(echo $R | cut -d' ' -f 1)
+    RY=$(echo $R | cut -d' ' -f 3)
+    imgcreate
+    SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
+    for RES in $SR
+    do
+        # monitor position/offset
+        SRX=$(echo $RES | cut -d'x' -f 1)                   # x pos
+        SRY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
+        SROX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
+        SROY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
+        PX=$(($SROX + $SRX/2 - $RX/2))
+        PY=$(($SROY + $SRY/2 - $RY/2))
+ 
+	$command
+        convert $imgtarget $imgpaste -geometry +$PX+$PY -composite -matte $imgtarget
+        echo "done"
+    done
+
+###LOGOPASTE###
+#    PX=0
+#    PY=0
+#    # lockscreen image info
+#    R=$(file $imgpaste | grep -o '[0-9]* x [0-9]*')
+#    RX=$(echo $R | cut -d' ' -f 1)
+#    RY=$(echo $R | cut -d' ' -f 3)
+#    imgcreate
+#    SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
+#    for RES in $SR
+#    do
+#        # monitor position/offset
+#        SRX=$(echo $RES | cut -d'x' -f 1)                   # x pos
+#        SRY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
+#        SROX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
+#        SROY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
+#        PX=$(($SROX + $SRX/2 - $RX/2))
+#        PY=$(($SROY + $SRY/2 - $RY/2))
+# 
+#        convert $imgtarget $imgpaste -geometry +$PX+$PY -composite -matte $imgtarget
+#        echo "done"
+#    done
+#convert $imgpath $imgtarget
+
+#
+#convert "$imgb" -resize 1366x768! "$imgbt"
+#montage $imgat $imgbt -mode Concatenate -tile x1 $imgc

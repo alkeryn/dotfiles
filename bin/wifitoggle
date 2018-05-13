@@ -1,0 +1,12 @@
+#!/bin/bash
+STATE=$(nmcli networking)
+if [ $STATE == "enabled" ]
+then
+echo disabling
+nmcli networking off
+echo disabled
+else
+echo enabling
+nmcli networking on
+echo enabled
+fi

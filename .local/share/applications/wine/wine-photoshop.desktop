@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Version=CC 14.0
+Name=Photoshop
+Comment=Photoshop
+Exec=~/.local/share/applications/Scripts/Photoshop.sh
+#Exec=env WINEPREFIX=/home/alkeryn/App/wine/Photoshop WINEARCH=win32 wine App/wine/Photoshop/drive_c/Program\ Files/Adobe/Adobe\ Photoshop\ CC\ 2015\ \(32\ Bit\)/Photoshop.exe
+ 

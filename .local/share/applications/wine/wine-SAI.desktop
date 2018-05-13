@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Version=1.2.5
+Name=Paint Tool Sai
+Comment=Paint Tool Sai
+Exec=env WINEPREFIX=/home/alkeryn/App/wine/PaintTooolSAI wine App/wine/PaintTooolSAI/drive_c/Program\ Files/PaintToolSAI/sai.exe

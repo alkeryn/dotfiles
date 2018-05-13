@@ -1,0 +1,40 @@
+#!/bin/bash
+[[ $EUID -ne 0 ]] && { echo You need to be root; exit 1;} #exit if more than 1 argument
+[[ ! -n $1 ]] && { echo Not enough argument; exit 1;} #exit if more than 1 argument
+[[ -n $2 ]] && { echo Too many arguments; exit 1;} #exit if more than 1 argument
+
+gpuBus="0000:01:00.0"
+audioBus="0000:01:00.1"
+
+gpuId="10de 1189"
+audioId="10de 0e0a"
+
+case $1 in
+	nvidia)
+		echo unbinding vfio
+			#echo unbind vfio
+			echo -n 0000:01:00.0 > /sys/bus/pci/drivers/vfio-pci/unbind 
+			echo -n 0000:01:00.1 > /sys/bus/pci/drivers/vfio-pci/unbind
+		echo vfio unbound
+		echo binding nvidia
+			#bind nvidia
+			echo -n $gpuBus > /sys/bus/pci/drivers/nvidia/bind
+			echo -n $audioBus > /sys/bus/pci/drivers/snd_hda_intel/bind
+			optirun /bin/true
+		echo nvidia bound
+	;;
+	vfio)
+		echo unbinding nvidia
+			#unbind nvidia
+			echo -n $gpuBus > /sys/bus/pci/drivers/nvidia/unbind 
+			echo -n $audioBus > /sys/bus/pci/drivers/snd_hda_intel/unbind
+		echo nvidia unbond
+	;;
+	*)
+		echo invalid argument
+	;;
+esac
+
+
+
+#bind vfio todo !?

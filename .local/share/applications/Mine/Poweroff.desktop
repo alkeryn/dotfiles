@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Poweroff
+Comment=Shutdown The system
+Icon=utilities-terminal
+Terminal=false
+Exec=pkill ckb && poweroff

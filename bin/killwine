@@ -1,0 +1,2 @@
+#!/bin/sh
+ps ax | egrep "*.exe|*exe]" | awk '{ print $1 }' | xargs kill

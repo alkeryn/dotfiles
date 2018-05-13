@@ -1,0 +1,6 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Entry Spec
+Type=Application
+Exec=xdg-open https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
+Icon=text-html

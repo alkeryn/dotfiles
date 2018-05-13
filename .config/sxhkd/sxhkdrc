@@ -1,0 +1,202 @@
+#
+# wm independent hotkeys
+#Unused -----------------------------------------------------
+#
+# Super + {q,w,z,o,F1-F12)
+#
+#----------------------------------------------
+# Exec ------------------------------------------------------------------
+
+# Screenshot
+super + {_,shift + } Print
+	 {gnome-screenshot -i,scrot}
+# Lock
+super + a
+	~/bin/blurlock
+# Suspend
+super + Pause
+	systemctl suspend && ~/bin/blurlock 
+
+# terminal emulator
+super + space
+	termite	
+# Music
+super + p
+	termite -e ncmpcpp
+
+# Rofi  
+super + {_,ctrl + }Return
+	rofi -show {drun -modi drun,run}
+# Rofi Show Windows
+super + Tab
+	rofi -show window
+
+#Ranger
+super + e
+	urxvt -e ranger
+# Sound  -------------------------------------------------------------------
+#MPC control 
+
+{XF86AudioStop,XF86AudioPrev,XF86AudioPlay,XF86AudioNext}
+	mpc {stop,prev,toggle,next}
+
+# Raises volume
+{XF86AudioRaiseVolume,XF86AudioLowerVolume}
+	pactl set-sink-volume @DEFAULT_SINK@ {+4,-4}%
+# Mutes
+XF86AudioMute + {_,super}
+	pactl {set-sink-mute @DEFAULT_SINK@ toggle,set-sink-volume @DEFAULT_SINK@ 100%}
+
+# Shortcut -------------------------------------------------------------------------------------------
+
+
+# make sxhkd reload its configuration files:
+super + Escape
+	pkill -USR1 -x sxhkd && ~/.config/bspwm/bspwmrc
+
+# Change keyboard layout
+super + {F1,F2,F3}
+	setxkbmap {fr, us, us -variant colemak}; xset r rate 250 75; xmodmap -e "keycode 66 = ISO_Level3_Shift" 
+
+# Bspwm hotkeys -------------------------------------------------------------------------------------
+
+
+# quit bspwm normally
+super + ctrl + alt + Escape
+	bspc quit
+
+# close and kill
+super + {_,shift + }x
+	bspc node -{c,k}
+
+# alternate between the tiled and monocle layout
+super + v
+	bspc desktop -l next
+
+# if the current node is automatic, send it to the last manual, otherwise pull the last leaf
+super + y
+	bspc query -N -n focused.automatic && bspc node -n last.!automatic || bspc node last.leaf -n focused
+# Rotate
+super + {_,alt +} r
+	bspc node -R {90,270}
+#Flip
+super + {h,u}
+	bspc node -F {vertical,horizontal}
+#Balance Tree
+super + {alt,ctrl} + b
+	bspc node @/ {-B,-E}
+
+# swap the current node and the biggest node
+super + g
+	bspc node -s biggest
+
+# State/flags ----------------------------------------------------------------------------------------
+
+# set the window state
+super + {s,d,f,t}
+	bspc node -t {tiled,floating,fullscreen,pseudo_tiled}
+
+# set the node flags
+super + ctrl + {w,x,c,v}
+	bspc node -g {locked,sticky,private,urgent}
+
+# Focus/swap -------------------------------------------------------------------------------------------
+
+# focus the node in the given direction
+super + {_,shift + }{j,k,i,l}
+	bspc node -{f,s} {west,south,north,east}
+
+# focus the node for the given path jump
+super + {b,n,colon,exclam}
+	bspc node -f @{parent,brother,first,second}
+
+#focus muliple
+super + q 
+	bspc node -f last 
+
+# focus the next/previous node in the current desktop
+super + {_,alt + }c
+	bspc node -f {next,prev}.local
+
+# focus/send to the next/previous desktop in the current monitor
+super + {_,shift +}{dead_circumflex,dollar}
+	bspc {desktop -f,node -d} {prev,next}.local
+
+# focus the last node/desktop
+# #TAB desktop
+alt + {twosuperior,Tab}
+	bspc {node,desktop} -f last
+
+# focus the older or newer node in the focus history
+super + {parenright,equal}
+	bspc wm -h off; \
+	bspc node {older,newer} -f; \
+	bspc wm -h on
+
+# focus or send to the given desktop
+super + {_,shift + }{ampersand,eacute,quotedbl,apostrophe,parenleft,minus,egrave,underscore,ccedilla,agrave}
+	bspc {desktop -f,node -d} '^{1-9,10}'
+# Layer ---------------------------------------------------------------------------------------------
+super + shift + {m,ugrave,asterisk}
+	bspc node -l {below,normal,above}
+# Preselect -----------------------------------------------------------------------------------------
+
+# preselect the direction
+super + ctrl + {j,k,i,l}
+	bspc node -p {west,south,north,east}
+
+# preselect the ratio
+super + ctrl + {ampersand,eacute,quotedbl,apostrophe,parenleft,minus,egrave,underscore,ccedilla}
+	bspc node -o 0.{1-9}
+
+# cancel the preselection for the focused node
+super + ctrl + space
+	bspc node -p cancel
+
+# cancel the preselection for the focused desktop
+super + ctrl + shift + space
+	bspc query -N -d | xargs -I id -n 1 bspc node id -p cancel
+
+
+# Move/resize ---------------------------------------------------------------------------------------
+
+
+# expand a window by moving one of its side outward
+super + alt + {j,k,i,l}
+	bspc node -z {left -20 0,bottom 0 20,top 0 -20,right 20 0}
+
+# contract a window by moving one of its side inward
+super + alt + ctrl + {j,k,i,l}
+	bspc node -z {right -20 0,top 0 20,bottom 0 -20,left 20 0}
+
+# move a floating window
+super + {Left,Down,Up,Right}
+	bspc node -v {-20 0,0 20,0 -20,20 0}
+
+# Resize all 
+super + {Next,Prior}
+	bspc config -d focused window_gap $((`bspc config -d focused window_gap` {+,-} 5 ))
+
+super + {_,shift + } BackSpace
+	bspc config -d focused window_gap {8,0}
+
+#Misc ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#Transplant
+super + shift + t
+	bspc node -n @/
+#super + alt + {j,k,i,l}
+#	bspc node -n {west,south,north,east}
+#Sounds
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+super + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End}
+	paplay ~/Cloud/Mega/zPC/Sounds/{NeinNein,miaou,Popopo,YES,Issou,Jeff,PickleRick,AH,Nils}.wav & 
+
+super + shift + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End,KP_Insert}
+	paplay ~/Cloud/Mega/zPC/Sounds/{RickRoll,Lol,Jurassic,Interject,Fuck,FuckedUp,Cena,ShootingStars,Souffrir,Colere}.wav &
+
+super + alt + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End,KP_Insert}
+	paplay ~/Cloud/Mega/zPC/Sounds/{DAMN,Malou,Weee}.wav &
+
+super + KP_Insert
+	pkill paplay &

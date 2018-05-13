@@ -1,0 +1,159 @@
+urxvt.termName: rxvt-unicode-256color
+
+urxvt.foreground: #ff0000
+urxvt.background: [70]#000000
+urxvt.depth: 32
+
+urxvt.scrollBar: false
+URxvt*borderLess: false
+URxvt.cursorBlink: true
+!URxvt.fading: 0
+
+urxvt.font: xft:DejaVu Sans Mono:size=11
+    xft:unifont:medium
+urxvt.boldfont: xft:DejaVu Sans Mono:bold:size=11
+URxvt.letterSpace: 0
+
+urxvt.saveLines: 12000
+
+urxvt.pointerColorBackground: [70]#000000
+urxvt.pointerColorForeground: [70]#ff0000
+
+urxvt.scrollstyle: rxvt
+
+*color0: #073642
+*color1: #dc322f
+*color2: #859900
+*color3: #b58900
+*color4: #268bd2
+*color5: #d33682
+*color6: #2aa198
+*color7: #eee8d5
+*color8: #002b36
+*color9: #cb4b16
+*color10: #586e75
+*color11: #657b83
+*color12: #839496
+*color13: #6c71c4
+*color14: #93a1a1
+*color15: #fdf6e3
+
+urxvt.colorBD: #ff0000
+
+!URxvt.cursorUnderline: false
+!URxvt*hold: boolean
+!URxvt.intensityStyles: false
+!URxvt.perl-ext-common: default,matcher,clipboard,keyboard-select,selection_to_clipboard
+URxvt.perl-ext-common: default,matcher,clipboard,keyboard-select
+URxvt*urgentOnBell: false
+
+! URLs
+!
+
+URxvt.matcher.rend.0: Uline Bold fg6
+URxvt.keysym.Control-l: perl:matcher:last
+URxvt.keysym.Control-u: perl:matcher:list
+
+!
+! Clickable URLs
+!
+
+URxvt.url-launcher: chromium
+URxvt.matcher.button: 1
+
+!
+! Paste
+!
+
+URxvt.keysym.Shift-Control-V: perl:clipboard:paste
+!URxvt.iso14755: False
+
+!
+! Fonts
+!
+
+
+!
+! Select text with the keyboard
+!
+
+URxvt.keysym.M-Escape: perl:keyboard-select:activate
+
+!
+! Search text with keyboard
+!
+
+URxvt.keysym.M-s: perl:keyboard-select:search
+
+!
+! Fix for Home and End keys
+!
+
+URxvt.keysym.Home: \033[1~
+URxvt.keysym.End: \033[4~
+URxvt.keysym.KP_Home: \033[1~
+URxvt.keysym.KP_End:  \033[4~
+
+!
+! Cursor theme
+!
+
+Xcursor.theme: Vanilla-DMZ
+
+
+!
+! Rofi
+!
+
+!rofi.color-enabled: true
+!rofi.color-window: #002b36, #255662, #0d4350
+!rofi.color-normal: #002b36, #839496, #002b36, #0d4350, #839496
+!rofi.color-active: #0d4350, #2aa198, #002b36, #839496, #002B36
+!rofi.color-urgent: #a83838, #ffffff, #eee8d5, #a83838, #ffffff
+!rofi.monitor: 0
+!rofi.font: xos4Terminus
+
+!
+! Colors
+!
+
+!#define S_yellow		#b58900
+!#define S_orange		#cb4b16
+!#define S_red			#dc322f
+!#define S_magenta		#d33682
+!#define S_violet		#6c71c4
+!#define S_blue			#268bd2
+!#define S_cyan			#2aa198
+!#define S_green			#859900
+!
+!#define S_base03		#002b36
+!#define S_base02		#0d4350
+!#define S_base01		#586e75
+!#define S_base00		#657b83
+!#define S_base0			#839496
+!#define S_base1			#93a1a1
+!#define S_base2			#839496
+!#define S_base3			#fdf6e3
+!
+!*fading:		0
+!*fadeColor:		S_base03
+!URxvt.cursorColor:	S_base1
+!*pointerColorBackground:S_base01
+!*pointerColorForeground:S_base1
+!
+!URxvt.color0:		S_base02
+!URxvt.color1:		S_red
+!URxvt.color2:		S_green
+!URxvt.color3:		S_yellow
+!URxvt.color4:		S_blue
+!URxvt.color5:		S_magenta
+!URxvt.color6:		S_cyan
+!URxvt.color7:		S_base2
+!URxvt.color9:		S_orange
+!URxvt.color8:		S_base03
+!URxvt.color10:		S_base01
+!URxvt.color11:		S_base00
+!URxvt.color12:		S_base0
+!URxvt.color13:		S_violet
+!URxvt.color14:		S_base1
+!URxvt.color15:		S_base3

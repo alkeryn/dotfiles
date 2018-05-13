@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=LookingGlass
+Comment=LookingGlass Cient
+Exec=looking-glass-client -s

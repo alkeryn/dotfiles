@@ -1,0 +1,52 @@
+#!/bin/bash
+#[[ $EUID -ne 0 ]] && { echo You need to be root; exit 1;} #exit if more than 1 argument
+[[ -n $2 ]] && { echo Too many arguments; exit 1;} #exit if more than 1 argument
+vmstop ()
+{
+		optirun /bin/true #rebind the gpu and stop the fans
+		echo VM Stoped
+}
+vmrun ()
+{
+	virsh -q start $1 
+	while $(virsh -q list | grep -q Windows) 
+		do
+			sleep 3
+		done
+		vmstop
+}
+run () {
+case $1 in
+	'')
+		vmrun Windows10 
+		;;
+	"audio")
+		vmrun Windows10Audio
+		pulseaudio -k; sleep 2; pulseaudio --start # Restart pulse to grab onboard audio again
+		;;
+	"off")
+		$(virsh -q list | grep -q Windows10) && { virsh -q shutdown Windows10; echo Shuting down VM;S=1;}
+		$(virsh -q list | grep -q Windows10Audio) && { virsh -q shutdown Windows10Audio;echo Shuting down VM;S=1;}
+		[[ $S -ne 1 ]] && { echo No VM running; return 1;}
+		while $(virsh -q list | grep -q Windows) #In case the vm haven't been launched from the script
+			do
+				sleep 3
+			done
+			vmstop
+		;;
+	'-h')
+	echo
+	echo ' winvm		--  start the vm'
+	echo ' winvm audio 	--  start the vm and passthrough audio card'
+	echo ' winvm stop 	--  shutdown the vm'
+	echo ' winvm -h 	--  show this help'
+	echo
+	;;
+	*)
+		echo Invalid argument
+		echo $1
+	;;
+esac
+}
+run $1
+#TODO : Not being able to launch multiple times use pgrep

@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Version=12.5.1.5
+Name=FLStudio
+Comment=FLStudio
+GenericName=DAW
+Exec=env WINEPREFIX=/home/alkeryn/App/wine/FLStudio wine /home/alkeryn/App/wine/FLStudio/drive_c/Program\ Files\ \(x86\)/Image-Line/FL\ Studio\ 12/FL64.exe
