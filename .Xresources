@@ -1,6 +1,6 @@
 urxvt.termName: rxvt-unicode-256color
 
-urxvt.foreground: #ff0000
+urxvt.foreground: #ffffff
 urxvt.background: [70]#000000
 urxvt.depth: 32
 
@@ -9,9 +9,9 @@ URxvt*borderLess: false
 URxvt.cursorBlink: true
 !URxvt.fading: 0
 
-urxvt.font: xft:DejaVu Sans Mono:size=11
+urxvt.font: xft:hack:size=9
     xft:unifont:medium
-urxvt.boldfont: xft:DejaVu Sans Mono:bold:size=11
+urxvt.boldfont: xft:hack:bold:size=9
 URxvt.letterSpace: 0
 
 urxvt.saveLines: 12000
