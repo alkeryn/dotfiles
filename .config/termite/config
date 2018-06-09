@@ -10,10 +10,10 @@ audible_bell     = false
 mouse_autohide   = true
 
 [colors]
-#foreground = #ff0000
-foreground = #f7f7f7
+foreground = #00ffff
+#foreground = #f7f7f7
 foreground_bold = #FF00B6
-background = rgba(0, 0, 0, 0.7)
+background = rgba(0, 0, 0, 0.60)
 cursor = #93a1a1
 
 
