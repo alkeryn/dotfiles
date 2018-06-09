@@ -55,40 +55,37 @@ case $PC in
 		bspc rule -a looking-glass-client desktop=8 follow=on
 		;;
 	laptop)
-		xrdb -merge <(echo "Xft.dpi: 180")
-		xrdb -merge <(echo "rofi.font: sans-serif bold 30")
-
-# If docked
-if [ `xrandr | grep -c "^DP1 connected"` -gt 0 ] 
-then
-bspc monitor eDP1  -d 1 2 3 4
-bspc monitor DP1   -d 5 6 7 8 9 10
-bspc rule -a Chromium desktop=5 follow=on
-bspc rule -a discord desktop='^1'
-bspc rule -a qBittorrent desktop='2' follow=on
-bspc rule -a skypeforlinux desktop='3'
-bspc rule -a Lxappearance state=floating follow=on
-bspc rule -a Pavucontrol state=floating follow=on
-bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
-bspc rule -a Screenkey manage=off
-bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
-bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
-bspc rule -a vscode-color-ui state=floating follow=on
-~/bin/dock
-else
-bspc monitor eDP1  -d 1 2 3 4 5 6 7 8 9 10
-bspc rule -a Chromium desktop=1 follow=on
-bspc rule -a discord desktop='^10'
-bspc rule -a qBittorrent desktop='9' follow=on
-bspc rule -a skypeforlinux desktop='10'
-bspc rule -a Lxappearance state=floating follow=on
-bspc rule -a Pavucontrol state=floating follow=on
-bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
-bspc rule -a Screenkey manage=off
-bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
-bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
-bspc rule -a vscode-color-ui state=floating follow=on
-xrdb ~/.Xresources &
-fi
+		# If docked
+		if [ `xrandr | grep -c "^DP1 connected"` -gt 0 ] 
+		then
+			bspc monitor eDP1  -d 1 2 3 4
+			bspc monitor DP1   -d 5 6 7 8 9 10
+			bspc rule -a Chromium desktop=5 follow=on
+			bspc rule -a discord desktop='^1'
+			bspc rule -a qBittorrent desktop='2' follow=on
+			bspc rule -a skypeforlinux desktop='3'
+			bspc rule -a Lxappearance state=floating follow=on
+			bspc rule -a Pavucontrol state=floating follow=on
+			bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
+			bspc rule -a Screenkey manage=off
+			bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
+			bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
+			bspc rule -a vscode-color-ui state=floating follow=on
+			~/bin/dock
+		else
+			bspc monitor eDP1  -d 1 2 3 4 5 6 7 8 9 10
+			bspc rule -a Chromium desktop=1 follow=on
+			bspc rule -a discord desktop='^10'
+			bspc rule -a qBittorrent desktop='9' follow=on
+			bspc rule -a skypeforlinux desktop='10'
+			bspc rule -a Lxappearance state=floating follow=on
+			bspc rule -a Pavucontrol state=floating follow=on
+			bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
+			bspc rule -a Screenkey manage=off
+			bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
+			bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
+			bspc rule -a vscode-color-ui state=floating follow=on
+			xrdb ~/.Xresources &
+		fi
 		;;
 esac
