@@ -6,7 +6,7 @@
 ;   The README contains alot of information	     |
 ;						     |
 ;=====================================================
-[bar/bar]
+[bar/mainpc]
 #bottom = false
 
 tray-transparent = true 

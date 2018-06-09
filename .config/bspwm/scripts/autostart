@@ -1,0 +1,23 @@
+#!/bin/bash
+# System ~~~~~~~~~~~~~~~~~~~~~~~~~
+$mainpc && ckb-next --background &
+$mainpc && i3lock -i ~/.config/misc/flock.png &
+setxkbmap fr
+numlockx on 
+sxhkd &
+compton -b &
+
+xsetroot -cursor_name left_ptr &
+xset s off -dpms &
+xset r rate 250 75 &
+#$mainpc && nvidia-settings --load-config-only --assign="SyncToVBlank=0" & #Unlimited Framerate
+xrdb ~/.Xresources
+#Others ---------------------
+$mainpc && conky -q &
+nm-applet &
+mpd &
+# APPS ~~~~~~~~~~~~~~~~~
+megasync &
+$mainpc && discord-canary &
+$mainpc && optirun true &
+#~$mainpc && /bin/Software/mpd_discord_richpresence &

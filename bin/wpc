@@ -1,0 +1,12 @@
+#!/bin/bash
+export mainpc=false
+export laptop=false
+export PC
+grep -q Alkeryn-PC /etc/hostname && { mainpc=true;PC=mainpc; }
+grep -q Blade /etc/hostname && { laptop=true;PC=laptop; }
+
+[[ -z "$PC" ]] && { mainpc=true;PC=mainpc; }
+
+#echo PC : $PC
+#echo laptop : $laptop
+#echo mainpc : $mainpc

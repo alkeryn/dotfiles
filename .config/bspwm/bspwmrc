@@ -1,20 +1,25 @@
 #!/bin/sh
+source ~/bin/wpc # To use $mainpc and $laptop
 # Exec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if [[ $(pgrep -c sxhkd) -eq 0 ]]
 then
-~/.config/bspwm/autostart &
+	~/.config/bspwm/scripts/autostart &
 fi
 ~/.fehbg &
 ~/.config/polybar/launch.sh &
-~/.config/bspwm/redo
+~/.config/bspwm/scripts/redo
 # End Exec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bspc rule -r $(bspc rule -l)
-
-bspc monitor HDMI1  -d 1 2 3 4
-bspc monitor HDMI2  -d 5 6 7 8 9 10
-
-bspc config border_width         1
-bspc config window_gap           8
+case $PC in
+	mainpc)
+		bspc monitor HDMI1  -d 1 2 3 4
+		bspc monitor HDMI2  -d 5 6 7 8 9 10
+		bspc config border_width         1
+		bspc config window_gap           8
+		;;
+	laptop)
+		;;
+esac
 
 bspc config normal_border_color "#500000"
 bspc config active_border_color "#600000"
@@ -31,16 +36,22 @@ bspc config single_monocle 	true
 bspc config ignore_ewmh_focus	true
 bspc config directional_focus_tightness low
 
-bspc rule -a Chromium desktop=5 follow=on
-bspc rule -a discord desktop='^1'
-bspc rule -a qBittorrent desktop='2' follow=on
-bspc rule -a skypeforlinux desktop='1'
-bspc rule -a Lxappearance state=floating follow=on
-bspc rule -a Pavucontrol state=floating follow=on
-bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
-bspc rule -a Screenkey manage=off
-bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
-bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
-bspc rule -a vscode-color-ui state=floating follow=on
-bspc rule -a Virt-manager desktop=3 follow=on
-bspc rule -a looking-glass-client desktop=8 follow=on
+case $PC in
+	mainpc)
+		bspc rule -a Chromium desktop=5 follow=on
+		bspc rule -a discord desktop='^1'
+		bspc rule -a qBittorrent desktop='2' follow=on
+		bspc rule -a skypeforlinux desktop='1'
+		bspc rule -a Lxappearance state=floating follow=on
+		bspc rule -a Pavucontrol state=floating follow=on
+		bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
+		bspc rule -a Screenkey manage=off
+		bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
+		bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
+		bspc rule -a vscode-color-ui state=floating follow=on
+		bspc rule -a Virt-manager desktop=3 follow=on
+		bspc rule -a looking-glass-client desktop=8 follow=on
+		;;
+	laptop)
+		;;
+esac
