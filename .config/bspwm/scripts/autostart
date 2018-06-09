@@ -4,7 +4,8 @@ $mainpc && ckb-next --background &
 $mainpc && i3lock -i ~/.config/misc/flock.png &
 setxkbmap fr
 numlockx on 
-sxhkd &
+$mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
+$laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &
 compton -b &
 
 xsetroot -cursor_name left_ptr &
