@@ -1,6 +1,6 @@
 urxvt.termName: rxvt-unicode-256color
 
-urxvt.foreground: #ffffff
+urxvt.foreground: #00ffff
 urxvt.background: [70]#000000
 urxvt.depth: 32
 
