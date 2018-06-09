@@ -1,7 +1,8 @@
 [Desktop Entry]
 Type=Application
+Version=1.0
 Name=Poweroff
-Comment=Shutdown The system
+GenericName=Shutdown the computer
+Comment=Shutdown
 Icon=utilities-terminal
-Terminal=false
-Exec=pkill ckb && poweroff
+Exec=termite -e /home/alkeryn/bin/poweroff
