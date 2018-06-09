@@ -1,19 +1,22 @@
 #!/bin/bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
 $mainpc && ckb-next --background &
-$mainpc && i3lock -i ~/.config/misc/flock.png &
+i3lock -i ~/.config/misc/flock.png &
 setxkbmap fr
-numlockx on 
+numlockx on
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
 $laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &
 compton -b &
 
 xsetroot -cursor_name left_ptr &
 xset s off -dpms &
+$laptop && xss-lock -q ~/bin/lock &
 xset r rate 250 75 &
 #$mainpc && nvidia-settings --load-config-only --assign="SyncToVBlank=0" & #Unlimited Framerate
+$laptop && setxkbmap -option "lv3:caps_switch" &
 xrdb ~/.Xresources
 #Others ---------------------
+$laptop && unclutter --timeout 3 -b &
 $mainpc && conky -q &
 nm-applet &
 mpd &
@@ -21,4 +24,5 @@ mpd &
 megasync &
 $mainpc && discord-canary &
 $mainpc && optirun true &
-#~$mainpc && /bin/Software/mpd_discord_richpresence &
+$laptop && `sleep 3; ~/.config/bspwm/redo` &
+#$mainpc && /bin/Software/mpd_discord_richpresence &

@@ -1,0 +1,3 @@
+# Suspend
+super + Pause
+	systemctl suspend && ~/bin/blurlock 

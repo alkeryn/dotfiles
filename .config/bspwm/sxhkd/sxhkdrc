@@ -12,11 +12,7 @@ super + {_,shift + } Print
 	 {gnome-screenshot -i,scrot}
 # Lock
 super + a
-	~/bin/blurlock
-# Suspend
-super + Pause
-	systemctl suspend && ~/bin/blurlock 
-
+	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
 # terminal emulator
 super + space
 	termite	
@@ -46,9 +42,16 @@ super + e
 # Mutes
 XF86AudioMute + {_,super}
 	pactl {set-sink-mute @DEFAULT_SINK@ toggle,set-sink-volume @DEFAULT_SINK@ 100%}
-
+#Backlight ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{XF86MonBrightnessDown,XF86MonBrightnessUp}
+	{xbacklight -10,xbacklight +10}
+super + Insert
+	xbacklight -get
 # Shortcut -------------------------------------------------------------------------------------------
 
+#wifi toggle
+super + F12
+	~/bin/wifitoggle
 
 # make sxhkd reload its configuration files:
 super + Escape
@@ -171,14 +174,14 @@ super + alt + ctrl + {j,k,i,l}
 
 # move a floating window
 super + {Left,Down,Up,Right}
-	bspc node -v {-20 0,0 20,0 -20,20 0}
+	$mainpc && X=20;$laptop && X=40;bspc node -v {-$X 0,0 $X,0 -$X,$X 0}
 
 # Resize all 
 super + {Next,Prior}
 	bspc config -d focused window_gap $((`bspc config -d focused window_gap` {+,-} 5 ))
 
 super + {_,shift + } BackSpace
-	bspc config -d focused window_gap {8,0}
+	$mainpc && X=8;$laptop && X=12;bspc config -d focused window_gap {$X,0}
 
 #Misc ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #Transplant

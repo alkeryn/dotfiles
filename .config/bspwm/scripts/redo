@@ -1,9 +1,10 @@
 #!/bin/bash
 setxkbmap fr
+$laptop && setxkbmap -option "lv3:caps_switch" &
 numlockx on 
 xsetroot -cursor_name left_ptr &
 xset s off -dpms &
 xset r rate 250 75 &
-xmodmap -e "keycode 66 = ISO_Level3_Shift"
+$mainpc && xmodmap -e "keycode 66 = ISO_Level3_Shift"
 #$mainpc && optirun nvidia-settings --load-config-only --assign="SyncToVBlank=1" & #Unlimited Framerate
 xrdb ~/.Xresources
