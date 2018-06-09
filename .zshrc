@@ -26,6 +26,8 @@ alias winetricks='sh winetricks'
 alias speedtest='speedtest --bytes'
 alias gpg='gpg --keyserver pgp.mit.edu'
 alias rangimg='while true; do pkill w3mimgdisplay; sleep 5;done'
+alias screen="screen -q"
+alias diff="diff --color=always"
 alias restartpulse='pulseaudio -k && sleep 2 && pulseaudio --start; optirun true &'
 alias gpuswitch='sudo gpuswitch'
 alias kbedit='vim ~/bin/Software/qmk_firmware/keyboards/planck/keymaps/alkeryn/'
