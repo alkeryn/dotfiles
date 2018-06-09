@@ -8,3 +8,5 @@ xset r rate 250 75 &
 $mainpc && xmodmap -e "keycode 66 = ISO_Level3_Shift"
 #$mainpc && optirun nvidia-settings --load-config-only --assign="SyncToVBlank=1" & #Unlimited Framerate
 xrdb ~/.Xresources
+$laptop && xrdb -merge <(echo "Xft.dpi: 180")
+$laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")

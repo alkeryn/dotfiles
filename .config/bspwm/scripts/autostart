@@ -1,5 +1,9 @@
 #!/bin/bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
+xrdb ~/.Xresources
+
+$laptop && xrdb -merge <(echo "Xft.dpi: 180")
+$laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")
 $mainpc && ckb-next --background &
 $mainpc && i3lock -i ~/.config/misc/flock.png &
 $laptop && i3lock -i ~/.config/misc/flocklap.png &
@@ -15,9 +19,6 @@ $laptop && xss-lock -q ~/bin/lock &
 xset r rate 250 75 &
 #$mainpc && nvidia-settings --load-config-only --assign="SyncToVBlank=0" & #Unlimited Framerate
 $laptop && setxkbmap -option "lv3:caps_switch" &
-xrdb ~/.Xresources
-$laptop && xrdb -merge <(echo "Xft.dpi: 180")
-$laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")
 #Others ---------------------
 $laptop && unclutter --timeout 3 -b &
 $mainpc && conky -q &
