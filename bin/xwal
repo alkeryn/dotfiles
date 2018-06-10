@@ -1,8 +1,21 @@
 #!/bin/bash
 # use mplayer instead of mpv
 # use gifview or a better program for gifs you can resize gifs using gifsicle
-xwinwrap -fs -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config -wid WID "$1"
 
+mpv(){
+    # placement x/y
+    SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
+    for RES in $SR
+    do
+        # monitor position/offset
+        X=$(echo $RES | cut -d'x' -f 1)                   # x pos
+        Y=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
+        OX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
+        OY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
+xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$1" &
+    done
+}
+mpv $1
 #xwinwrap -g 1000x1000+1100+400 -sh circle -ov -- /usr/lib/xscreensaver/cityflow -window-id WID
 #xwinwrap -fs -ov -ni -nf -- "$1"
 #xwinwrap -fs -ov -ni -nf -- "/usr/lib/xqcreensaver/$1"
