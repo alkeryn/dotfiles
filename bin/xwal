@@ -1,0 +1,9 @@
+#!/bin/bash
+# use mplayer instead of mpv
+# use gifview or a better program for gifs you can resize gifs using gifsicle
+xwinwrap -fs -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config -wid WID "$1"
+
+#xwinwrap -g 1000x1000+1100+400 -sh circle -ov -- /usr/lib/xscreensaver/cityflow -window-id WID
+#xwinwrap -fs -ov -ni -nf -- "$1"
+#xwinwrap -fs -ov -ni -nf -- "/usr/lib/xqcreensaver/$1"
+#/usr/lib/xscreensaver/cityflow -window-id WID -wave-speed 15
