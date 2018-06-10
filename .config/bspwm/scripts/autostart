@@ -29,5 +29,4 @@ mpd &
 megasync &
 $mainpc && discord-canary &
 $mainpc && optirun true &
-$laptop && `sleep 3; ~/.config/bspwm/redo` &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
