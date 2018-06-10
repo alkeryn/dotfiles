@@ -1,2 +1,5 @@
 #!/bin/sh
-bspc config external_rules_command "/home/alkeryn/.config/misc/getname"
+#Get classname of a windows
+NAME=`xprop | grep "^WM_CLASS"`
+echo $NAME
+echo $NAME | awk '{print "Name: " $4}'
