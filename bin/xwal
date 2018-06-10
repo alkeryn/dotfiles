@@ -1,22 +1,47 @@
 #!/bin/bash
 # use mplayer instead of mpv
 # use gifview or a better program for gifs you can resize gifs using gifsicle
-
-mpv(){
-    # placement x/y
-    SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
-    for RES in $SR
-    do
-        # monitor position/offset
-        X=$(echo $RES | cut -d'x' -f 1)                   # x pos
-        Y=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
-        OX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
-        OY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
-xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$1" &
-    done
+#declare X Y OX OY
+pkill xwinwrap
+eachscreen(){
+	# placement x/y
+	local command=$1
+	shift
+	SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
+	for RES in $SR
+	do
+		# monitor position/offset
+		X=$(echo $RES | cut -d'x' -f 1)                   # x pos
+		Y=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
+		OX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
+		OY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
+		$command $@ 
+	done
 }
-mpv $1
+mpv(){
+	local path=$1
+	shift
+	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$path" "$@"  &
+}
+xscreensaver(){
+	local path=$1
+	shift
+	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- /usr/lib/xscreensaver/"$path" -window-id WID "$@" &
+}
+wrapper(){
+	local path=$1
+	shift
+	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" -window-id WID "$@" &
+}
+
+#arg1=$1 # wip add getopt
+#case $arg1 in
+#esac
+path=$1
+shift
+eachscreen
+xscreensaver $path $@ 
+
+#mpv $1
 #xwinwrap -g 1000x1000+1100+400 -sh circle -ov -- /usr/lib/xscreensaver/cityflow -window-id WID
-#xwinwrap -fs -ov -ni -nf -- "$1"
-#xwinwrap -fs -ov -ni -nf -- "/usr/lib/xqcreensaver/$1"
 #/usr/lib/xscreensaver/cityflow -window-id WID -wave-speed 15
