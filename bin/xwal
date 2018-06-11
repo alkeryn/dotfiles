@@ -2,6 +2,7 @@
 # use mplayer instead of mpv
 # use gifview or a better program for gifs you can resize gifs using gifsicle
 #declare X Y OX OY
+main(){
 pkill xwinwrap
 eachscreen(){
 	# placement x/y
@@ -23,25 +24,40 @@ mpv(){
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$path" "$@"  &
 }
+gif(){
+	local path=$1
+	shift
+		xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- gifview -a -w WID "$path" "$@"  &
+}
 xscreensaver(){
 	local path=$1
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- /usr/lib/xscreensaver/"$path" -window-id WID "$@" &
 }
-wrapper(){
+xwrapper(){
 	local path=$1
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" -window-id WID "$@" &
+}
+wrapper(){
+	local path=$1
+	shift
+	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" "$@" &
 }
 
 #arg1=$1 # wip add getopt
 #case $arg1 in
 #esac
-path=$1
-shift
+prgm=$1
+path=$2
+shift 2
+R=$(file "$path" | grep -o '[0-9]* x [0-9]*')
+RX=$(echo $R | cut -d' ' -f 1)
+RY=$(echo $R | cut -d' ' -f 3)
 eachscreen
-xscreensaver $path $@ 
-
+$prgm $path $@
+}
+main $@ &>/dev/null
 #mpv $1
 #xwinwrap -g 1000x1000+1100+400 -sh circle -ov -- /usr/lib/xscreensaver/cityflow -window-id WID
 #/usr/lib/xscreensaver/cityflow -window-id WID -wave-speed 15

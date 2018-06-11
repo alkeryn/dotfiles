@@ -1,7 +1,7 @@
 #!/bin/bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
 $mainpc && ckb-next --background &
-$mainpc && i3lock -i ~/.config/misc/flock.png &
+$mainpc && i3lock -n -i ~/.config/misc/flock.png && ./.wall &
 $laptop && i3lock -i ~/.config/misc/flocklap.png &
 setxkbmap fr
 numlockx on

@@ -46,9 +46,9 @@
 
 !.config/polybar
 
-!.config/qBittorrent
-.config/qBittorrent/*
-!.config/qBittorrent/qBittorrent.conf
+#!.config/qBittorrent
+#.config/qBittorrent/*
+#!.config/qBittorrent/qBittorrent.conf
 
 !.config/ranger
 .config/ranger/history
