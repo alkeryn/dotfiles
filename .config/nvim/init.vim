@@ -14,7 +14,7 @@ set smartcase
 set mouse=ni
 
 set autoindent                " always set autoindenting on
-set copyindent                " copy Indentation 
+set copyindent                " copy Indentation
 set autoread
 nnoremap Q <nop> "Disable annoying EX mode
 
@@ -51,12 +51,13 @@ Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
 Plug 'luochen1990/rainbow' "rainbow highlight brackets
 Plug 'neomake/neomake' "do full syntax checking for most languages
 "Tools
-Plug 'KabbAmine/vCoolor.vim'
-Plug 'lilydjwg/colorizer'
+Plug 'KabbAmine/vCoolor.vim' " color picker
+Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
 Plug 'mhinz/vim-startify' "A nice start menu
-Plug 'tpope/vim-surround' 
-Plug 'tpope/vim-repeat'
+Plug 'tpope/vim-surround' "Sourounding
+Plug 'tpope/vim-repeat' "repat last command from plugin
+Plug 'tpope/vim-commentary' "Comment shortcut
 
 "Themes
 Plug 'chriskempson/base16-vim'
