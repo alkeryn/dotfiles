@@ -26,42 +26,51 @@ set binary
 set expandtab
 
 syntax enable
-colorscheme elflord 
+colorscheme elflord
 call plug#begin('~/.vim/plugged')
-Plug 'scrooloose/nerdtree'
-Plug 'vim-airline/vim-airline'
+
+"Auto complete
 
 Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
 Plug 'zchee/deoplete-clang'
-Plug 'Shougo/neoinclude.vim' "also check completion in includes
-
 Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'zchee/deoplete-zsh'
+
+Plug 'Shougo/neoinclude.vim' "also check completion in includes
+Plug 'kovetskiy/sxhkd-vim'
+Plug 'Valloric/YouCompleteMe'
+
 
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 
-Plug 'ervandew/supertab'
-Plug 'SirVer/ultisnips'
-Plug 'honza/vim-snippets'
-Plug 'kovetskiy/sxhkd-vim'
-Plug 'vim-airline/vim-airline-themes'
-Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
-"Looks
-Plug 'luochen1990/rainbow' "rainbow highlight brackets
-Plug 'neomake/neomake' "do full syntax checking for most languages
 "Tools
-Plug 'KabbAmine/vCoolor.vim' " color picker
+Plug 'ervandew/supertab'
+Plug 'scrooloose/nerdtree'
 Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
-Plug 'mhinz/vim-startify' "A nice start menu
 Plug 'tpope/vim-surround' "Sourounding
 Plug 'tpope/vim-repeat' "repat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
 
+Plug 'KabbAmine/vCoolor.vim' " color picker
+
+Plug 'SirVer/ultisnips'
+Plug 'honza/vim-snippets'
+
+"Looks
+Plug 'luochen1990/rainbow' "rainbow highlight brackets
+Plug 'neomake/neomake' "do full syntax checking for most languages
+Plug 'vim-airline/vim-airline'
+Plug 'vim-airline/vim-airline-themes'
+
 "Themes
 Plug 'chriskempson/base16-vim'
 Plug 'kaicataldo/material.vim'
+
+"Fancy
+Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
+Plug 'mhinz/vim-startify' "A nice start menu
 
 Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
 call plug#end()
