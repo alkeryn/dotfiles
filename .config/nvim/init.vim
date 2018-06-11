@@ -45,11 +45,15 @@ Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 "Tools
 Plug 'ervandew/supertab'
 Plug 'scrooloose/nerdtree'
+Plug 'junegunn/fzf.vim'
 Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
 Plug 'tpope/vim-surround' "Sourounding
 Plug 'tpope/vim-repeat' "repat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
+
+Plug 'iago-lito/vim-visualMarks'
+" Plug 'terryma/vim-multiple-cursors' "Comment shortcut
 
 Plug 'KabbAmine/vCoolor.vim' " color picker
 
@@ -90,6 +94,19 @@ let g:NERDTreeDirArrowCollapsible = '▾'
 let g:seiya_auto_enable=1
 " Default value: ['ctermbg']
 let g:seiya_target_groups = has('nvim') ? ['guibg'] : ['ctermbg']
+
+
+let g:multi_cursor_use_default_mapping=0
+
+" Default mapping
+" let g:multi_cursor_start_word_key      = '<C-b>'
+" let g:multi_cursor_select_all_word_key = '<A-n>'
+" let g:multi_cursor_start_key           = 'g<C-n>'
+" let g:multi_cursor_select_all_key      = 'g<A-n>'
+" let g:multi_cursor_next_key            = '<C-b>'
+" let g:multi_cursor_prev_key            = '<C-p>'
+" let g:multi_cursor_skip_key            = '<C-x>'
+" let g:multi_cursor_quit_key            = '<Esc>'
 
 nmap <C-_> :noh<CR>
 nmap <C-ç> :set hlsearch!<CR>
