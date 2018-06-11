@@ -26,9 +26,7 @@ set binary
 set expandtab
 
 syntax enable
-colorscheme elflord
 call plug#begin('~/.vim/plugged')
-
 "Auto complete
 
 Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
@@ -38,7 +36,7 @@ Plug 'zchee/deoplete-zsh'
 
 Plug 'Shougo/neoinclude.vim' "also check completion in includes
 Plug 'kovetskiy/sxhkd-vim'
-Plug 'Valloric/YouCompleteMe'
+"Plug 'Valloric/YouCompleteMe'
 
 
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
@@ -63,17 +61,23 @@ Plug 'luochen1990/rainbow' "rainbow highlight brackets
 Plug 'neomake/neomake' "do full syntax checking for most languages
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
+Plug 'miyakogi/seiya.vim' "background transparent again
 
 "Themes
 Plug 'chriskempson/base16-vim'
 Plug 'kaicataldo/material.vim'
+Plug 'phanviet/vim-monokai-pro'
 
 "Fancy
 Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
 Plug 'mhinz/vim-startify' "A nice start menu
+Plug 'vim-scripts/Color-Scheme-Explorer'
 
-Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
+"Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
 call plug#end()
+
+colorscheme monokai_pro
+
 map <C-n> :NERDTreeToggle<CR>
 tnoremap <Esc> <C-\><C-n>
 
@@ -82,6 +86,10 @@ let g:deoplete#enable_at_startup = 1
 
 let g:NERDTreeDirArrowExpandable = '▸'
 let g:NERDTreeDirArrowCollapsible = '▾'
+
+let g:seiya_auto_enable=1
+" Default value: ['ctermbg']
+let g:seiya_target_groups = has('nvim') ? ['guibg'] : ['ctermbg']
 
 nmap <C-_> :noh<CR>
 nmap <C-ç> :set hlsearch!<CR>
