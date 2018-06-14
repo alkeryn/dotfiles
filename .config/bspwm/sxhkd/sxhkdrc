@@ -15,12 +15,12 @@ super + a
 	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
 # terminal emulator
 super + space
-	termite	
+	termite
 # Music
 super + p
 	termite -e ncmpcpp
 
-# Rofi  
+# Rofi
 super + {_,ctrl + }Return
 	rofi -show {drun -modi drun,run}
 # Rofi Show Windows
@@ -31,7 +31,7 @@ super + Tab
 super + e
 	urxvt -e ranger
 # Sound  -------------------------------------------------------------------
-#MPC control 
+#MPC control
 
 {XF86AudioStop,XF86AudioPrev,XF86AudioPlay,XF86AudioNext}
 	mpc {stop,prev,toggle,next}
@@ -55,11 +55,12 @@ super + F12
 
 # make sxhkd reload its configuration files:
 super + Escape
-	pkill -USR1 -x sxhkd && ~/.config/bspwm/bspwmrc
+	~/.config/bspwm/bspwmrc &&  ~/bin/sxhkdrestart &
+#pkill -USR1 -x sxhkd && ~/.config/bspwm/bspwmrc
 
 # Change keyboard layout
 super + {F1,F2,F3}
-	setxkbmap {fr, us, us -variant colemak}; xset r rate 250 75; xmodmap -e "keycode 66 = ISO_Level3_Shift" 
+	setxkbmap {fr, us, us -variant colemak}; xset r rate 250 75; xmodmap -e "keycode 66 = ISO_Level3_Shift"
 
 # Bspwm hotkeys -------------------------------------------------------------------------------------
 
@@ -114,8 +115,8 @@ super + {b,n,colon,exclam}
 	bspc node -f @{parent,brother,first,second}
 
 #focus muliple
-super + q 
-	bspc node -f last 
+super + q
+	bspc node -f last
 
 # focus the next/previous node in the current desktop
 super + {_,alt + }c
@@ -176,7 +177,7 @@ super + alt + ctrl + {j,k,i,l}
 super + {Left,Down,Up,Right}
 	$mainpc && X=20;$laptop && X=40;bspc node -v {-$X 0,0 $X,0 -$X,$X 0}
 
-# Resize all 
+# Resize all
 super + {Next,Prior}
 	bspc config -d focused window_gap $((`bspc config -d focused window_gap` {+,-} 5 ))
 
@@ -193,7 +194,7 @@ super + shift + t
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 super + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End}
-	paplay ~/Cloud/Mega/zPC/Sounds/{NeinNein,miaou,Popopo,YES,Issou,Jeff,PickleRick,AH,Nils}.wav & 
+	paplay ~/Cloud/Mega/zPC/Sounds/{NeinNein,miaou,Popopo,YES,Issou,Jeff,PickleRick,AH,Nils}.wav &
 
 super + shift + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End,KP_Insert}
 	paplay ~/Cloud/Mega/zPC/Sounds/{RickRoll,Lol,Jurassic,Interject,Fuck,FuckedUp,Cena,ShootingStars,Souffrir,Colere}.wav &
