@@ -2,6 +2,7 @@
 
 # home
 !bin
+bin/Software
 !.Xresources
 !.gitignore
 !.gitconfig
@@ -53,6 +54,7 @@
 !.config/ranger
 .config/ranger/history
 .config/ranger/tagged
+.config/ranger/bookmarks
 
 
 !.config/termite

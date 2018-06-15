@@ -29,17 +29,17 @@ gif(){
 	shift
 		xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- gifview -a -w WID "$path" "$@"  &
 }
-xscreensaver(){
+xs(){ #xscreen wrapper
 	local path=$1
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- /usr/lib/xscreensaver/"$path" -window-id WID "$@" &
 }
-xwrapper(){
+xw(){ #wrapper with windows id
 	local path=$1
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" -window-id WID "$@" &
 }
-wrapper(){
+wr(){ #wrapper without windows id
 	local path=$1
 	shift
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" "$@" &
