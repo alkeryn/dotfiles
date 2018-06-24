@@ -59,7 +59,7 @@ echo te
         SROY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
         PX=$(($SROX + $SRX/2 - $RX/2))
         PY=$(($SROY + $SRY/2 - $RY/2))
- 
+
 	$command
         convert $imgtarget $imgpaste -geometry +$PX+$PY -composite -matte $imgtarget
         echo "done"
@@ -83,7 +83,7 @@ echo te
 #        SROY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
 #        PX=$(($SROX + $SRX/2 - $RX/2))
 #        PY=$(($SROY + $SRY/2 - $RY/2))
-# 
+#
 #        convert $imgtarget $imgpaste -geometry +$PX+$PY -composite -matte $imgtarget
 #        echo "done"
 #    done
