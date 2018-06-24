@@ -8,8 +8,8 @@ vmstop ()
 }
 vmrun ()
 {
-	virsh -q start $1 
-	while $(virsh -q list | grep -q Windows) 
+	virsh -q start $1
+	while $(virsh -q list | grep -q Windows)
 		do
 			sleep 3
 		done
@@ -18,7 +18,7 @@ vmrun ()
 run () {
 case $1 in
 	'')
-		vmrun Windows10 
+		vmrun Windows10
 		;;
 	"audio")
 		vmrun Windows10Audio
