@@ -1,2 +1,3 @@
 #!/bin/bash
-pkill openrazer-daemo && poweroff
+$laptop && pkill openrazer-daemo && poweroff
+$mainpc && poweroff

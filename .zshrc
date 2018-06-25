@@ -34,6 +34,8 @@ alias kbedit='vim ~/bin/Software/qmk_firmware/keyboards/planck/keymaps/alkeryn/'
 alias kbmake='pushd ~/bin/Software/qmk_firmware ; sudo make planck:alkeryn:dfu ; popd'
 alias dl="youtube-dl"
 alias weather="curl wttr.in/~Mulhouse"
+# alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
+alias :q="exit"
 autoload -Uz compinit promptinit
 compinit
 promptinit

@@ -3,4 +3,4 @@ Type=Application
 Version=1.0
 Name=LookingGlass
 Comment=LookingGlass Cient
-Exec=looking-glass-client -s
+Exec=looking-glass-client -s -K 70 -o opengl:vsync=0
