@@ -3,12 +3,13 @@
 # home
 !bin
 bin/Software
-!.Xresources
+!.fishrc
 !.gitignore
 !.gitconfig
 !.xinitrc
 !.zshrc
 !readme.md
+!.Xresources
 
 # .config
 
@@ -24,6 +25,9 @@ bin/Software
 !.config/conky
 .config/conky/*
 !.config/conky/conky.conf
+
+!.config/fish
+.config/fish/fishd.*
 
 !.config/htop
 .config/htop/*

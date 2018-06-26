@@ -1,5 +1,5 @@
 #!/bin/bash
-mkdir $2
+mkdir -p $2
 docker pull $1
-docker export "$(docker create --name $(basename $2) $1 true)" | tar -x -C $2
-docker rm $2
+docker export "$(docker create --name $(basename "$2"temp) $1 true)" | tar -x -C $2
+docker rm $(basename "$2"temp)

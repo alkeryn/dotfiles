@@ -91,8 +91,8 @@ super + {alt,ctrl} + b
 	bspc node @/ {-B,-E}
 
 # swap the current node and the biggest node
-super + g
-	bspc node -s biggest
+#super + g
+	# bspc node -s biggest
 
 # State/flags ----------------------------------------------------------------------------------------
 

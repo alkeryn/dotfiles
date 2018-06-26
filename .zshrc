@@ -5,13 +5,18 @@ SAVEHIST=2000
 setopt extendedglob notify
 # End of lines configured by zsh-newuser-install
 # The following lines were added by compinstall
+
 zstyle compinstall filename '/home/alkeryn/.zshrc'
+
+# Alias
+
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
 alias up2='pac -Syu --noconfirm'
 alias xev='~/bin/xev'
 alias vim='nvim'
 alias visudo='sudo EDITOR=nvim visudo'
+alias sudo='sudo -E'
 alias vipw='sudo EDITOR=nvim vipw'
 alias vigr='sudo EDITOR=nvim vigr'
 alias viw='nvim -m'
@@ -34,26 +39,29 @@ alias kbedit='vim ~/bin/Software/qmk_firmware/keyboards/planck/keymaps/alkeryn/'
 alias kbmake='pushd ~/bin/Software/qmk_firmware ; sudo make planck:alkeryn:dfu ; popd'
 alias dl="youtube-dl"
 alias weather="curl wttr.in/~Mulhouse"
-alias schroot="sudo systemd-nspawn"
+alias mct="\sudo machinectl"
+alias shell="\sudo machinectl shell"
+alias nspawn="\sudo systemd-nspawn"
+alias kali="\sudo machinectl shell kali"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 alias :q="exit"
+
+# ZSH
 autoload -Uz compinit promptinit
 compinit
 promptinit
 #prompt elite
 source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
-winvm () {
-	~/bin/winvm $1 &
-}
+
 # Definition
-#
+
 export VISUAL=nvim
 export EDITOR=nvim
 export PATH=$PATH:~/bin:~/bin/launch
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
-#
+
 # key bindings
 export KEYTIMEOUT=1
 bindkey -e
@@ -84,3 +92,10 @@ bindkey "^H" backward-delete-word
 # completion in the middle of a line
 #bindkey '^i' expand-or-complete-prefix
 # End of lines added by compinstall
+
+# Functions
+
+md () { mkdir -p "$@" && cd "$1"; }
+winvm () {
+	~/bin/winvm $1 &
+}

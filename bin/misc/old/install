@@ -1,0 +1,5 @@
+#!/bin/bash
+INSTALLPATH=$1
+curl "http://git.kali.org/gitweb/?p=packages/debootstrap.git;a=blob_plain;f=scripts/kali;hb=refs/heads/kali/master" > kali-debootstrap &&\
+sudo debootstrap kali-rolling ./$INSTALLPATH http://http.kali.org/kali ./kali-debootstrap
+rm -f kali-debootstrap
