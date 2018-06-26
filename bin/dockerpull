@@ -1,0 +1,5 @@
+#!/bin/bash
+mkdir $2
+docker pull $1
+docker export "$(docker create --name $2 $1 true)" | tar -x -C $2
+docker rm $2
