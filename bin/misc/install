@@ -1,3 +1,0 @@
-#!/bin/bash
-# Set fish
-fish -c fisher rafaelrinaldi/pure

@@ -9,16 +9,17 @@ setopt extendedglob notify
 zstyle compinstall filename '/home/alkeryn/.zshrc'
 
 # Alias
-
+alias rm="\rm"
+alias cpa="cp -axrfT"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
 alias up2='pac -Syu --noconfirm'
 alias xev='~/bin/xev'
 alias vim='nvim'
 alias visudo='sudo EDITOR=nvim visudo'
-alias sudo='sudo -E'
 alias vipw='sudo EDITOR=nvim vipw'
 alias vigr='sudo EDITOR=nvim vigr'
+alias sudo='sudo -E'
 alias viw='nvim -m'
 alias view='nvim -m'
 alias rmlog='sudo journalctl --vacuum-time=2weeks'
@@ -41,8 +42,9 @@ alias dl="youtube-dl"
 alias weather="curl wttr.in/~Mulhouse"
 alias mct="\sudo machinectl"
 alias shell="\sudo machinectl shell"
-alias nspawn="\sudo systemd-nspawn"
+alias nspawn="\sudo systemd-nspawn -E TERM=xterm"
 alias kali="\sudo machinectl shell kali"
+alias zz="7z"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 alias :q="exit"
 
@@ -52,6 +54,8 @@ compinit
 promptinit
 #prompt elite
 source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
+#source ~/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh
+
 
 # Definition
 
@@ -99,3 +103,14 @@ md () { mkdir -p "$@" && cd "$1"; }
 winvm () {
 	~/bin/winvm $1 &
 }
+
+# FIX issue with echo -n & similar output not showing
+ # Skip defining precmd if the PROMPT_SP option is available.
+    if ! eval '[[ -o promptsp ]] 2>/dev/null'; then
+      function precmd {
+        # Output an inverse char and a bunch spaces.  We include
+        # a CR at the end so that any user-input that gets echoed
+        # between this output and the prompt doesn't cause a wrap.
+        print -nP "%B%S%#%s%b${(l:$((COLUMNS-1)):::):-}\r"
+      }
+    fi
