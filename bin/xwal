@@ -16,13 +16,13 @@ eachscreen(){
 		Y=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 1)  # y pos
 		OX=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 2) # x offset
 		OY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
-		$command $@ 
+		$command $@
 	done
 }
 mpv(){
 	local path=$1
 	shift
-	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$path" "$@"  &
+	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- mpv --mute=yes --no-audio --loop=inf --no-config --profile=gpu-hq --quiet -wid WID "$path" "$@"  &
 }
 gif(){
 	local path=$1

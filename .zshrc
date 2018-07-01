@@ -10,6 +10,7 @@ zstyle compinstall filename '/home/alkeryn/.zshrc'
 
 # Alias
 alias rm="\rm"
+alias myip='curl ipinfo.io/ip'
 alias cpa="cp -axrfT"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
@@ -42,7 +43,7 @@ alias dl="youtube-dl"
 alias weather="curl wttr.in/~Mulhouse"
 alias mct="\sudo machinectl"
 alias shell="\sudo machinectl shell"
-alias nspawn="\sudo systemd-nspawn -E TERM=xterm"
+alias nspawn="\sudo systemd-nspawn -E TERM=xterm -E DISPLAY=$DISPLAY"
 alias kali="\sudo machinectl shell kali"
 alias zz="7z"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
@@ -102,6 +103,12 @@ bindkey "^H" backward-delete-word
 md () { mkdir -p "$@" && cd "$1"; }
 winvm () {
 	~/bin/winvm $1 &
+}
+ddusb (){
+        vara=$1
+        varb=$2
+        shift 2
+sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
 }
 
 # FIX issue with echo -n & similar output not showing
