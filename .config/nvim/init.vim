@@ -32,15 +32,19 @@ call plug#begin('~/.vim/plugged')
 Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
 Plug 'zchee/deoplete-clang'
 Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
+Plug 'zchee/deoplete-jedi'
+
 Plug 'zchee/deoplete-zsh'
+Plug 'kovetskiy/sxhkd-vim'
 
 Plug 'Shougo/neoinclude.vim' "also check completion in includes
-Plug 'kovetskiy/sxhkd-vim'
 "Plug 'Valloric/YouCompleteMe'
 
 
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
+"Behavior
+Plug 'Townk/vim-autoclose'
 
 "Tools
 Plug 'ervandew/supertab'
