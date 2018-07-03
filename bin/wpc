@@ -2,11 +2,13 @@
 export mainpc=false
 export laptop=false
 export PC
-grep -q Alkeryn-PC /etc/hostname && { mainpc=true;PC=mainpc; }
-grep -q Blade /etc/hostname && { laptop=true;PC=laptop; }
+[ -d /sys/module/battery ] && { laptop=true;PC=laptop; } ||  { mainpc=true;PC=mainpc; }
+#grep -q Alkeryn-PC /etc/hostname && { mainpc=true;PC=mainpc; }
+#grep -q Blade /etc/hostname && { laptop=true;PC=laptop; }
 
 [[ -z "$PC" ]] && { mainpc=true;PC=mainpc; }
 
+true
 #echo PC : $PC
 #echo laptop : $laptop
 #echo mainpc : $mainpc

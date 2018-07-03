@@ -7,6 +7,7 @@ set nobackup		" do not keep a backup file, use versions instead
 set number relativenumber
 set numberwidth=1
 set hlsearch
+set ignorecase
 set smartcase
 
 "set foldmethod=syntax
@@ -44,7 +45,7 @@ Plug 'Shougo/neoinclude.vim' "also check completion in includes
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 "Behavior
-Plug 'Townk/vim-autoclose'
+Plug 'Townk/vim-autoclose' "autclose brackets
 
 "Tools
 Plug 'ervandew/supertab'
@@ -121,3 +122,13 @@ nnoremap <C-K> gt
 nnoremap tn :tabnew<CR>
 nnoremap tq :tabclose<CR>
 
+augroup Binary
+  au!
+  au BufReadPre  *.bin let &bin=1
+  au BufReadPost *.bin if &bin | %!xxd
+  au BufReadPost *.bin set ft=xxd | endif
+  au BufWritePre *.bin if &bin | %!xxd -r
+  au BufWritePre *.bin endif
+  au BufWritePost *.bin if &bin | %!xxd
+  au BufWritePost *.bin set nomod | endif
+augroup END<Paste>
