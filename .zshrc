@@ -46,6 +46,7 @@ alias shell="\sudo machinectl shell"
 alias nspawn="\sudo systemd-nspawn -E TERM=xterm -E DISPLAY=$DISPLAY"
 alias kali="\sudo machinectl shell kali"
 alias zz="7z"
+alias rax="rax2"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 alias :q="exit"
 

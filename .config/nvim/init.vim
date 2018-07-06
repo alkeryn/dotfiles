@@ -53,6 +53,7 @@ Plug 'scrooloose/nerdtree'
 Plug 'junegunn/fzf.vim'
 Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
+
 Plug 'tpope/vim-surround' "Sourounding
 Plug 'tpope/vim-repeat' "repat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
@@ -62,8 +63,8 @@ Plug 'iago-lito/vim-visualMarks'
 
 Plug 'KabbAmine/vCoolor.vim' " color picker
 
-Plug 'SirVer/ultisnips'
-Plug 'honza/vim-snippets'
+Plug 'honza/vim-snippets' "snippets engine
+Plug 'SirVer/ultisnips' "sippets
 
 "Looks
 Plug 'luochen1990/rainbow' "rainbow highlight brackets
