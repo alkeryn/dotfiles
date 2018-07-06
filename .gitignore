@@ -6,6 +6,7 @@ bin/Software
 !.fishrc
 !.gitignore
 !todo.md
+!.gdbinit
 !.gitconfig
 !.xinitrc
 !.zshrc
