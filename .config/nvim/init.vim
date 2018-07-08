@@ -79,7 +79,8 @@ Plug 'kaicataldo/material.vim'
 Plug 'phanviet/vim-monokai-pro'
 
 "Fancy
-Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
+"Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
+Plug 'anned20/vimsence' "discord
 Plug 'mhinz/vim-startify' "A nice start menu
 Plug 'vim-scripts/Color-Scheme-Explorer'
 

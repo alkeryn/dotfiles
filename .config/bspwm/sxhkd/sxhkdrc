@@ -200,7 +200,7 @@ super + shift + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Dow
 	paplay ~/Cloud/Mega/zPC/Sounds/{RickRoll,Lol,Jurassic,Interject,Fuck,FuckedUp,Cena,ShootingStars,Souffrir,Colere}.wav &
 
 super + alt + {KP_Prior,KP_Up,KP_Home,KP_Right,KP_Begin,KP_Left,KP_Next,KP_Down,KP_End,KP_Insert}
-	paplay ~/Cloud/Mega/zPC/Sounds/{DAMN,Malou,Weee}.wav &
+	paplay ~/Cloud/Mega/zPC/Sounds/{DAMN,Malou,Weee,Skrattar}.wav &
 
 super + KP_Insert
 	pkill paplay &

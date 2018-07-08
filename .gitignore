@@ -11,6 +11,7 @@ bin/Software
 !.xinitrc
 !.zshrc
 !readme.md
+!.radare2rc
 !.Xresources
 
 # .config
@@ -98,3 +99,9 @@ bin/Software
 !.local/share/nvim/site/autoload
 .local/share/nvim/site/autoload/*
 !.local/share/nvim/site/autoload/plug.vim
+
+#!.local/share/peda
+#.local/share/peda/*
+#!.local/share/peda/lib
+#.local/share/peda/lib/*
+#!.local/share/peda/lib/config.py

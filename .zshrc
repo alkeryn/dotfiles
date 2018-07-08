@@ -14,7 +14,7 @@ alias myip='curl ipinfo.io/ip'
 alias cpa="cp -axrfT"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
-alias up2='pac -Syu --noconfirm'
+alias up2='aurman -Syu --noconfirm'
 alias xev='~/bin/xev'
 alias vim='nvim'
 alias visudo='sudo EDITOR=nvim visudo'
