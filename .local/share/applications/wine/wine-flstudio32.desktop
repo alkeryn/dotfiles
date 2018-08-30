@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Version=12.4.2 Producer Edition
+Name=FL Studio (x86)
+GenericName=DAW
+Comment=DAW
+Exec=env WINEPREFIX=/home/alkeryn/App/wine/FLStudio wine App/wine/FlStudio/drive_c/Program\ Files\ \(x86\)/Image-Line/FL\ Studio\ 12/FL.exe --no-dwrite
