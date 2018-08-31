@@ -9,7 +9,7 @@
 [bar/mainpc]
 #bottom = false
 
-tray-transparent = true 
+tray-transparent = true
 monitor = ${env:MONITOR:HDMI-1}
 
 ;override-redirect = true
@@ -23,9 +23,9 @@ fixed-center = true
 background = ${colors.background}
 foreground = ${colors.foreground}
 
-line-size = 2 2 
+line-size = 2 2
 line-color = #f00
-;border-size = 0 
+;border-size = 0
 ;border-color = #ccff0000
 
 padding-left = 0
@@ -41,7 +41,7 @@ font-2 = FontAwesome:pixelsize=14;0
 
 
 modules-left = bspwm xwindow
-modules-center = 
+modules-center =
 modules-right = filesystem mpd volume xkeyboard memory temperature cpu date
 
 tray-position = right
@@ -51,7 +51,7 @@ tray-background = #ffffff
 [bar/laptop]
 #bottom = false
 
-tray-transparent = true 
+tray-transparent = true
 monitor = ${env:MONITOR:eDP1}
 
 #override-redirect = true
@@ -65,9 +65,9 @@ fixed-center = true
 background = ${colors.background}
 foreground = ${colors.foreground}
 
-line-size = 2 2 
+line-size = 2 2
 line-color = #f00
-;border-size = 0 
+;border-size = 0
 ;border-color = #ccff0000
 
 padding-left = 0
@@ -83,8 +83,8 @@ font-2 = FontAwesome:pixelsize=14;0
 
 
 modules-left = bspwm xwindow
-modules-center = battery 
-modules-right = backlight filesystem mpd volume xkeyboard memory temperature cpu date
+modules-center = battery
+modules-right = backlight filesystem mpd volume xkeyboard memory temperature1 cpu date
 
 tray-position = right
 tray-padding = 5
@@ -398,6 +398,24 @@ ramp-1 = 
 ramp-2 = 
 ramp-foreground = ${colors.foreground-alt}
 
+[module/temperature1]
+type = internal/temperature
+thermal-zone = 3
+warn-temperature = 60
+interval = 15
+format = <ramp> <label>
+format-underline = #00ffff
+format-warn = <ramp> <label-warn>
+format-warn-underline = ${self.format-underline}
+
+label = %temperature%
+label-warn = %temperature%
+label-warn-foreground = ${colors.secondary}
+
+ramp-0 = 
+ramp-1 = 
+ramp-2 = 
+ramp-foreground = ${colors.foreground-alt}
 [module/powermenu]
 type = custom/menu
 
