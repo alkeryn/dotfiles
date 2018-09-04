@@ -89,8 +89,10 @@ call plug#end()
 
 colorscheme monokai_pro
 
-noremap <C-n> :NERDTreeToggle<CR>
 tnoremap <Esc> <C-\><C-n>
+
+"Variables
+let mapleader = "-"
 
 autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
 let g:deoplete#enable_at_startup = 1
@@ -115,6 +117,8 @@ let g:multi_cursor_use_default_mapping=0
 " let g:multi_cursor_skip_key            = '<C-x>'
 " let g:multi_cursor_quit_key            = '<Esc>'
 
+"Shortcuts
+noremap <C-n> :NERDTreeToggle<CR>
 nnoremap <C-_> :noh<CR>
 nnoremap <C-ç> :set hlsearch!<CR>
 
@@ -123,6 +127,9 @@ nnoremap <C-J> gT
 nnoremap <C-K> gt
 nnoremap tn :tabnew<CR>
 nnoremap tq :tabclose<CR>
+
+nnoremap <leader>ev :vsplit $MYVIMRC<cr>
+nnoremap <leader>sv :source $MYVIMRC<cr>
 
 augroup Binary
   au!
