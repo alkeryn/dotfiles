@@ -55,11 +55,11 @@ Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
 
 Plug 'tpope/vim-surround' "Sourounding
-Plug 'tpope/vim-repeat' "repat last command from plugin
+Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
 
 Plug 'iago-lito/vim-visualMarks'
-" Plug 'terryma/vim-multiple-cursors' "Comment shortcut
+" Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
 
 Plug 'KabbAmine/vCoolor.vim' " color picker
 
@@ -94,7 +94,6 @@ tnoremap <Esc> <C-\><C-n>
 "Variables
 let mapleader = "-"
 
-autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
 let g:deoplete#enable_at_startup = 1
 
 let g:NERDTreeDirArrowExpandable = '▸'
@@ -128,8 +127,15 @@ nnoremap <C-K> gt
 nnoremap tn :tabnew<CR>
 nnoremap tq :tabclose<CR>
 
+"Quick edit init.vim
 nnoremap <leader>ev :vsplit $MYVIMRC<cr>
 nnoremap <leader>sv :source $MYVIMRC<cr>
+
+"Augroup
+augroup AutoGroup
+        au!
+        autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
+augroup END
 
 augroup Binary
   au!
@@ -140,4 +146,4 @@ augroup Binary
   au BufWritePre *.bin endif
   au BufWritePost *.bin if &bin | %!xxd
   au BufWritePost *.bin set nomod | endif
-augroup END<Paste>
+augroup END
