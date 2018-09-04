@@ -89,7 +89,7 @@ call plug#end()
 
 colorscheme monokai_pro
 
-map <C-n> :NERDTreeToggle<CR>
+noremap <C-n> :NERDTreeToggle<CR>
 tnoremap <Esc> <C-\><C-n>
 
 autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
@@ -115,8 +115,8 @@ let g:multi_cursor_use_default_mapping=0
 " let g:multi_cursor_skip_key            = '<C-x>'
 " let g:multi_cursor_quit_key            = '<Esc>'
 
-nmap <C-_> :noh<CR>
-nmap <C-ç> :set hlsearch!<CR>
+nnoremap <C-_> :noh<CR>
+nnoremap <C-ç> :set hlsearch!<CR>
 
 "tab nav with shift
 nnoremap <C-J> gT
