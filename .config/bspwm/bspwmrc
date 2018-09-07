@@ -41,6 +41,7 @@ bspc config directional_focus_tightness low
 case $PC in
 	mainpc)
 		bspc rule -a Chromium desktop=5 follow=on
+		bspc rule -a Firefox desktop=5 follow=on
 		bspc rule -a discord desktop='^1'
 		bspc rule -a qBittorrent desktop='2' follow=on
 		bspc rule -a skypeforlinux desktop='1'
@@ -61,6 +62,7 @@ case $PC in
 			bspc monitor eDP1  -d 1 2 3 4
 			bspc monitor DP1   -d 5 6 7 8 9 10
 			bspc rule -a Chromium desktop=5 follow=on
+                        bspc rule -a Firefox desktop=5 follow=on
 			bspc rule -a discord desktop='^1'
 			bspc rule -a qBittorrent desktop='2' follow=on
 			bspc rule -a skypeforlinux desktop='3'
@@ -75,6 +77,7 @@ case $PC in
 		else
 			bspc monitor eDP1  -d 1 2 3 4 5 6 7 8 9 10
 			bspc rule -a Chromium desktop=1 follow=on
+			bspc rule -a Firefox desktop=1 follow=on
 			bspc rule -a discord desktop='^10'
 			bspc rule -a qBittorrent desktop='9' follow=on
 			bspc rule -a skypeforlinux desktop='10'
