@@ -11,7 +11,8 @@ zstyle compinstall filename '/home/alkeryn/.zshrc'
 # Alias
 alias rm="\rm"
 alias myip='curl ipinfo.io/ip'
-alias cpa="cp -axrfT"
+alias cpd="cp -axrfT"
+alias cpa="cp -axvuf"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
 alias up2='aurman -Syu --noconfirm'
