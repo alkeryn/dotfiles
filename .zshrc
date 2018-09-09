@@ -10,7 +10,7 @@ zstyle compinstall filename '/home/alkeryn/.zshrc'
 
 # Alias
 alias rm="\rm"
-alias myip='curl ipinfo.io/ip'
+alias myip="curl -4 ifconfig.co; curl -6 ifconfig.co"
 alias cpd="cp -axrfT"
 alias cpa="cp -axvuf"
 alias ls='ls --color'
@@ -49,7 +49,6 @@ alias kali="\sudo machinectl shell kali"
 alias zz="7z"
 alias rax="rax2"
 alias op="xdg-open"
-alias space="zfs list | grep 'NAME\|home\|Arch';printf '\n';zpool list"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 alias :q="exit"
 

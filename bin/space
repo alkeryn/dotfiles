@@ -1,0 +1,9 @@
+#!/bin/bash
+clear
+zfs list zroot/{data/home,root/Arch}
+echo
+zpool list
+echo
+zfs list -t filesystem -o name,compressratio,usedbychildren,used,logicalused
+echo
+zfs list -t snapshot -o name,used,creation -S creation | head -10
