@@ -49,6 +49,7 @@ alias kali="\sudo machinectl shell kali"
 alias zz="7z"
 alias rax="rax2"
 alias op="xdg-open"
+alias space="zfs list | grep 'NAME\|home\|Arch';printf '\n';zpool list"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 alias :q="exit"
 
@@ -67,6 +68,7 @@ export VISUAL=nvim
 export EDITOR=nvim
 export PATH=$PATH:~/bin:~/bin/launch
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export ZPOOL_VDEV_NAME_PATH=YES
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
