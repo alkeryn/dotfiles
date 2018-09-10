@@ -15,7 +15,7 @@ alias cpd="cp -axrfT"
 alias cpa="cp -axvuf"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
-alias up2='aurman -Syu --noconfirm'
+alias up2='aurman -Syu --noconfirm --noedit --pgp-fetch'
 alias xev='~/bin/xev'
 alias vim='nvim'
 alias visudo='sudo EDITOR=nvim visudo'
