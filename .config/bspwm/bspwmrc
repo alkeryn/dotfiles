@@ -40,7 +40,7 @@ bspc config directional_focus_tightness low
 
 case $PC in
 	mainpc)
-		bspc rule -a Chromium desktop=5 follow=on
+		#bspc rule -a Chromium desktop=5 follow=on
 		bspc rule -a Firefox desktop=5 follow=on
 		bspc rule -a discord desktop='^1'
 		bspc rule -a qBittorrent desktop='2' follow=on
@@ -48,6 +48,7 @@ case $PC in
 		bspc rule -a Lxappearance state=floating follow=on
 		bspc rule -a Pavucontrol state=floating follow=on
 		bspc rule -a 'Gimp-2.8' state=floating desktop=8 follow=on
+		bspc rule -a 'VESC Tool' desktop=8 follow=on
 		bspc rule -a Screenkey manage=off
 		bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
 		bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
@@ -61,7 +62,7 @@ case $PC in
 		then
 			bspc monitor eDP1  -d 1 2 3 4
 			bspc monitor DP1   -d 5 6 7 8 9 10
-			bspc rule -a Chromium desktop=5 follow=on
+			#bspc rule -a Chromium desktop=5 follow=on
                         bspc rule -a Firefox desktop=5 follow=on
 			bspc rule -a discord desktop='^1'
 			bspc rule -a qBittorrent desktop='2' follow=on
@@ -76,7 +77,7 @@ case $PC in
 			~/bin/dock
 		else
 			bspc monitor eDP1  -d 1 2 3 4 5 6 7 8 9 10
-			bspc rule -a Chromium desktop=1 follow=on
+			#bspc rule -a Chromium desktop=1 follow=on
 			bspc rule -a Firefox desktop=1 follow=on
 			bspc rule -a discord desktop='^10'
 			bspc rule -a qBittorrent desktop='9' follow=on

@@ -1,5 +1,5 @@
 #!/bin/bash
-if xsetwacom --list devices | grep -q WL; then  
+if xsetwacom --list devices | grep -q WL; then
 Eraser=$(xsetwacom --list devices | grep eraser | awk '{print $9}')
 Stylus=$(xsetwacom --list devices | grep stylus | awk '{print $9}')
 else
