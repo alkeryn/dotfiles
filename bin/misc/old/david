@@ -1,1 +1,0 @@
-ssh -X khyrmandy@$(ip neigh | grep -i 50:9A:4C:4D:0A:12 | awk '{print $1}')

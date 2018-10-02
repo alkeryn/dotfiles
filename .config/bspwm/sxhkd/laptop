@@ -1,3 +1,18 @@
 # Suspend
 super + Delete
-	systemctl suspend && ~/bin/blurlock 
+	systemctl suspend && ~/bin/blurlock
+#Sounds
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#super + {p,o,i,m,l,k,exclam,colon,semicolon,comma}
+#	paplay ~/Cloud/Mega/zPC/Sounds/{NeinNein,miaou,Popopo,YES,Issou,Jeff,PickleRick,AH,Nils}.wav &
+#
+#super + shift + {p,o,i,m,l,k,exclam,colon,semicolon,comma}
+#	paplay ~/Cloud/Mega/zPC/Sounds/{RickRoll,Lol,Jurassic,Interject,Fuck,FuckedUp,Cena,ShootingStars,Souffrir,Colere}.wav &
+#
+#super + alt + {p,o,i,m,l,k,exclam,colon,semicolon,comma}
+#	paplay ~/Cloud/Mega/zPC/Sounds/{DAMN,Malou,Weee,Skrattar}.wav &
+#
+#super + KP_Insert
+#	pkill paplay &
+#
