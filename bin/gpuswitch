@@ -13,11 +13,12 @@ case $1 in
 	nvidia)
 		echo unbinding vfio
 			#echo unbind vfio
-			echo -n 0000:01:00.0 > /sys/bus/pci/drivers/vfio-pci/unbind 
+			echo -n 0000:01:00.0 > /sys/bus/pci/drivers/vfio-pci/unbind
 			echo -n 0000:01:00.1 > /sys/bus/pci/drivers/vfio-pci/unbind
 		echo vfio unbound
 		echo binding nvidia
 			#bind nvidia
+			sudo systemctl start bumblebeed.service
 			echo -n $gpuBus > /sys/bus/pci/drivers/nvidia/bind
 			echo -n $audioBus > /sys/bus/pci/drivers/snd_hda_intel/bind
 			optirun /bin/true
@@ -26,7 +27,8 @@ case $1 in
 	vfio)
 		echo unbinding nvidia
 			#unbind nvidia
-			echo -n $gpuBus > /sys/bus/pci/drivers/nvidia/unbind 
+			systemctl stop bumblebeed.service
+			echo -n $gpuBus > /sys/bus/pci/drivers/nvidia/unbind
 			echo -n $audioBus > /sys/bus/pci/drivers/snd_hda_intel/unbind
 		echo nvidia unbond
 	;;

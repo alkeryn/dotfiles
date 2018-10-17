@@ -1,7 +1,7 @@
 #!/bin/bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
 $mainpc && ckb-next --background &
-$mainpc && i3lock -n -i ~/.config/misc/flock.png && ./.wall &
+$mainpc && i3lock -n -i ~/.config/misc/flock.png & #  && ./.wall &
 $laptop && i3lock -i ~/.config/misc/flocklap.png &
 setxkbmap fr
 numlockx on
@@ -30,3 +30,4 @@ megasync &
 $mainpc && discord-canary &
 $mainpc && optirun true &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
+~/.wall &
