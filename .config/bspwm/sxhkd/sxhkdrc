@@ -123,7 +123,7 @@ super + {_,alt + }c
 	bspc node -f {next,prev}.local
 
 # focus/send to the next/previous desktop in the current monitor
-super + {_,shift +}{dead_circumflex,dollar}
+super + {_,shift + }{dead_circumflex,dollar}
 	bspc {desktop -f,node -d } {prev,next}.local {,--follow}
 
 # focus the last node/desktop
