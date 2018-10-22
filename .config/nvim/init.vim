@@ -1,32 +1,41 @@
+"Colors
 set t_Co=256
-
 set background=dark
 set termguicolors
 
-set nobackup		" do not keep a backup file, use versions instead
 set number relativenumber
 set numberwidth=1
-set hlsearch
-set ignorecase
-set smartcase
+
+set hlsearch "highlight search
+set ignorecase "not case sensitive
+set smartcase "case smart
 
 "set foldmethod=syntax
 "set clipboard=unnamedplus
 set mouse=ni
 
+"Indent settings
+
 set autoindent                " always set autoindenting on
 set copyindent                " copy Indentation
+
+"File settings
+
+set nobackup		" do not keep a backup file, use versions instead
 set autoread
-nnoremap Q <nop> "Disable annoying EX mode
-
 set encoding=utf-8
-set fileencoding=utf-8
-set fileencodings=utf-8
-set bomb
-set binary
-set expandtab
+set fileencoding=utf-8 "write
+set fileencodings=utf-8 "read
+set bomb "unicode header
+set binary "warning disable expandtab if set after
 
-syntax enable
+"Tabs settings
+
+set shiftwidth=4 "tab indent size
+" set tabstop=4 "tab display
+set softtabstop=4 "insert tab
+" set expandtab "tabs are space
+
 call plug#begin('~/.vim/plugged')
 "Auto complete
 
@@ -41,9 +50,9 @@ Plug 'kovetskiy/sxhkd-vim'
 Plug 'Shougo/neoinclude.vim' "also check completion in includes
 "Plug 'Valloric/YouCompleteMe'
 
-
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
+
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
 
@@ -87,6 +96,7 @@ Plug 'vim-scripts/Color-Scheme-Explorer'
 "Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
 call plug#end()
 
+syntax enable
 colorscheme monokai_pro
 
 tnoremap <Esc> <C-\><C-n>
@@ -120,6 +130,7 @@ let g:multi_cursor_use_default_mapping=0
 noremap <C-n> :NERDTreeToggle<CR>
 nnoremap <C-_> :noh<CR>
 nnoremap <C-ç> :set hlsearch!<CR>
+nnoremap Q <nop> "Disable annoying EX mode
 
 "tab nav with shift
 nnoremap <C-J> gT
@@ -135,17 +146,17 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 
 "Augroup
 augroup AutoGroup
-        au!
-        autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
+    au!
+    autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
 augroup END
 
 augroup Binary
-  au!
-  au BufReadPre  *.bin let &bin=1
-  au BufReadPost *.bin if &bin | %!xxd
-  au BufReadPost *.bin set ft=xxd | endif
-  au BufWritePre *.bin if &bin | %!xxd -r
-  au BufWritePre *.bin endif
-  au BufWritePost *.bin if &bin | %!xxd
-  au BufWritePost *.bin set nomod | endif
+    au!
+    au BufReadPre  *.bin let &bin=1
+    au BufReadPost *.bin if &bin | %!xxd
+    au BufReadPost *.bin set ft=xxd | endif
+    au BufWritePre *.bin if &bin | %!xxd -r
+    au BufWritePre *.bin endif
+    au BufWritePost *.bin if &bin | %!xxd
+    au BufWritePost *.bin set nomod | endif
 augroup END
