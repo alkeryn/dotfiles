@@ -10,7 +10,9 @@ zstyle compinstall filename '/home/alkeryn/.zshrc'
 
 # Alias
 alias rm="\rm"
-alias myip="curl -4 ifconfig.co; curl -6 ifconfig.co"
+alias myip="curl -4 ifconfig.co"
+alias myip6="curl -6 ifconfig.co"
+alias myipa="curl -4 ifconfig.co; curl -6 ifconfig.co"
 alias cpd="cp -axrfT"
 alias cpa="cp -axvuf"
 alias ls='ls --color'
@@ -28,6 +30,7 @@ alias rmlog='sudo journalctl --vacuum-time=2weeks'
 alias clearlog='sudo rm -rf /var/log/journal/*'
 alias cls='clear'
 alias sspd='systemctl suspend && lock'
+alias ssha='ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'
 alias caup='update-desktop-database ~/.local/share/applications && update-mime-database ~/.local/share/mime/ && echo Done'
 alias webcam='mpv tv:// --tv-driver=v4l2 --tv-device=/dev/video0'
 alias winetricks='sh winetricks'
