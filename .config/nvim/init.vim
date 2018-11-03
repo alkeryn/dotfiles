@@ -58,7 +58,7 @@ Plug 'tpope/vim-surround' "Sourounding
 Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
 
-Plug 'iago-lito/vim-visualMarks'
+" Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
 
 Plug 'KabbAmine/vCoolor.vim' " color picker
