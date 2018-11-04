@@ -119,12 +119,17 @@ sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
 }
 
 # FIX issue with echo -n & similar output not showing
- # Skip defining precmd if the PROMPT_SP option is available.
-    if ! eval '[[ -o promptsp ]] 2>/dev/null'; then
-      function precmd {
+# Skip defining precmd if the PROMPT_SP option is available.
+if ! eval '[[ -o promptsp ]] 2>/dev/null'; then
+    function precmd {
         # Output an inverse char and a bunch spaces.  We include
         # a CR at the end so that any user-input that gets echoed
         # between this output and the prompt doesn't cause a wrap.
         print -nP "%B%S%#%s%b${(l:$((COLUMNS-1)):::):-}\r"
-      }
-    fi
+    }
+fi
+
+if [[ $TERM == xterm-termite ]]; then #Termite directory set
+  . /etc/profile.d/vte.sh
+  __vte_osc7
+fi
