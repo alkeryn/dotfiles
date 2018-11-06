@@ -124,6 +124,8 @@ nnoremap <C-ç> :set hlsearch!<CR>
 "tab nav with shift
 nnoremap <C-J> gT
 nnoremap <C-K> gt
+nnoremap <C-H> :tabm -1<CR>
+nnoremap <C-L> :tabm +1<CR>
 nnoremap tn :tabnew<CR>
 nnoremap tq :tabclose<CR>
 
