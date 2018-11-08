@@ -81,7 +81,7 @@ super + v
 super + y
 	bspc query -N -n focused.automatic && bspc node -n last.!automatic || bspc node last.leaf -n focused
 # Rotate
-super + {_,alt +} r
+super + {_,shift +} r
 	bspc node -R {90,270}
 #Flip
 super + {u,i}
