@@ -71,6 +71,7 @@ export EDITOR=nvim
 export PATH=$PATH:~/bin:~/bin/launch
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
+VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
@@ -116,6 +117,10 @@ ddusb (){
         varb=$2
         shift 2
 sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
+}
+vpn (){
+name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
+sudo openvpn "$VPNDIR"/"$name"
 }
 
 # FIX issue with echo -n & similar output not showing

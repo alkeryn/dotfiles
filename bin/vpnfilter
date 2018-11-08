@@ -1,0 +1,25 @@
+#!/bin/bash
+declare tmp
+what=~/Documents/VPN/ovpn_tcp/fr*
+multithread(){
+    if [[ $(jobs -r -p | wc -l) -ge $1 ]]; then
+        wait
+    fi
+}
+pingip(){
+    ip=`grep "remote\ " $1 | awk '{print $2}'`
+    ping=`timeout 0.09 ping -c1 $ip 2>/dev/null | head -n2 | tail -n 1 | awk '{print $7 $8}' | cut -d"=" -f2`
+    echo $ping $ip `basename $1` | grep ms
+}
+content(){
+    [[ -n tmp ]] && tmp=$(pingip $1) && echo $tmp \\n
+}
+loop(){
+for i in $what
+do
+    content $i &
+    multithread 50
+done
+wait
+}
+echo -e $(loop | sort -h | tac)
