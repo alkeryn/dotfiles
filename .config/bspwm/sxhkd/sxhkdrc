@@ -14,8 +14,8 @@ super + {_,shift + } Print
 super + a
 	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
 # terminal emulator
-super + space
-	termite
+super + {_,alt} + space
+	termite {_,--class=floating}
 # Music
 super + p
 	termite -e ncmpcpp
