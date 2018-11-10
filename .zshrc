@@ -45,6 +45,7 @@ alias kbedit='vim ~/bin/Software/qmk_firmware/keyboards/planck/keymaps/alkeryn/'
 alias kbmake='pushd ~/bin/Software/qmk_firmware ; sudo make planck:alkeryn:dfu ; popd'
 alias dl="youtube-dl"
 alias weather="curl wttr.in/~Mulhouse"
+alias anonradio="mpv http://anonradio.net:8000/anonradio"
 alias mct="\sudo machinectl"
 alias shell="\sudo machinectl shell"
 alias nspawn="\sudo systemd-nspawn -E TERM=xterm -E DISPLAY=$DISPLAY"
@@ -110,31 +111,31 @@ bindkey "^H" backward-delete-word
 
 md () { mkdir -p "$@" && cd "$1"; }
 winvm () {
-	~/bin/winvm $1 &
+    ~/bin/winvm $1 &
 }
 ddusb (){
-        vara=$1
-        varb=$2
-        shift 2
-sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
+    vara=$1
+    varb=$2
+    shift 2
+    sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
 }
 vpn (){
-name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
-sudo openvpn "$VPNDIR"/"$name"
+    name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
+    sudo openvpn "$VPNDIR"/"$name"
 }
 
 # FIX issue with echo -n & similar output not showing
 # Skip defining precmd if the PROMPT_SP option is available.
 if ! eval '[[ -o promptsp ]] 2>/dev/null'; then
     function precmd {
-        # Output an inverse char and a bunch spaces.  We include
-        # a CR at the end so that any user-input that gets echoed
-        # between this output and the prompt doesn't cause a wrap.
-        print -nP "%B%S%#%s%b${(l:$((COLUMNS-1)):::):-}\r"
+	# Output an inverse char and a bunch spaces.  We include
+	# a CR at the end so that any user-input that gets echoed
+	# between this output and the prompt doesn't cause a wrap.
+	print -nP "%B%S%#%s%b${(l:$((COLUMNS-1)):::):-}\r"
     }
 fi
 
 if [[ $TERM == xterm-termite ]]; then #Termite directory set
-  . /etc/profile.d/vte.sh
-  __vte_osc7
+    . /etc/profile.d/vte.sh
+    __vte_osc7
 fi
