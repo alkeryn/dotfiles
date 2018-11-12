@@ -1,1 +1,1 @@
-source ~/.local/share/peda/peda.py
+source /usr/share/peda/peda.py
