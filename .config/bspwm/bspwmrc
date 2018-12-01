@@ -4,6 +4,7 @@ source ~/bin/wpc # To use $mainpc and $laptop
 if [[ $(pgrep -c sxhkd) -eq 0 ]]
 then
     ~/.config/bspwm/scripts/autostart
+    # pkill -f "$HOME"/.config/bspwm/scripts/autostart
 fi
 ~/.fehbg &
 ~/.config/polybar/launch.sh &

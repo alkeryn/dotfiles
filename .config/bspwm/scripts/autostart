@@ -24,7 +24,7 @@ $laptop && setxkbmap -option "lv3:caps_switch" &
 $laptop && unclutter --timeout 3 -b &
 $mainpc && conky -q &
 nm-applet &
-mpd &
+(pkill -x mpd;mpd) &
 # APPS ~~~~~~~~~~~~~~~~~
 megasync &
 $mainpc && discord-canary &
