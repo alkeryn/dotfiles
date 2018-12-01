@@ -1,8 +1,9 @@
 #!/bin/bash
 export mainpc=false
 export laptop=false
+export mainpcenv
 export PC
-[ -d /sys/module/battery ] && { laptop=true;PC=laptop; } ||  { mainpc=true;PC=mainpc; }
+[ -d /sys/module/battery ] && { laptop=true;PC=laptop; } ||  { mainpc=true;PC=mainpc;mainpcenv=true; }
 #grep -q Alkeryn-PC /etc/hostname && { mainpc=true;PC=mainpc; }
 #grep -q Blade /etc/hostname && { laptop=true;PC=laptop; }
 
