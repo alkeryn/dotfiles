@@ -1,0 +1,51 @@
+#!/bin/bash
+alias rm="\rm"
+alias myip="curl -4 ifconfig.co"
+alias myip6="curl -6 ifconfig.co"
+alias myipa="curl -4 ifconfig.co; curl -6 ifconfig.co"
+alias cpd="cp -axrfT"
+alias cpa="cp -axvuf"
+alias ls='ls --color'
+alias up='sudo pacman -Syu --noconfirm'
+alias up2='aurman -Syu --noconfirm --noedit --pgp_fetch'
+alias sudo='sudo -E'
+alias vim='nvim'
+alias v='nvim'
+alias vz='nvim $(fzf)'
+alias vs='nvim -S'
+alias visudo='sudo EDITOR=nvim visudo'
+alias vipw='sudo EDITOR=nvim vipw'
+alias vigr='sudo EDITOR=nvim vigr'
+alias viw='nvim -m'
+alias view='nvim -m'
+alias rmlog='sudo journalctl --vacuum-time=2weeks'
+alias clearlog='sudo rm -rf /var/log/journal/*'
+alias cls='clear'
+alias sspd='systemctl suspend && lock'
+alias ssha='ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR'
+alias caup='update-desktop-database ~/.local/share/applications && update-mime-database ~/.local/share/mime/ && echo Done'
+alias webcam='mpv tv:// --tv-driver=v4l2 --tv-device=/dev/video0'
+alias winetricks='sh winetricks'
+alias speedtest='speedtest --bytes'
+alias gpg='gpg --keyserver pgp.mit.edu'
+alias rangimg='while true; do pkill w3mimgdisplay; sleep 5;done'
+alias screen="screen -q"
+alias diff="diff --color=always"
+alias restartpulse='pulseaudio -k && sleep 2 && pulseaudio --start'
+alias gpuswitch='sudo gpuswitch'
+alias kbedit='vim ~/bin/Software/qmk_firmware/keyboards/planck/keymaps/alkeryn/'
+alias kbmake='pushd ~/bin/Software/qmk_firmware ; sudo make planck:alkeryn:dfu ; popd'
+alias dl="youtube-dl"
+alias weather="curl wttr.in/~Mulhouse"
+alias anonradio="mpv http://anonradio.net:8000/anonradio"
+alias mct="\sudo machinectl"
+alias shell="\sudo machinectl shell"
+alias s="\sudo machinectl shell"
+alias nspawn="\sudo systemd-nspawn -E TERM=xterm -E DISPLAY=$DISPLAY"
+alias zz="7z"
+alias rax="rax2"
+alias op="xdg-open"
+alias mvmkv='mv */*.{mkv,mp4,avi} ./'
+alias incognito='unset HISTFILE'
+alias :q="exit"
+# alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""

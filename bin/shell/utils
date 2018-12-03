@@ -1,0 +1,64 @@
+#!/bin/bash
+
+# Utils
+md () { mkdir -p "$@" && cd "$1"; }
+winvm () {
+    ~/bin/winvm $1 &
+}
+
+ddusb (){
+    vara=$1
+    varb=$2
+    shift 2
+    sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
+}
+
+#Command
+
+vpn (){
+    name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
+    sudo openvpn "$VPNDIR"/"$name"
+}
+
+xev (){
+command xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
+}
+
+cpufreq (){
+while true;do  grep MHz /proc/cpuinfo;sleep 0.5;clear;done
+}
+
+dockerpull (){
+mkdir -p $2
+docker pull $1
+docker export "$(docker create --name $(basename "$2"temp) $1 true)" | tar -x -C $2
+docker rm $(basename "$2"temp)
+}
+
+getname (){
+#Get classname of a windows
+NAME=`xprop | grep "^WM_CLASS"`
+echo $NAME
+echo $NAME | awk '{print "Name: " $4}'
+}
+
+small (){
+convert -resize $1 $2 Small$2
+}
+
+wireless (){
+while true
+do
+echo `cat /proc/net/wireless | awk '{print $4}' | tail -n 1 | cut -d '.' -f1 ;sleep 0.01` dBm
+done
+}
+
+wolpc (){
+wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
+}
+
+# ZPLUG
+
+zplug-install(){
+curl -sL --proto-redir -all,https https://raw.githubusercontent.com/zplug/installer/master/installer.zsh | zsh
+}

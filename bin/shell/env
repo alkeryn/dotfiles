@@ -1,0 +1,14 @@
+#!/bin/bash
+export VISUAL=nvim
+export EDITOR=nvim
+export PATH=$PATH:~/bin:~/bin/launch
+export WINEDLLOVERRIDES="winemenubuilder.exe=d"
+export ZPOOL_VDEV_NAME_PATH=YES
+VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
+stock=/run/media/alkeryn/Stock
+stock2=/run/media/alkeryn/Stock2
+
+if [[ $TERM == xterm-termite ]]; then #Termite directory set
+    . /etc/profile.d/vte.sh
+    __vte_osc7
+fi
