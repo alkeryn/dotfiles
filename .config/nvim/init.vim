@@ -102,7 +102,7 @@ colorscheme monokai_pro
 tnoremap <Esc> <C-\><C-n>
 
 "Variables
-let mapleader = "-"
+let mapleader = " "
 
 let g:deoplete#enable_at_startup = 1
 

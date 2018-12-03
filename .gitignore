@@ -62,6 +62,7 @@ bin/Software
 .config/ranger/history
 .config/ranger/tagged
 .config/ranger/bookmarks
+.config/ranger/commands_full.py
 
 
 !.config/termite
@@ -92,13 +93,13 @@ bin/Software
 !.local/share/fonts
 .local/share/fonts/.uuid
 
-!.local/share/nvim
-.local/share/nvim/*
-!.local/share/nvim/site
-.local/share/nvim/site/*
-!.local/share/nvim/site/autoload
-.local/share/nvim/site/autoload/*
-!.local/share/nvim/site/autoload/plug.vim
+# !.local/share/nvim
+# .local/share/nvim/*
+# !.local/share/nvim/site
+# .local/share/nvim/site/*
+# !.local/share/nvim/site/autoload
+# .local/share/nvim/site/autoload/*
+# !.local/share/nvim/site/autoload/plug.vim
 
 #!.local/share/peda
 #.local/share/peda/*

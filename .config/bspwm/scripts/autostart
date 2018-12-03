@@ -27,7 +27,7 @@ nm-applet &
 (pkill -x mpd;mpd) &
 # APPS ~~~~~~~~~~~~~~~~~
 megasync &
-$mainpc && discord-canary &
+$mainpc && (discord-canary || discord) &
 $mainpc && optirun true &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
 ~/.wall &

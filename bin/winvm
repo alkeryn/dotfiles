@@ -38,7 +38,7 @@ case $1 in
 	echo
 	echo ' winvm		--  start the vm'
 	echo ' winvm audio 	--  start the vm and passthrough audio card'
-	echo ' winvm stop 	--  shutdown the vm'
+	echo ' winvm off 	--  shutdown the vm'
 	echo ' winvm -h 	--  show this help'
 	echo
 	;;
