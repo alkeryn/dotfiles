@@ -1,5 +1,0 @@
-#!/bin/sh
-#Get classname of a windows
-NAME=`xprop | grep "^WM_CLASS"`
-echo $NAME
-echo $NAME | awk '{print "Name: " $4}'

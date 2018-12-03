@@ -1,2 +1,0 @@
-#!/bin/bash
-convert -resize $1 $2 Small$2

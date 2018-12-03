@@ -46,19 +46,35 @@ small (){
 convert -resize $1 $2 Small$2
 }
 
-wireless (){
+wifidb (){
 while true
 do
 echo `cat /proc/net/wireless | awk '{print $4}' | tail -n 1 | cut -d '.' -f1 ;sleep 0.01` dBm
 done
 }
 
+ydlmusic (){
+    cd ~/Music/Musiques/Autres/Youtube
+    youtube-dl --playlist-reverse -f bestaudio/best --download-archive list.txt -cio '%(playlist_index)s-%(id)s %(title)s.%(ext)s' https://www.youtube.com/playlist\?list\=PLtuQ0P--dLnwb78V9LdEy0DAFGvZKfMnt 2>> errors.log
+    cd -
+}
+
 wolpc (){
 wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
 }
 
-# ZPLUG
+# Installs
 
 zplug-install(){
 curl -sL --proto-redir -all,https https://raw.githubusercontent.com/zplug/installer/master/installer.zsh | zsh
+}
+
+vimplug-install (){
+curl -fLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
+    https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+}
+
+rice-install (){
+zplug-install
+vimplug-install
 }

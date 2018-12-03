@@ -1,2 +1,0 @@
-#!/bin/bash
-wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b

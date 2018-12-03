@@ -1,6 +1,0 @@
-#!/bin/bash
-while true
-do
-echo `cat /proc/net/wireless | awk '{print $4}' | tail -n 1 | cut -d '.' -f1 ;sleep 0.01` dBm
-done
-
