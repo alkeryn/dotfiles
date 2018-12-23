@@ -12,6 +12,9 @@ ddusb (){
     shift 2
     sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
 }
+mipsl (){
+    ip addr |  awk '/inet6.*global/{print substr($2,1,length($2)-3)}'
+}
 
 #Command
 
