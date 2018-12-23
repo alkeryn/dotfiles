@@ -1,6 +1,7 @@
 #!/bin/bash
 export VISUAL=nvim
 export EDITOR=nvim
+export MANPAGER='nvim -c "set ft=man"'
 export PATH=$PATH:~/bin:~/bin/launch
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
