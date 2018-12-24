@@ -11,7 +11,7 @@ fi
 ~/.config/bspwm/scripts/redo &
 # End Exec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-bspc rule -r $(bspc rule -l)
+bspc rule -r \*
 
 #monitor=($(xrandr -q | grep " connected" | cut -d" " -f1 ))
 

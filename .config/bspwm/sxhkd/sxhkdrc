@@ -124,7 +124,7 @@ super + {_,alt + }c
 
 # focus/send to the next/previous desktop in the current monitor
 super + {_,shift + }{dead_circumflex,dollar}
-	bspc {desktop -f,node -d } {prev,next}.local {,--follow}
+	bspc {desktop -f,node -d } {prev,next}.local {,--follow} &>/dev/null
 
 # focus the last node/desktop
 # #TAB desktop
@@ -139,7 +139,7 @@ super + {parenright,equal}
 
 # focus or send to the given desktop
 super + {_,shift + }{ampersand,eacute,quotedbl,apostrophe,parenleft,minus,egrave,underscore,ccedilla,agrave}
-	bspc {desktop -f,node -d} '^{1-9,10}' {,--follow}
+	bspc {desktop -f,node -d} '^{1-9,10}' {,--follow} &>/dev/null
 # Layer ---------------------------------------------------------------------------------------------
 super + shift + {m,ugrave,asterisk}
 	bspc node -l {below,normal,above}
