@@ -9,7 +9,6 @@
 [bar/mainpc]
 ;bottom = false
 
-tray-transparent = true
 ;monitor = ${env:MONITOR:HDMI-1}
 
 ;override-redirect = true
@@ -46,12 +45,12 @@ modules-right = filesystem mpd volume xkeyboard memory temperature cpu date
 
 tray-position = right
 tray-padding = 5
-tray-background = #ffffff
+tray-transparent = true
+;tray-background = #000000
 
 [bar/laptop]
 ;bottom = false
 
-tray-transparent = true
 monitor = ${env:MONITOR:eDP1}
 
 ;override-redirect = true
@@ -88,7 +87,8 @@ modules-right = backlight filesystem mpd volume xkeyboard memory temperature1 cp
 
 tray-position = right
 tray-padding = 5
-tray-background = #ffffff
+tray-transparent = true
+;tray-background = #000000
 
 [colors]
 ;background = ${xrdb:color0:#222}
