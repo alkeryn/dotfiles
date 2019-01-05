@@ -43,44 +43,40 @@ Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
 Plug 'zchee/deoplete-clang'
 Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'zchee/deoplete-jedi'
-
 Plug 'zchee/deoplete-zsh'
-Plug 'kovetskiy/sxhkd-vim'
+
 
 Plug 'Shougo/neoinclude.vim' "also check completion in includes
-"Plug 'Valloric/YouCompleteMe'
 
-Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] }
+Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'npm install' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
+Plug 'tpope/vim-surround' "Sourounding
+Plug 'honza/vim-snippets' "snippets engine
+Plug 'SirVer/ultisnips' "sippets
 
 "Tools
 Plug 'ervandew/supertab'
 Plug 'scrooloose/nerdtree'
 Plug 'junegunn/fzf.vim'
-Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
-
-Plug 'tpope/vim-surround' "Sourounding
 Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
+Plug 'KabbAmine/vCoolor.vim' " color picker
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
 
-Plug 'KabbAmine/vCoolor.vim' " color picker
-
-Plug 'honza/vim-snippets' "snippets engine
-Plug 'SirVer/ultisnips' "sippets
-
 "Looks
 Plug 'luochen1990/rainbow' "rainbow highlight brackets
+Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
 Plug 'neomake/neomake' "do full syntax checking for most languages
 Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'miyakogi/seiya.vim' "background transparent again
+Plug 'kovetskiy/sxhkd-vim'
 
 "Themes
 Plug 'chriskempson/base16-vim'
@@ -105,7 +101,7 @@ tnoremap <Esc> <C-\><C-n>
 let mapleader = " "
 
 let g:deoplete#enable_at_startup = 1
-
+let g:AutoClosePumvisible = {"ENTER": "<C-Y>", "ESC": "<ESC>"} "fix autoclose breaking escape exit autocompletion
 let g:NERDTreeDirArrowExpandable = '▸'
 let g:NERDTreeDirArrowCollapsible = '▾'
 
@@ -131,6 +127,7 @@ noremap <C-n> :NERDTreeToggle<CR>
 nnoremap <C-_> :noh<CR>
 nnoremap <C-ç> :set hlsearch!<CR>
 nnoremap Q <nop> "Disable annoying EX mode
+let g:SuperTabDefaultCompletionType = "<c-n>"
 
 "tab nav with shift
 nnoremap <C-J> gT
@@ -147,7 +144,7 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 "Augroup
 augroup AutoGroup
     au!
-    autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
+    " autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
 augroup END
 
 augroup Binary
