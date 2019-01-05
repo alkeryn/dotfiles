@@ -2,7 +2,7 @@
 export VISUAL=nvim
 export EDITOR=nvim
 export MANPAGER='nvim -c "set ft=man"'
-export PATH=$PATH:~/bin:~/bin/launch
+export PATH=$PATH:~/bin:~/.local/bin
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
 VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
