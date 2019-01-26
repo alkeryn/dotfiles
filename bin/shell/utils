@@ -80,4 +80,8 @@ curl -fLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
 rice-install (){
 zplug-install
 vimplug-install
+pip2 install --user neovim
+pip3 install --user neovim
+pip install --user ueberzug
+npm install --user neovim
 }

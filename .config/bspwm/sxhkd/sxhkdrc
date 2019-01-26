@@ -29,7 +29,7 @@ super + Tab
 
 #Ranger
 super + e
-	urxvt -e ranger
+	source ~/bin/shell/env;termite -e ranger
 # Sound  -------------------------------------------------------------------
 #MPC control
 
