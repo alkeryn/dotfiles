@@ -2,3 +2,4 @@
 source /home/alkeryn/bin/wpc
 $mainpc && /home/alkeryn/bin/corsairid
 $mainpc && /home/alkeryn/bin/systemd/scripts/looking-glass
+$mainpc && (sleep 10; /home/alkeryn/bin/systemd/scripts/hdd)

@@ -1,2 +1,0 @@
-#!/bin/bash
-#hdparm -B 127 -S 120 -y /dev/sdb /dev/sdc
