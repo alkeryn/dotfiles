@@ -60,7 +60,7 @@ super + Escape
 
 # Change keyboard layout
 super + {F1,F2,F3}
-	setxkbmap {fr, us, us -variant colemak}; xset r rate 250 75; xmodmap -e "keycode 66 = ISO_Level3_Shift"
+	setxkbmap {fr, us altgr-intl, us colemak}; xset r rate 250 75; xmodmap -e "keycode 66 = ISO_Level3_Shift"
 
 # Bspwm hotkeys -------------------------------------------------------------------------------------
 

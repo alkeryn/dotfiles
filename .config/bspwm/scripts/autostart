@@ -19,7 +19,7 @@ $laptop && xrdb -merge <(echo "Xft.dpi: 180")
 $laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")
 
 #$mainpc && nvidia-settings --load-config-only --assign="SyncToVBlank=0" & #Unlimited Framerate
-$laptop && setxkbmap -option "lv3:caps_switch" &
+setxkbmap -option "lv3:caps_switch" &
 #Others ---------------------
 $laptop && unclutter --timeout 3 -b &
 $mainpc && conky -q &
