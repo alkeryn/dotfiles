@@ -8,8 +8,8 @@
 # Exec ------------------------------------------------------------------
 
 # Screenshot
-super + {_,shift + } Print
-	 {gnome-screenshot -i,scrot}
+super + {_,shift,ctrl} + Print
+	 {maim -u -s -c 255\,0\,0 --format png | xclip -selection clipboard -t image/png -i, maim -u -s -c 255\,0\,0 ~/Images/scrot/$(date +%Y%m%d_%H%M%S).png, scrot ~/Images/scrot/%Y%m%d_%H%M%S.png}
 # Lock
 super + a
 	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
@@ -21,7 +21,7 @@ super + p
 	termite -e ncmpcpp
 
 # Rofi
-super + {_,ctrl + }Return
+super + {_,ctrl} + Return
 	rofi -show {drun -modi drun,run}
 # Rofi Show Windows
 super + Tab
