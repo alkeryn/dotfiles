@@ -36,3 +36,5 @@ source ~/bin/shell/alias
 source ~/bin/shell/env
 source ~/bin/shell/utils
 source ~/bin/shell/zsh
+
+ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff"
