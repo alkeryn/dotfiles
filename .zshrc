@@ -1,21 +1,34 @@
-# Lines configured by zsh-newuser-install
-source ~/.zplug/init.zsh
+source ~/.zsh/antigen.zsh
 
-HISTFILE=~/.histfile
-HISTSIZE=2000
-SAVEHIST=2000
+HISTFILE=~/.zhistory
+HISTSIZE=10000
+SAVEHIST=10000
 setopt extendedglob notify
-# End of lines configured by zsh-newuser-install
-# The following lines were added by compinstall
-
-zstyle compinstall filename '/home/alkeryn/.zshrc'
 
 # ZSH
-autoload -Uz compinit promptinit
-compinit
-promptinit
-source "${ZDOTDIR:-$HOME}/.zprezto/init.zsh"
-#prompt elite
+
+eval $(dircolors -b)
+zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS} #completion colors
+
+# Zplug
+
+
+antigen use prezto
+antigen bundle sorin-ionescu/prezto modules/environement
+antigen bundle sorin-ionescu/prezto modules/terminal
+antigen bundle sorin-ionescu/prezto modules/editor
+antigen bundle sorin-ionescu/prezto modules/history
+antigen bundle sorin-ionescu/prezto modules/directory
+antigen bundle sorin-ionescu/prezto modules/spectrum
+antigen bundle sorin-ionescu/prezto modules/utility
+antigen bundle sorin-ionescu/prezto modules/completion
+# antigen bundle sorin-ionescu/prezto modules/prompt
+
+antigen bundle mafredri/zsh-async
+antigen bundle sindresorhus/pure
+antigen bundle zsh-users/zsh-autosuggestions
+
+antigen apply
 
 # Source
 
