@@ -85,6 +85,7 @@ pip2 install --user neovim
 pip3 install --user neovim
 pip install --user ueberzug
 npm install --user neovim
+rm -f ~/package-lock.json
 }
 
 # ~~~~~~~~~~~~~~~~~~~~
