@@ -27,6 +27,7 @@ antigen bundle sorin-ionescu/prezto modules/completion
 antigen bundle mafredri/zsh-async
 antigen bundle sindresorhus/pure
 antigen bundle zsh-users/zsh-autosuggestions
+antigen bundle zsh-users/zsh-history-substring-search
 
 antigen apply
 
