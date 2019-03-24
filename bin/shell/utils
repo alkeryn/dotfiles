@@ -69,18 +69,24 @@ wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
 # Installs
 
 antigen-install(){
-mkdir ~/.zsh
-curl -sL --proto-redir -all,https git.io/antigen -o ~/.zsh/antigen.zsh
+curl -sLo ~/.zsh/antigen.zsh --create-dirs --proto-redir -all,https \
+    git.io/antigen
 }
 
 vimplug-install (){
-curl -fLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
+curl -sLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
+}
+
+gef-install (){
+curl -sLo ~/.local/share/gdb/gef.py --create-dirs \
+    https://github.com/hugsy/gef/raw/master/gef.py
 }
 
 rice-install (){
 antigen-install
 vimplug-install
+gef-install
 pip2 install --user neovim
 pip3 install --user neovim
 pip install --user ueberzug

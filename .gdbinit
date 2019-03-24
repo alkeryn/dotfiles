@@ -1,1 +1,1 @@
-source /usr/share/peda/peda.py
+source ~/.local/share/gdb/gef.py
