@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 scrot /tmp/screenshot.png
 convert /tmp/screenshot.png -blur 0x3 /tmp/screen.png
 if [[ -f $HOME/.config/misc/locka.png ]]

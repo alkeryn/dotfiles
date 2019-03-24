@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 imgpath=$(cat ~/.fehbg | awk '{print $3}' | tail -c +3 | head -c -2) #Don't work with witespace
 #imgtarget=~/.config/misc/flock.png
 imgtarget=/tmp/canvas.png

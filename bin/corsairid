@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #find the eventid of corsair keyboard and make a symlink in /dev/input for evdev passthrough
 echo "Corsairid Launched"
 until paths=`ls -d /sys/devices/virtual/input/input* 2>/dev/null`;do sleep 1; done

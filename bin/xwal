@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # use mplayer instead of mpv
 # use gifview or a better program for gifs you can resize gifs using gifsicle
 #declare X Y OX OY

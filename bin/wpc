@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 export mainpc=false
 export laptop=false
 export mainpcenv

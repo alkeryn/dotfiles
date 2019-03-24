@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 source /home/alkeryn/bin/wpc
 $mainpc && /home/alkeryn/bin/corsairid
 $mainpc && /home/alkeryn/bin/systemd/scripts/looking-glass

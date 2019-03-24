@@ -1,4 +1,4 @@
-#!/bin/env bash
+#!/usr/bin/env bash
 if xsetwacom --list devices | grep -q WL; then
 Eraser=$(xsetwacom --list devices | awk /eraser/'{print $9}')
 Stylus=$(xsetwacom --list devices | awk /stylus/'{print $9}')

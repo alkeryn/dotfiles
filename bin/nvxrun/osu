@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ~/.config/bspwm/scripts/redo &
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
 $laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &

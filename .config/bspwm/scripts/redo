@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 setxkbmap fr
 setxkbmap -option "lv3:caps_switch" &
 # $mainpc && xmodmap -e "keycode 66 = ISO_Level3_Shift"

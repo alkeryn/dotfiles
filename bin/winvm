@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #[[ $EUID -ne 0 ]] && { echo You need to be root; exit 1;} #exit if more than 1 argument
 [[ -n $2 ]] && { echo Too many arguments; exit 1;} #exit if more than 1 argument
 vmstop ()

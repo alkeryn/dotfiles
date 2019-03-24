@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 source ~/bin/wpc # To use $mainpc and $laptop
 # Exec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if [[ $(pgrep -c sxhkd) -eq 0 ]]

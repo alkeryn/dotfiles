@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 touch /dev/shm/looking-glass
 chown alkeryn:kvm /dev/shm/looking-glass
 chmod 660 /dev/shm/looking-glass

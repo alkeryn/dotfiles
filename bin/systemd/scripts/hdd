@@ -1,2 +1,2 @@
-#!/bin/bash
+#!/usr/bin/env bash
 hdparm -B 127 -S 240 -y /dev/sdb /dev/sdc

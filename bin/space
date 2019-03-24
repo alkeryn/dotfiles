@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 zpool list
 echo
 zfs list -t filesystem -o name,compressratio,usedbychildren,used,logicalused,compress

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 alias mip="curl -4 ifconfig.co 2>/dev/null"
 alias mips="curl -6 ifconfig.co 2>/dev/null"
 alias mipa="curl -4 ifconfig.co 2>/dev/null; curl -6 ifconfig.co 2>/dev/null"

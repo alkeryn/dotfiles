@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
 $mainpc && (ckb-next -b &)
 $mainpc && i3lock -n -i ~/.config/misc/flock.png & #  && ./.wall &

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 declare tmp
 what=~/Documents/VPN/ovpn_tcp/fr*
 multithread(){
