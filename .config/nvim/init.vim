@@ -130,12 +130,17 @@ nnoremap Q <nop> "Disable annoying EX mode
 let g:SuperTabDefaultCompletionType = "<c-n>"
 
 "tab nav with shift
-nnoremap <C-J> gT
-nnoremap <C-K> gt
-nnoremap <C-H> :tabm -1<CR>
-nnoremap <C-L> :tabm +1<CR>
+nnoremap <C-j> gT
+nnoremap <C-k> gt
+nnoremap <C-h> :tabm -1<CR>
+nnoremap <C-l> :tabm +1<CR>
 nnoremap tn :tabnew<CR>
 nnoremap tq :tabclose<CR>
+"splits
+nnoremap <A-h> <C-w>h
+nnoremap <A-j> <C-w>j
+nnoremap <A-k> <C-w>k
+nnoremap <A-l> <C-w>l
 
 "Quick edit init.vim
 nnoremap <leader>ev :vsplit $MYVIMRC<cr>
