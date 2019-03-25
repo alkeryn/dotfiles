@@ -4,7 +4,6 @@ application/pdf=evince.desktop;
 image/gif=imv.desktop;feh.desktop;
 image/jpeg=imv.desktop;
 image/png=imv.desktop;
-inode/directory=ranger.desktop;
 video/mp4=mpv.desktop;
 text/html=gvim.desktop;nvim.desktop;chromium.desktop;
 video/x-matroska=mpv.desktop;
@@ -22,6 +21,7 @@ application/x-extension-xht=chromium.desktop;
 [Removed Associations]
 
 [Default Applications]
+inode/directory=ranger.desktop;
 video/mp4=mpv.desktop;
 image/gif=imv.desktop
 image/jpeg=imv.desktop
