@@ -7,7 +7,7 @@ alias cpa="cp -axvuf"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
 alias up='sudo pacman -Syu --noconfirm'
-alias up2='yay -Syu --noconfirm --noeditmenu --pgpfetch'
+alias up2='yay -Syu --noconfirm --noeditmenu --pgpfetch --sudoloop'
 alias sudo='sudo -E'
 alias vim='nvim'
 alias v='nvim'
