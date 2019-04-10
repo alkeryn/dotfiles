@@ -4,7 +4,7 @@ mkdir -p ~/Cloud/Mega
 mkdir ~/Downloads
 mkdir -p ~/tmp/tmp
 
-pacman -Syu $(cat /home/alkeryn/bin/misc/Install/pacman)
+pacman -Syu $(cat /home/alkeryn/bin/etc/Install/pacman)
 #mkdir -p ~/{App/{chroot,ISO,VM,wine},Cloud/Mega,Downloads,tmp/tmp}
 
 #~/bin/misc/install/zsh
