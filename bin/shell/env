@@ -3,8 +3,11 @@ export VISUAL=nvim
 export EDITOR=nvim
 export MANPAGER='nvim -c "set ft=man"'
 export PATH=$PATH:~/bin:~/.local/bin
+
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
+export ANDROID_HOME=~/.android-sdk #flutter needs that
+
 VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2

@@ -50,6 +50,7 @@ Plug 'Shougo/neoinclude.vim' "also check completion in includes
 
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'npm install' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
+Plug 'dart-lang/dart-vim-plugin' " Dart completion
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
