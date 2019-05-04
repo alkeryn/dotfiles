@@ -48,7 +48,6 @@ case $PC in
 	bspc rule -a discord desktop='^1'
 	bspc rule -a skypeforlinux desktop='1'
 	bspc rule -a qBittorrent desktop='2' follow=on
-	bspc rule -a Virt-manager desktop='3' follow=on
 	;;
     laptop)
 	# If docked
@@ -83,3 +82,4 @@ bspc rule -a 'VESC Tool' desktop=8 follow=on
 bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
 bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
 bspc rule -a looking-glass-client desktop=8 follow=on
+bspc rule -a Zathura state=tiled
