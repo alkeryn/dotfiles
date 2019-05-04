@@ -27,7 +27,7 @@ alias caup='update-desktop-database ~/.local/share/applications && update-mime-d
 alias webcam='mpv tv:// --tv-driver=v4l2 --tv-device=/dev/video0'
 alias winetricks='sh winetricks'
 alias speedtest='speedtest --bytes'
-alias gpg='gpg --keyserver pgp.mit.edu'
+alias gpg='gpg --keyserver hkps.pool.sks-keyservers.net'
 alias rangimg='while true; do pkill w3mimgdisplay; sleep 5;done'
 alias screen="screen -q"
 alias diff="diff --color=always"
