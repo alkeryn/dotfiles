@@ -38,6 +38,11 @@ docker export "$(docker create --name $(basename "$2"temp) $1 true)" | tar -x -C
 docker rm $(basename "$2"temp)
 }
 
+gitforce (){
+echo -n Are you sure \?
+read
+git add . && git commit --amend --date=$(date --iso-8601=seconds) && git push --force
+}
 getname (){
 #Get classname of a windows
 NAME=`xprop | grep "^WM_CLASS"`
