@@ -51,6 +51,7 @@ Plug 'Shougo/neoinclude.vim' "also check completion in includes
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'npm install' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'dart-lang/dart-vim-plugin' " Dart completion
+Plug 'sirtaj/vim-openscad' " openscad
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
@@ -146,6 +147,9 @@ nnoremap <A-l> <C-w>l
 "Quick edit init.vim
 nnoremap <leader>ev :vsplit $MYVIMRC<cr>
 nnoremap <leader>sv :source $MYVIMRC<cr>
+nnoremap <leader>w :w<cr>
+nnoremap <leader>q :q<cr>
+nnoremap <leader>Q :q!<cr>
 
 "Augroup
 augroup AutoGroup
