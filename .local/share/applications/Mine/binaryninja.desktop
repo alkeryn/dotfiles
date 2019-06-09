@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Binary Ninja
+Exec=/home/alkeryn/.local/bin/binaryninja
+Icon=binaryninja
+Type=Application
+Categories=Development;Debugger;Profiling;
