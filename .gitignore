@@ -3,6 +3,7 @@
 # home
 !bin
 bin/Software
+!.nix-channels
 !.fishrc
 !.gitignore
 !todo.md
@@ -43,6 +44,9 @@ bin/Software
 !.config/mpv
 .config/mpv/*
 !.config/mpv/mpv.conf
+
+!.config/nixos
+!.config/nixpkgs
 
 !.config/ncmpcpp
 .config/ncmpcpp/*

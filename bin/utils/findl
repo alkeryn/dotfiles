@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+findlib(){
+    local arch=$1
+    shift
+
+    if [ -z "$2" ]
+    then
+	for i in /nix/store/$1/
+	do
+	    file -L "$i"lib/*.so | grep $arch
+	done | head -n1 | cut -d"/" -f1-5 | sed 's/$/\//'
+
+    else
+	file -L /nix/store/$1/lib/$2 | grep 64-bit | head -n1 | sed "s/$2.*//"
+    fi
+}
+
+findlib32(){
+    findlib 32-bit $@
+}
+findlib64(){
+    findlib 64-bit $@
+}
+
+# time findlib64 *zlib* libz.so.1
+# time findlib64 *zlib*

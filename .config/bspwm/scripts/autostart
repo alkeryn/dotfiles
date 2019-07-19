@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
 $mainpc && (ckb-next -b &)
-$mainpc && i3lock -n -i ~/.config/misc/flock.png & #  && ./.wall &
-$laptop && i3lock -i ~/.config/misc/flocklap.png &
+$mainpc && i3lock -n -i ~/.config/etc/flock.png & #  && ./.wall &
+$laptop && i3lock -i ~/.config/etc/flocklap.png &
 setxkbmap fr
 numlockx on
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
@@ -27,7 +27,7 @@ nm-applet &
 (pkill -x mpd;mpd) &
 # APPS ~~~~~~~~~~~~~~~~~
 megasync &
-$mainpc && (discord-canary || discord) &
+$mainpc && (discord-canary || discord || Discord) &
 $mainpc && optirun true &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
 ~/.wall &

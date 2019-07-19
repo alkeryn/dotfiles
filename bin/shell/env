@@ -6,13 +6,19 @@ export PATH=$PATH:~/bin:~/.local/bin:/opt/rocm/hip/bin
 
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
-export ANDROID_HOME=~/.android-sdk #flutter needs that
+export ANDROID_HOME=~/.local/opt/androidsdk #flutter needs that
+unset SSH_ASKPASS
 
 VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
 if [[ $TERM == xterm-termite ]]; then #Termite directory set
-    . /etc/profile.d/vte.sh
+    # source ./etc/vte.sh
+    source $(dirname $0)/etc/vte.sh
     __vte_osc7
+    TERM=xterm-256color
 fi
+
+$mainpc && export NIXOS_CONFIG=~/.config/nixos/mainpc.nix
+$laptop && export NIXOS_CONFIG=~/.config/nixos/laptop.nix

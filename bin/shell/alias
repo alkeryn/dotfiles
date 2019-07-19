@@ -6,8 +6,6 @@ alias cpd="cp -axrfT"
 alias cpa="cp -axvuf"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
-alias up='sudo pacman -Syu --noconfirm'
-alias up2='yay -Syu --noconfirm --noeditmenu --pgpfetch --sudoloop'
 alias sudo='sudo -E'
 alias vim='nvim'
 alias v='nvim'
@@ -51,3 +49,18 @@ alias :q="exit"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 
 unalias rm
+
+case $(grep "^ID=" /etc/os-release | cut -d"=" -f2) in
+    nixos)
+	alias symld="sudo mkdir /lib64;sudo ln -sf $(file -L /usr/bin/env | cut -d"," -f5 | cut -d" " -f3) /lib64/ld-linux-x86-64.so.2"
+	alias up="sudo nixos-rebuild switch --upgrade"
+	alias nix-shell="nix-shell --run zsh"
+	;;
+    arch)
+	alias up='sudo pacman -Syu --noconfirm'
+	alias up2='yay -Syu --noconfirm --noeditmenu --pgpfetch --sudoloop'
+	;;
+    debian | ubuntu )
+	alias up='sudo su -c "apt update; apt upgrade;apt full-upgrade"'
+	;;
+esac

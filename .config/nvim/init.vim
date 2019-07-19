@@ -79,6 +79,7 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'miyakogi/seiya.vim' "background transparent again
 Plug 'kovetskiy/sxhkd-vim'
+Plug 'LnL7/vim-nix' "nix vim syntax
 
 "Themes
 Plug 'chriskempson/base16-vim'

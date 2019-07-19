@@ -1,4 +1,5 @@
 source ~/.zsh/antigen.zsh
+source ~/bin/wpc
 
 HISTFILE=~/.zhistory
 HISTSIZE=10000
@@ -9,6 +10,7 @@ setopt extendedglob notify
 
 eval $(dircolors -b)
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS} #completion colors
+zstyle ':completion:*' rehash true #reload path when new software installed
 
 # Zplug
 
@@ -28,6 +30,7 @@ antigen bundle mafredri/zsh-async
 antigen bundle sindresorhus/pure
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
+antigen bundle spwhitt/nix-zsh-completions.git
 
 antigen apply
 
