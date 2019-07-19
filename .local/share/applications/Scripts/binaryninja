@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+if [[ $(head -n 1 /etc/os-release | cut -d"=" -f2) = NixOS ]]
+then
+    source ~/bin/utils/findl
+    export LD_LIBRARY_PATH=\
+$(findlib64 *gcc*-lib libstdc++.so.6 ):\
+$(findlib64 *libGLU* libGL.so.1):\
+$(findlib64 *zlib* libz.so.1):\
+$(findlib64 *glib* libgthread-2.0.so.0):\
+$(findlib64 *qtbase* libQt5Concurrent.so):\
+$LD_LIBRARY_PATH
+
+    exec ~/.local/opt/binaryninja/binaryninja $@
+else
+    exec ~/.local/opt/binaryninja/binaryninja $@
+fi

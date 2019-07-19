@@ -1,6 +1,6 @@
 [Desktop Entry]
 Name=Binary Ninja
-Exec=/home/alkeryn/.local/bin/binaryninja
+Exec=sh -c "$HOME/.local/share/applications/Scripts/binaryninja"
 Icon=binaryninja
 Type=Application
 Categories=Development;Debugger;Profiling;
