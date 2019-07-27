@@ -13,6 +13,8 @@
       zfs
     ];
     hardware.ckb-next.enable = true;
+    hardware.bluetooth.enable = true;
+    hardware.steam-hardware.enable = true;
 
     services.openssh = {
       enable = true;
@@ -20,6 +22,7 @@
       passwordAuthentication = false;
       permitRootLogin = "no";
     };
+
     networking.hostName = "Alkeryn-PC";
     networking.hostId = "8fddb2a7";
 
@@ -27,6 +30,10 @@
         # address = "192.168.1.2";
         # prefixLength = 24;
     # } ];
+
+    boot.extraModprobeConfig =''
+    options bluetooth disable_ertm=1
+'';
 
     services.xserver.videoDrivers = [ "nvidia" ];
     services.xserver.screenSection = ''
