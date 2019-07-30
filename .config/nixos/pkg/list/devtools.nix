@@ -4,6 +4,7 @@
     environment.systemPackages = with pkgs; [
       cmake
       gcc
+      git
       clang
       nodejs
       python

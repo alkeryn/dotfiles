@@ -1,14 +1,16 @@
 { config, pkgs, ... }:
 
+let
+  overlays = with pkgs; [ ueberzug ];
+in
 {
   imports = [
-    ./list.nix
-    ./xorg/apps.nix
-    ./xorg/fonts.nix
-    ./xorg/games.nix
-    ./xorg/utils.nix
-    ./xorg/media.nix
-    ./xorg/themes.nix
+    ./apps.nix
+    ./fonts.nix
+    ./games.nix
+    ./utils.nix
+    ./media.nix
+    ./themes.nix
   ];
 
   environment.systemPackages = with pkgs; [
@@ -26,7 +28,7 @@
     sxhkd
     termite
     xclip
-  ];
+  ] ++ overlays;
 
   services.xserver = {
     enable = true;
