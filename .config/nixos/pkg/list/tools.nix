@@ -2,7 +2,12 @@
 
 {
     environment.systemPackages = with pkgs; [
-      killall
+      file
       hdparm
+      killall
+      exiftool
+      sshfs-fuse
+      usbutils
+      youtube-dl
     ];
 }

@@ -2,6 +2,7 @@
 
 let
   overlays = with pkgs; [ ueberzug ];
+  qt = with pkgs; [ libsForQt512.qtstyleplugins qt512.qtx11extras qt512.qtbase];
 in
 {
   imports = [
@@ -15,6 +16,7 @@ in
 
   environment.systemPackages = with pkgs; [
     bspwm
+    i3lock
     compton
     conky
     feh
@@ -28,7 +30,10 @@ in
     sxhkd
     termite
     xclip
-  ] ++ overlays;
+    xorg.xhost
+  ]
+  ++ qt
+  ++ overlays;
 
   services.xserver = {
     enable = true;

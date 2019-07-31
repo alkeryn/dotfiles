@@ -4,8 +4,13 @@
   environment.systemPackages = with pkgs; [
     chromium
     discord
+    epiphany
+    evince
+    gnome3.nautilus
     i3lock
     imagemagick
-    gnome3.nautilus
+    qbittorrent
+    spotify
+    xorg.xeyes
   ];
 }

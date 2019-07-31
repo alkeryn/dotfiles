@@ -4,6 +4,17 @@
 
 { config, pkgs, ... }:
 
+let
+  rangertools = with pkgs; [
+    atool
+    highlight
+    mediainfo
+  ];
+  nixtools = with pkgs; [
+    nix-prefetch-git
+    patchelf
+  ];
+in
 {
   imports =
     [ # Include the results of the hardware scan.
@@ -14,13 +25,19 @@
   system.autoUpgrade.channel = "https://nixos.org/channels/nixos-unstable";
 
   environment.systemPackages = with pkgs; [
-    htop
-    neovim
+    bind
     fzf
-    ranger
+    htop
+    lsof
+    mosh
     neofetch
+    neovim
+    ranger
+    unzip
     zsh
-  ];
+  ]
+  ++ rangertools
+  ++ nixtools;
 
   environment.variables = {
     LIBVIRT_DEFAULT_URI="qemu:///system";

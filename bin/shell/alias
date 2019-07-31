@@ -56,6 +56,7 @@ case $(grep "^ID=" /etc/os-release | cut -d"=" -f2) in
 	alias up="sudo nixos-rebuild switch --upgrade"
 	alias nix-shell="nix-shell --run zsh"
 	alias nix-env="nix-env -f '<nixpkgs>'"
+	alias nenv="nix-env"
 	;;
     arch)
 	alias up='sudo pacman -Syu --noconfirm'

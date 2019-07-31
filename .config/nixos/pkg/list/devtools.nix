@@ -1,14 +1,24 @@
 { config, pkgs, ... }:
 
+let
+  languages = with pkgs;[
+    clisp
+    python
+    python3
+  ];
+in
 {
     environment.systemPackages = with pkgs; [
-      cmake
-      gcc
-      git
+      binutils
       clang
+      cmake
+      debootstrap
+      gcc
+      gdb
+      git
+      gnumake
       nodejs
-      python
-      python3
-    ];
+      qemu
+    ] ++ languages;
     programs.adb.enable = true;
 }
