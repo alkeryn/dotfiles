@@ -1,9 +1,6 @@
 source ~/.zsh/antigen.zsh
 source ~/bin/wpc
 
-HISTFILE=~/.zhistory
-HISTSIZE=10000
-SAVEHIST=10000
 setopt extendedglob notify
 
 # ZSH
@@ -42,3 +39,7 @@ source ~/bin/shell/utils
 source ~/bin/shell/zsh
 
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff"
+
+HISTFILE=~/.zhistory
+HISTSIZE=999999999
+SAVEHIST=$HISTSIZE
