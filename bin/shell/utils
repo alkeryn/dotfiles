@@ -143,10 +143,18 @@ pip install --user ueberzug
 }
 
 # ~~~~~~~~~~~~~~~~~~~~
-$mainpc && zsnap () {
-sudo zfs snapshot stock/stock/Media@$(date +%Y%m%d_%H%M%S)
-while [ $(zfs list -t snapshot -H -r stock | wc -l) -gt 3 ]
-do
-    sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r stock | head -n1)
-done
+
+zsnap () {
+(
+zsnap(){
+    sudo zfs snapshot "$1"@$(date +%Y%m%d_%H%M%S)
+    while [ $(zfs list -t snapshot -H -r "$1" | wc -l) -gt 3 ]
+    do
+	sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r "$1" | head -n1)
+    done
+}
+$mainpc && zsnap stock/stock/Media
+$mainpc && zsnap linux/root/nixos
+zsnap linux/data/home
+)
 }
