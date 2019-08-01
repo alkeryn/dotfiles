@@ -51,7 +51,10 @@ echo $NAME | awk '{print "Name: " $4}'
 }
 
 small(){
-convert -resize $1 $2 Small$2
+    [[ $# < 2 ]] && return 1
+    local much=$1 a=$2 b
+    [[ $# == 2 ]] && { b=$a;shift 2; } || { b=$3;shift 3; }
+    convert -resize $much $a $b
 }
 
 wifidb(){
@@ -59,6 +62,25 @@ while true
 do
 echo `cat /proc/net/wireless | awk '{print $4}' | tail -n 1 | cut -d '.' -f1 ;sleep 0.01` dBm
 done
+}
+
+waifu2x-converter-cpp(){
+grep -q "^ID=nixos" /etc/os-release && {
+    export LD_LIBRARY_PATH=$(bash -c "source ~/bin/utils/findl;findlib64 *ocl-icd*"):$LD_LIBRARY_PATH; }
+command waifu2x-converter-cpp $@
+}
+
+waifu(){
+    [[ $# < 2 ]] && { waifu2x-converter-cpp; return 1; }
+    local algo=$1 a=$2 b
+    [[ $# == 2 ]] && { b=$a;shift 2; } || { b=$3;shift 3; }
+    waifu2x-converter-cpp -m $algo -i "$a" -o "$b" $@
+}
+wnoise(){
+    waifu noise $@
+}
+wscale(){
+    waifu scale $@
 }
 
 revshell(){
