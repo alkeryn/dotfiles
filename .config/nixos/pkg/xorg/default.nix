@@ -35,6 +35,10 @@ in
   ++ qt
   ++ overlays;
 
+  environment.variables = {
+    TERMINAL="termite";
+  };
+
   services.xserver = {
     enable = true;
     autorun = true;
