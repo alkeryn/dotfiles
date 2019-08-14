@@ -4,7 +4,8 @@
   imports =
     [
       ./devtools.nix
-      ./tools.nix
       ./hacking.nix
+      ./sdr.nix
+      ./tools.nix
     ];
 }
