@@ -54,6 +54,10 @@ in
   boot.supportedFilesystems = ["zfs"];
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
+  virtualisation.libvirtd = {
+    enable = true;
+    qemuOvmf = true;
+  };
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -100,7 +104,7 @@ in
   users.users.root.shell = pkgs.zsh;
   users.users.alkeryn = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "adbusers" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "adbusers" "libvirtd" ]; # Enable ‘sudo’ for the user.
     uid = 1000;
     shell = pkgs.zsh;
   };
