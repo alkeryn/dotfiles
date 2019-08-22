@@ -16,6 +16,11 @@
     hardware.ckb-next.enable = true;
     hardware.bluetooth.enable = true;
     hardware.steam-hardware.enable = true;
+    hardware.pulseaudio.daemon.config = {
+      default-sample-rate = "96000";
+      default-sample-format = "s32le";
+      resample-method = "src-sinc-best-quality";
+    };
 
     services.openssh = {
       enable = true;
