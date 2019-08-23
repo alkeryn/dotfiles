@@ -9,7 +9,7 @@
 [bar/mainpc]
 ;bottom = false
 
-;monitor = ${env:MONITOR:HDMI-1}
+monitor = ${env:MONITOR:HDMI-0}
 
 ;override-redirect = true
 wm-restack = bspwm
