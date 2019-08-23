@@ -2,7 +2,7 @@
 
 let
   overlays = with pkgs; [ ueberzug ];
-  qt = with pkgs; [ libsForQt512.qtstyleplugins qt512.qtx11extras qt512.qtbase];
+  qt = with pkgs; [ libsForQt512.qtstyleplugins ];
 in
 {
   imports = [
