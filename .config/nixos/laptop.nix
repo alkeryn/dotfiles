@@ -4,8 +4,8 @@
   imports =
     [
       ./configuration.nix
-      ./pkg/list
-      ./pkg/xorg
+      ./pkgs/list
+      ./pkgs/xorg
     ];
 
     environment.systemPackages = with pkgs; [
