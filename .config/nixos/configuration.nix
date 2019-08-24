@@ -20,7 +20,7 @@ in
     [ # Include the results of the hardware scan.
     /etc/nixos/hardware-configuration.nix
   ];
-  nixpkgs.overlays = [ (import ./overlays/default.nix) ];
+  nixpkgs.overlays = import ./overlays;
 
   system.autoUpgrade.channel = "https://nixos.org/channels/nixos-unstable";
 

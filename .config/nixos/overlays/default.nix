@@ -1,3 +1,5 @@
+[(
+
 self: super:
 {
    bspwm = super.bspwm.overrideAttrs (old: rec {
@@ -11,3 +13,9 @@ self: super:
    });
    ueberzug = super.callPackage ./pkgs/ueberzug.nix {};
 }
+
+)]
+++
+[
+  (import (fetchGit "https://github.com/nixos-rocm/nixos-rocm" ) [] )
+]
