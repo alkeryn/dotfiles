@@ -55,6 +55,7 @@ bin/Software
 
 !.config/nvim
 .config/nvim/colors/base16*
+.config/nvim/spell
 
 !.config/polybar
 
