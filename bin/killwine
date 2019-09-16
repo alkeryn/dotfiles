@@ -1,2 +1,2 @@
 #!/bin/sh
-ps ax | egrep "*.exe|*exe]" | awk '{ print $1 }' | head -n -1 | xargs kill
+ps ax | grep -E "*\.exe" | grep -v "grep -E" | awk '{ print $1 }' | xargs kill
