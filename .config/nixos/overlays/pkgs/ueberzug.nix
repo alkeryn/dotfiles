@@ -5,23 +5,23 @@ with python3Packages;
 let
   pillow-simd = pillow.overrideAttrs (_: rec {
     pname = "Pillow-SIMD";
-    version = "5.4.1";
+    version = "6.0.0";
 
     src = fetchFromGitHub {
       owner = "uploadcare";
       repo = "pillow-simd";
       rev = version;
-      sha256 = "07c4pkyfg641mb0xfqw349p5s11n4f241v3mkvba2z58w112kgmf";
+      sha256 = "05i862vlxndh1wsrr8hvw7k2inr1xfzaj4ywwb0fw7kfaws8fjnf";
     };
   });
 in
   buildPythonPackage rec {
     pname = "ueberzug";
-    version = "18.1.3";
+    version = "18.1.5";
 
     src = fetchPypi {
       inherit pname version;
-      sha256 = "1galc64vbi8d1nbq7d8387my87jq4kqmv30jhlcwrl8g7yph00kg";
+      sha256 = "1rj864sdn1975v59i8j3cfa9hni1hacq0z2b8m7wib0da9apygby";
     };
 
     postPatch = ''
