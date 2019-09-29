@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-scrot /tmp/screenshot.png
+scrot -o /tmp/screenshot.png
 convert /tmp/screenshot.png -blur 0x3 /tmp/screen.png
 if [[ -f $HOME/.config/misc/locka.png ]]
 then
@@ -10,7 +10,7 @@ then
     R=$(file ~/.config/misc/lock.png | grep -o '[0-9]* x [0-9]*')
     RX=$(echo $R | cut -d' ' -f 1)
     RY=$(echo $R | cut -d' ' -f 3)
- 
+
     SR=$(xrandr --query | grep ' connected' | sed 's/primary //' | cut -f3 -d' ')
     for RES in $SR
     do
@@ -21,7 +21,7 @@ then
         SROY=$(echo $RES | cut -d'x' -f 2 | cut -d'+' -f 3) # y offset
         PX=$(($SROX + $SRX/2 - $RX/2))
         PY=$(($SROY + $SRY/2 - $RY/2))
- 
+
         convert /tmp/screen.png $HOME/.config/misc/lock.png -geometry +$PX+$PY -composite -matte  /tmp/screen.png
         echo "done"
     done
