@@ -11,6 +11,9 @@ self: super:
    waifu2x-converter-cpp = (super.waifu2x-converter-cpp.override {
      cudaSupport = true;
    });
+   chromium = (super.chromium.override {
+     enableWideVine = true;
+   });
    ueberzug = super.callPackage ./pkgs/ueberzug.nix {};
 }
 
