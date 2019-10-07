@@ -46,6 +46,10 @@ in
     GTK2_RC_FILES="$HOME/.gtkrc-2.0";
   };
 
+  nix.nixPath = [
+    "nixpkgs=/home/alkeryn/.nixpkgs"
+  ];
+
   boot.tmpOnTmpfs = true;
 
   # Use the systemd-boot EFI boot loader.

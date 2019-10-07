@@ -3,7 +3,6 @@
 # home
 !bin
 bin/Software
-!.nix-channels
 !.fishrc
 !.gitignore
 !todo.md
