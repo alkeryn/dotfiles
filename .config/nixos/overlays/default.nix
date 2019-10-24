@@ -14,6 +14,19 @@ self: super:
    chromium = (super.chromium.override {
      enableWideVine = true;
    });
+
+   neovim = super.neovim.override {
+     withNodeJs = true;
+     configure = {
+       customRC = ''
+         source ~/.config/nvim/init.vim
+         let g:deoplete#sources#clang#libclang_path = "${super.llvmPackages.libclang}/lib/libclang.so"
+         let g:deoplete#sources#clang#clang_header = "${super.llvmPackages.clang-unwrapped}/lib/clang"
+       '';
+         # let g:deoplete#sources#clang#clang_header = "${super.llvmPackages.clang-unwrapped}/lib/clang/${builtins.elemAt (builtins.split "-" super.llvmPackages.clang-unwrapped.name) 2}/include"
+     };
+   };
+
    ueberzug = super.callPackage ./pkgs/ueberzug.nix {};
 }
 
