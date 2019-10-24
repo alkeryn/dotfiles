@@ -108,7 +108,7 @@ in
   users.users.root.shell = pkgs.zsh;
   users.users.alkeryn = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "adbusers" "libvirtd" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "adbusers" "libvirtd" "systemd-journald" ]; # Enable ‘sudo’ for the user.
     uid = 1000;
     shell = pkgs.zsh;
   };

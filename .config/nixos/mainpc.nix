@@ -41,6 +41,7 @@
     options bluetooth disable_ertm=1
 '';
 
+    services.xserver.wacom.enable = true;
     services.xserver.videoDrivers = [ "nvidia" ];
     services.xserver.screenSection = ''
     Option         "metamodes" "DVI-D-0: 1920x1080_144 +1920+0 {ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}, HDMI-0: nvidia-auto-select +0+0 {ForceCompositionPipeline=On, ForceFullCompositionPipeline=On}"
