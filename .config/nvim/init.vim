@@ -36,28 +36,42 @@ set shiftwidth=4 "tab indent size
 set softtabstop=4 "insert tab
 " set expandtab "tabs are space
 
+set completeopt=noinsert,menuone,noselect
+
 call plug#begin('~/.vim/plugged')
 "Auto complete
 
-Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
-Plug 'zchee/deoplete-clang'
-Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
-Plug 'zchee/deoplete-jedi'
-Plug 'zchee/deoplete-zsh'
-
-
+Plug 'neoclide/coc.nvim', {'branch': 'release'}
+Plug 'neoclide/coc-snippets', {'do': 'yarn install --frozen-lockfile'}
+Plug 'jsfaint/coc-neoinclude', {'do': 'yarn install --frozen-lockfile'}
 Plug 'Shougo/neoinclude.vim' "also check completion in includes
 
-Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'npm install' }
+Plug 'neoclide/coc-json', {'do': 'yarn install --frozen-lockfile'}
+Plug 'neoclide/coc-python', {'do': 'yarn install --frozen-lockfile'}
+Plug 'neoclide/coc-tsserver', {'do': 'yarn install --frozen-lockfile'}
+Plug 'neoclide/coc-html', {'do': 'yarn install --frozen-lockfile'}
+Plug 'neoclide/coc-css', {'do': 'yarn install --frozen-lockfile'}
+
+" Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
+" Plug 'zchee/deoplete-clang'
+" Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
+" Plug 'zchee/deoplete-jedi'
+" Plug 'zchee/deoplete-zsh'
+" let g:deoplete#enable_at_startup = 1
+
+
+Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'yarn install --frozen-lockfile' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
-Plug 'dart-lang/dart-vim-plugin' " Dart completion
+
+"Highlighting
+Plug 'dart-lang/dart-vim-plugin' " Dart
 Plug 'sirtaj/vim-openscad' " openscad
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
-Plug 'tpope/vim-surround' "Sourounding
-Plug 'honza/vim-snippets' "snippets engine
-Plug 'SirVer/ultisnips' "sippets
+Plug 'tpope/vim-surround' "sourounding
+Plug 'honza/vim-snippets' "snippets
+Plug 'SirVer/ultisnips' "snippets engine
 
 "Tools
 Plug 'ervandew/supertab'
@@ -103,7 +117,6 @@ tnoremap <Esc> <C-\><C-n>
 "Variables
 let mapleader = " "
 
-let g:deoplete#enable_at_startup = 1
 let g:AutoClosePumvisible = {"ENTER": "<C-Y>", "ESC": "<ESC>"} "fix autoclose breaking escape exit autocompletion
 let g:NERDTreeDirArrowExpandable = '▸'
 let g:NERDTreeDirArrowCollapsible = '▾'
@@ -151,6 +164,8 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 nnoremap <leader>Q :q!<cr>
+
+" nnoremap <leader>f :call CocActionAsync('jumpDefinition')<cr>
 
 "Augroup
 augroup AutoGroup
