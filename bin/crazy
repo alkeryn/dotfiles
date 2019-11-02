@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+j=0
+while read input
+do
+    input=${input,,}
+    for(( i=0;i<${#input};i++ ))
+    do
+	char="${input:$i:1}"
+	if [[ $(( $j & 1 )) -ne 1 ]]; then
+	    echo -n "${char^^}"
+	else
+	    echo -n "$char"
+	fi
+	((j++))
+    done
+    echo
+done
