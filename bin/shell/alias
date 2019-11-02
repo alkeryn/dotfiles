@@ -50,13 +50,18 @@ alias :q="exit"
 
 unalias rm
 
-case $(grep "^ID=" /etc/os-release | cut -d"=" -f2) in
+type -p nix >/dev/null && {
+    alias nix-shell="nix-shell --run zsh"
+    alias nell="nix-shell"
+    alias xell="exec nix-shell --run zsh"
+    alias nix-env="nix-env -f '<nixpkgs>'"
+    alias nenv="nix-env"
+}
+
+case $(source /etc/os-release;echo $ID) in
     nixos)
 	alias symld="sudo mkdir /lib64;sudo ln -sf $(file -L /usr/bin/env | cut -d"," -f5 | cut -d" " -f3) /lib64/ld-linux-x86-64.so.2"
 	alias up="sudo nixos-rebuild switch --upgrade"
-	alias nix-shell="nix-shell --run zsh"
-	alias nix-env="nix-env -f '<nixpkgs>'"
-	alias nenv="nix-env"
 	;;
     arch)
 	alias up='sudo pacman -Syu --noconfirm'
