@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+shopt -s dotglob
+if [ -n "$1" ]
+then
+    mkdir -p "$1"
+    cd "$1"
+    echo $PWD
+fi
+cp -r $(dirname $0)/files/* ./

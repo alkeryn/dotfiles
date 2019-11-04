@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+if [ -n "$1" ]
+then
+    genpath="$(dirname $0)/etc/gen" #where gen files are stored
+    first=$1
+    path="$genpath/$first"
+    shift
+    if [ -e $path ]
+    then
+	if [ -d $path ]
+	then
+	    $path/gen "$@"
+	else
+	    $path "$@"
+	fi
+    else
+	echo No gen script for $first >&2
+	exit 1
+    fi
+else
+    echo no argument given >&2
+    exit 1
+fi
