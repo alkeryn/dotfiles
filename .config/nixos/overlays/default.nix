@@ -20,8 +20,8 @@ self: super:
      configure = {
        customRC = ''
          source ~/.config/nvim/init.vim
-         let g:deoplete#sources#clang#libclang_path = "${super.llvmPackages.libclang}/lib/libclang.so"
-         let g:deoplete#sources#clang#clang_header = "${super.llvmPackages.clang-unwrapped}/lib/clang"
+         let g:deoplete#sources#clang#libclang_path = "${super.llvmPackages_latest.libclang}/lib/libclang.so"
+         let g:deoplete#sources#clang#clang_header = "${super.llvmPackages_latest.clang-unwrapped}/lib/clang"
        '';
          # let g:deoplete#sources#clang#clang_header = "${super.llvmPackages.clang-unwrapped}/lib/clang/${builtins.elemAt (builtins.split "-" super.llvmPackages.clang-unwrapped.name) 2}/include"
      };

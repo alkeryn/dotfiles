@@ -10,14 +10,15 @@ in
 {
     environment.systemPackages = with pkgs; [
       binutils
-      clang
+      llvmPackages_latest.clang
+      clang-tools
       cmake
       debootstrap
       gcc
       gdb
       git
       gnumake
-      nodejs
+      nodejs yarn
       qemu
     ] ++ languages;
     programs.adb.enable = true;

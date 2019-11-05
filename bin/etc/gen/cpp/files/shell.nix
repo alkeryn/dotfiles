@@ -1,7 +1,7 @@
 with import <nixpkgs> {};
 mkShell rec {
   nativeBuildInputs = [
-    clang_9
+    llvmPackages_latest.clang
   ];
   buildInputs = [
     # glew
