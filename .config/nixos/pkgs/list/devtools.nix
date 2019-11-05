@@ -3,23 +3,30 @@
 let
   languages = with pkgs;[
     clisp
+    dart
+    go
+    nodejs yarn
     python
     python3
   ];
 in
 {
     environment.systemPackages = with pkgs; [
+      bear
       binutils
-      llvmPackages_latest.clang
+      ccls
       clang-tools
       cmake
       debootstrap
+      direnv
       gcc
       gdb
       git
       gnumake
-      nodejs yarn
+      llvmPackages_latest.clang
+      pandoc
       qemu
+      stdman
     ] ++ languages;
     programs.adb.enable = true;
 }

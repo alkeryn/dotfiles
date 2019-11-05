@@ -2,9 +2,11 @@
 
 {
   environment.systemPackages = with pkgs; [
-    xorg.xev
     glxinfo
-    virtmanager
     megasync
+    virtmanager
+    xorg.xev
+    xsel
+    xwinwrap
   ];
 }

@@ -12,6 +12,7 @@ let
   ];
   nixtools = with pkgs; [
     nix-prefetch-git
+    nix-review
     patchelf
   ];
 in

@@ -3,9 +3,11 @@
 {
   environment.systemPackages = with pkgs; [
     nmap
-    whois
-    socat
+    pythonPackages.binwalk
     radare2
+    socat
+    tcpdump
+    whois
     xxd
   ];
 }
