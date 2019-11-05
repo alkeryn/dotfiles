@@ -81,6 +81,7 @@ Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitesp
 Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
 Plug 'KabbAmine/vCoolor.vim' " color picker
+Plug 'direnv/direnv.vim' " direnv integration
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors

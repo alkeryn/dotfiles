@@ -8,6 +8,8 @@ export MAKEFLAGS="-j$(nproc)"
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
 export ZPOOL_VDEV_NAME_PATH=YES
 export ANDROID_HOME=~/.local/opt/androidsdk #flutter needs that
+export DIRENV_LOG_FORMAT=
+
 unset SSH_ASKPASS
 
 VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
