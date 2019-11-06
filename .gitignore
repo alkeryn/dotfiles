@@ -45,6 +45,7 @@ bin/Software
 !.config/mpv/mpv.conf
 
 !.config/nixos
+.config/nixos/hardware-configuration.nix
 !.config/nixpkgs
 
 !.config/ncmpcpp
