@@ -3,12 +3,14 @@
 {
   imports =
     [
+      /etc/nixos/hardware-configuration.nix
+    ]
+    ++
+    [
       ./configuration.nix
       ./pkgs/list
       ./pkgs/xorg
     ];
-
-    nixpkgs.config.allowUnfree = true;
 
     environment.systemPackages = with pkgs; [
       zfs

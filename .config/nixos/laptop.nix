@@ -3,6 +3,10 @@
 {
   imports =
     [
+      /etc/nixos/hardware-configuration.nix
+    ]
+    ++
+    [
       ./configuration.nix
       ./pkgs/list
       ./pkgs/xorg
@@ -17,6 +21,7 @@
     networking = {
       hostName = "Blade";
       networkmanager.enable = true;
-    }
+      wireless.enable = false;
+    };
     users.users.alkeryn.extraGroups = [ "networkmanager" ];
   }
