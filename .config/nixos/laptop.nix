@@ -13,13 +13,26 @@
     ];
 
     environment.systemPackages = with pkgs; [
-      tlp
+      networkmanagerapplet
+      unclutter
       xorg.xbacklight
+      xss-lock
     ];
 
-    services.xserver.libinput.enable = true;
+    services.tlp.enable = true;
+    services.xserver.videoDrivers = [ "intel" ];
+    services.xserver.libinput = {
+      enable = true;
+      naturalScrolling = true;
+      accelSpeed = "0.6";
+    };
+
+    hardware.cpu.intel.updateMicrocode = true;
+    hardware.openrazer.enable = true;
+
     networking = {
       hostName = "Blade";
+      hostId="8425e349";
       networkmanager.enable = true;
       wireless.enable = false;
     };

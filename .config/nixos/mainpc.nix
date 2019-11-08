@@ -15,6 +15,7 @@
     environment.systemPackages = with pkgs; [
       zfs
     ];
+    hardware.cpu.intel.updateMicrocode = true;
     hardware.ckb-next.enable = true;
     hardware.bluetooth.enable = true;
     hardware.steam-hardware.enable = true;

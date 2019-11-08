@@ -53,14 +53,14 @@ case $PC in
 	# If docked
 	if [ `xrandr | grep -c "^DP1 connected"` -gt 0 ]
 	then
-	    bspc monitor eDP1  -d 1 2 3 4
-	    bspc monitor DP1   -d 5 6 7 8 9 10
+	    bspc monitor \^1 -d 1 2 3 4
+	    bspc monitor \^2 -d 5 6 7 8 9 10
 	    bspc rule -a discord desktop='^1'
 	    bspc rule -a qBittorrent desktop='2' follow=on
 	    bspc rule -a skypeforlinux desktop='3'
 	    ~/bin/dock
 	else
-	    bspc monitor eDP1  -d 1 2 3 4 5 6 7 8 9 10
+	    bspc monitor \^1 -d 1 2 3 4 5 6 7 8 9 10
 	    bspc rule -a qBittorrent desktop='9' follow=on
 	    bspc rule -a discord desktop='10'
 	    bspc rule -a skypeforlinux desktop='10'

@@ -157,7 +157,7 @@ zsnap(){
     done
 }
 $mainpc && zsnap stock/stock/Media
-$mainpc && zsnap linux/root/nixos
+zsnap linux/root/nixos
 zsnap linux/data/home
 )
 }
