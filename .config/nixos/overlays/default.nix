@@ -28,10 +28,12 @@ self: super:
    };
 
    ueberzug = super.callPackage ./pkgs/ueberzug.nix {};
+   sycl = super.callPackage ./pkgs/sycl {};
+
 }
 
 )]
 ++
 [
-  (import (fetchGit "https://github.com/nixos-rocm/nixos-rocm" ) [] )
+  (import (fetchGit "https://github.com/nixos-rocm/nixos-rocm" ) )
 ]
