@@ -12,6 +12,7 @@
       ./pkgs/xorg
     ];
 
+    boot.kernelParams = [ "button.lid_init_state=open" ];
     environment.systemPackages = with pkgs; [
       networkmanagerapplet
       unclutter
