@@ -14,6 +14,14 @@ urxvt.font: xft:hack:size=9
 urxvt.boldfont: xft:hack:bold:size=9
 URxvt.letterSpace: 0
 
+Xft.dpi: 96
+Xft.antialias: true
+Xft.hinting: true
+Xft.rgba: rgb
+Xft.autohint: false
+Xft.hintstyle: hintslight
+Xft.lcdfilter: lcddefault
+
 urxvt.saveLines: 12000
 
 urxvt.pointerColorBackground: [70]#000000

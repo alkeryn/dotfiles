@@ -157,7 +157,13 @@ zsnap(){
     done
 }
 $mainpc && zsnap stock/stock/Media
-zsnap linux/root/nixos
+
+for i in $(zfs list -Hro name linux/root | tail -n +2)
+do
+    zsnap $i
+done
+
 zsnap linux/data/home
+
 )
 }
