@@ -126,7 +126,6 @@ let g:seiya_auto_enable=1
 " Default value: ['ctermbg']
 let g:seiya_target_groups = has('nvim') ? ['guibg'] : ['ctermbg']
 
-
 let g:multi_cursor_use_default_mapping=0
 
 " Default mapping
@@ -166,6 +165,10 @@ nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 nnoremap <leader>Q :q!<cr>
 
+"up down wrap line
+noremap <silent> k gk
+noremap <silent> j gj
+
 " nnoremap <leader>f :call CocActionAsync('jumpDefinition')<cr>
 
 "Augroup
@@ -184,3 +187,5 @@ augroup Binary
     au BufWritePost *.bin if &bin | %!xxd
     au BufWritePost *.bin set nomod | endif
 augroup END
+
+exec "source " . expand("<sfile>:p:h") . "/types.vim"

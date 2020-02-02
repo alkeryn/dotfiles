@@ -2,7 +2,7 @@
 export VISUAL=nvim
 export EDITOR=nvim
 export MANPAGER='nvim -c "set ft=man"'
-export PATH=$PATH:~/bin:~/.local/bin:/opt/rocm/hip/bin
+export PATH=$PATH:~/bin:~/.local/bin
 export MAKEFLAGS="-j$(nproc)"
 
 export WINEDLLOVERRIDES="winemenubuilder.exe=d"
@@ -22,6 +22,8 @@ if [[ $TERM == xterm-termite ]]; then #Termite directory set
     __vte_osc7
     TERM=xterm-256color
 fi
+
+$mainpc && export PATH=$PATH:/opt/rocm/hip/bin:/opt/hipSYCL/CUDA/bin
 
 $mainpc && export NIXOS_CONFIG=~/.config/nixos/mainpc.nix
 $laptop && export NIXOS_CONFIG=~/.config/nixos/laptop.nix
