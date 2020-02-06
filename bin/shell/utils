@@ -6,6 +6,10 @@ winvm () {
     ~/bin/winvm $1 &
 }
 
+adblog(){
+    adb devices | tail -n +2 | cut -f1 | xargs -P0 -I{} adb -s {} logcat | stdbuf -oL grep $@ | cut -d" " -f2,6-
+}
+
 ddusb(){
     local vara=$1
     local varb=$2
