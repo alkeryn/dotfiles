@@ -38,20 +38,24 @@ opengl: $(NAME)
 vulkan: $(NAME)
 gpu: $(NAME)
 
-ifneq (,$(findstring windows,$(MAKECMDGOALS)))
+ifneq ($(findstring windows,$(MAKECMDGOALS)),)
     CXX=x86_64-w64-mingw32-g++
     OGL := -lopengl32 -lglew32
 endif
 
-ifneq (,$(findstring opengl,$(MAKECMDGOALS)))
+ifneq ($(findstring opengl,$(MAKECMDGOALS)),)
     OPTIONS+=-D "OGL"
     LDFLAGS+=$(OGL)
 endif
 
-ifneq (,$(findstring vulkan,$(MAKECMDGOALS)))
+ifneq ($(findstring vulkan,$(MAKECMDGOALS)),)
     OPTIONS+=-D "VK"
 endif
 
-ifneq (,$(findstring gpu,$(MAKECMDGOALS)))
+ifneq ($(findstring gpu,$(MAKECMDGOALS)),)
     OPTIONS+=-D "GPU"
+endif
+
+ifneq ($(shell grep Microsoft /proc/version),) # Build from wsl
+    CXX=clang++.exe
 endif
