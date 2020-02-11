@@ -1,0 +1,2 @@
+#!/bin/bash
+ssh vm ./bin/utils/clangdssh.ps1 $(pwd | cut -d"/" -f5-) $@
