@@ -78,7 +78,7 @@ bin/Software
 .config/vis/*
 !.config/vis/config
 
-!.config/compton.conf
+!.config/picom.conf
 !.config/mimeapps.list
 !.config/user-dirs.dirs
 

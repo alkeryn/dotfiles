@@ -17,7 +17,7 @@ in
   environment.systemPackages = with pkgs; [
     bspwm
     i3lock
-    compton
+    picom
     conky
     feh
     imv

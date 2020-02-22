@@ -7,7 +7,7 @@ setxkbmap fr
 numlockx on
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
 $laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &
-compton -b &
+picom -b &
 
 xsetroot -cursor_name left_ptr &
 xset s off -dpms &
