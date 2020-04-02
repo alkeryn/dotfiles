@@ -75,7 +75,7 @@ bspc rule -a Lxappearance state=floating follow=on
 bspc rule -a Pavucontrol state=floating follow=on
 bspc rule -a Screenkey manage=off
 bspc rule -a vscode-color-ui state=floating follow=on
-bspc rule -a floating state=floating #Makes poping windows on floating doable
+bspc rule -a MEGAsync state=floating #Makes poping windows on floating doable
 
 bspc rule -a 'Gimp-2.8'  desktop=8 state=floating follow=on
 bspc rule -a 'VESC Tool' desktop=8 follow=on
@@ -83,3 +83,5 @@ bspc rule -a 'Ethereum Wallet' desktop=3 state=floating follow=on
 bspc rule -a Ethereumwallet desktop=3 state=floating follow=on
 bspc rule -a looking-glass-client desktop=8 follow=on
 bspc rule -a Zathura state=tiled
+
+bspc rule -a floating state=floating #Makes poping windows on floating doable
