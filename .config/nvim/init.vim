@@ -66,6 +66,7 @@ Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 "Highlighting
 Plug 'dart-lang/dart-vim-plugin' " Dart
 Plug 'sirtaj/vim-openscad' " openscad
+Plug 'https://github.com/ziglang/zig.vim'
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
