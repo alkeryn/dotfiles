@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+if ! cut -d" " -f1 /proc/modules | grep -q v4l2loopback
+then
+    sudo modprobe v4l2loopback
+fi
+
+monitor=$(xrandr --listactivemonitors | grep "${1:-0}": | cut -d" " -f4)
+X=$(cut -d"/" -f1 <<< "$monitor")
+Y=$(cut -d"/" -f2  <<< "$monitor" | cut -d"x" -f2)
+OX=$(cut -d"+" -f2 <<< "$monitor")
+OY=$(cut -d"+" -f3 <<< "$monitor")
+
+RES="$X"x"$Y"
+offset=$DISPLAY+"$OX","$OY"
+
+ffmpeg -f x11grab -framerate 60 -video_size $RES -i $offset -vcodec rawvideo -pix_fmt yuv420p  -f v4l2 /dev/video2
