@@ -17,3 +17,6 @@
   unhide-all = update-index --really-refresh
   hidden = !git ls-files -v | grep \"^[a-z]\"
   ignored = !git status -s --ignored | grep \"^!!\"
+  fzf = !git log --pretty=oneline | fzf | cut -d' ' -f1
+[pull]
+	rebase = false
