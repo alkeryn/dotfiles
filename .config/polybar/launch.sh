@@ -2,13 +2,10 @@
 # Terminate already running bar instances
 killall -q polybar &
 
-export cpuid
+export hwmon
 
-for i in /sys/class/thermal/thermal_zone*/temp
-do
-    cat $i &>/dev/null && { cpuid="$i"; break; }
-done
-cpuid="$(echo $cpuid | cut -d"/" -f5 | sed 's/thermal_zone//g')"
+exp=(/sys/devices/platform/coretemp*/hwmon/hwmon*/temp1_input)
+hwmon=$exp
 
 # Wait until the processes have been shut down
 while pgrep -x polybar >/dev/null; do sleep 1; done

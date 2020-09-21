@@ -382,9 +382,10 @@ bar-volume-empty-foreground = ${colors.foreground-alt}
 
 [module/temperature]
 type = internal/temperature
-thermal-zone = ${env:cpuid:0}
+;thermal-zone = ${env:cpuid:0}
+hwmon-path = ${env:hwmon}
 warn-temperature = 60
-interval = 15
+interval = 1
 format = <ramp> <label>
 format-underline = #00ffff
 format-warn = <ramp> <label-warn>
