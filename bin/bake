@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+export BAKEFILE=./bakefile
+
+export CC=clang
+export CXX=clang++
+
+FLAGS=
+
+if [ -f "$FILE" ]
+then
+    echo source "$BAKEFILE"
+else
+    echo Error : bakefile not found >&2
+    exit 1
+fi
+
