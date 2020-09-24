@@ -1,20 +1,39 @@
 ---
 title: Template
 author: Pierre-Louis Braun
-date:  2019-03-01 - 2019-09-01
+date:  2020-02-01 - 2020-08-01
 header-includes:
+- |
+    ```{=latex}
     \usepackage{graphicx,wrapfig,float}
     \usepackage{fancyvrb,newverbs,xcolor}
+    \usepackage{framed,quoting}
     \graphicspath{{./img/}}
 
-    \definecolor{Light}{HTML}{F4F4F4}
+    \definecolor{Light}{HTML}{E7E7E7}
+
+    % inline block
     \let\oldtexttt\texttt
     \renewcommand{\texttt}[1]{
-      \colorbox{Light}{\oldtexttt{#1}}
+	\colorbox{Light}{\oldtexttt{#1}}
     }
+
+    \newenvironment{lcverbatim}
+    {\SaveVerbatim{cverb}}
+    {\endSaveVerbatim
+	\flushleft\fboxrule=0pt\fboxsep=.5em
+	    \colorbox{Light}{%
+		\makebox[\dimexpr\linewidth-2\fboxsep][l]{\BUseVerbatim{cverb}}%
+	    }
+	\endflushleft
+    }
+    \counterwithin*{footnote}{page}
+    ```
 
 fontsize: 11pt
 
+color-links: true
+linkcolor: red
 urlcolor: red
 geometry: margin=1in
 
