@@ -43,6 +43,7 @@ bin/Software
 !.config/mpv
 .config/mpv/*
 !.config/mpv/mpv.conf
+!.config/mpv/input.conf
 
 !.config/nixos
 .config/nixos/hardware-configuration.nix
