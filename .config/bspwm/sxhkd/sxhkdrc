@@ -31,10 +31,13 @@ super + Tab
 super + e
 	source ~/bin/shell/env;termite -e ranger
 # Sound  -------------------------------------------------------------------
-#MPC control
+#MPC/MPRIS control
 
 {XF86AudioStop,XF86AudioPrev,XF86AudioPlay,XF86AudioNext}
-	mpc {stop,prev,toggle,next}
+	playerctl -p playerctld {pause;sleep 0.1;playerctld shift,previous,play-pause,next}
+
+XF86AudioPlay + shift
+	playerctl -a pause
 
 # Raises volume
 {XF86AudioRaiseVolume,XF86AudioLowerVolume}
