@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # System ~~~~~~~~~~~~~~~~~~~~~~~~~
-$mainpc && (ckb-next -b &)
-$mainpc && i3lock -n -i ~/.config/etc/flock.png & #  && ./.wall &
+$mainpc && ckb-next -b &
+$mainpc && i3lock -i ~/.config/etc/flock.png &
 $laptop && i3lock -i ~/.config/etc/flocklap.png &
 setxkbmap fr
 numlockx on
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
 $laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &
-picom -b &
 
 xsetroot -cursor_name left_ptr &
 xset s off -dpms &
@@ -31,4 +30,5 @@ lorri daemon &>/dev/null &
 $mainpc && (discord-canary || discord || Discord) &
 $mainpc && optirun true &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
+(sleep 1;picom -b) & # run picom after as it being start before cause discord to pop up on top of i3
 ~/.wall &
