@@ -22,7 +22,7 @@ super + p
 
 # Rofi
 super + {_,ctrl,alt} + Return
-	rofi -show {drun -modi drun,run,emoji -modi emoji}
+	rofi -terminal termite -show {drun -modi drun,run,emoji -modi emoji}
 # Rofi Show Windows
 super + Tab
 	rofi -show window
