@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+file=$(~/bin/svar -f ~/.config/etc/env get xwall)
+locked=$(~/bin/svar -f ~/.config/etc/env get xwall_locked)
+if [ -n "$file" ]
+then
+    case "$1" in
+	lock)
+	    while ! pgrep -x i3lock > /dev/null;do sleep 1;done
+	    if [ -n "$locked" ];then
+		~/bin/xwal each mpv "$file"
+	    fi
+	    while pgrep -x i3lock > /dev/null;do sleep 1;done
+	    ~/bin/xwal each mpv "$file"
+	    ;;
+	*)
+	    ~/bin/xwal each mpv "$file"
+	    ;;
+    esac
+fi

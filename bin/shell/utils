@@ -143,6 +143,7 @@ pip3 install --user capstone unicorn keystone-engine ropper
 }
 
 rice-install(){
+mkdir -p .config/etc
 antigen-install
 vimplug-install
 gef-install

@@ -4,7 +4,7 @@
 #declare X Y OX OY
 main(){
 pkill xwinwrap
-eachscreen(){
+each(){
 	# placement x/y
 	local command=$1
 	shift
@@ -45,17 +45,11 @@ wr(){ #wrapper without windows id
 	xwinwrap -g "$X"x"$Y"+"$OX"+"$OY" -ov -ni -nf -- "$path" "$@" &
 }
 
-#arg1=$1 # wip add getopt
-#case $arg1 in
-#esac
-prgm=$1
-path=$2
-shift 2
 R=$(file "$path" | grep -o '[0-9]* x [0-9]*')
 RX=$(echo $R | cut -d' ' -f 1)
 RY=$(echo $R | cut -d' ' -f 3)
-eachscreen
-$prgm $path $@ #merge those two lines for eachscreen
+each
+$@ # execute command
 }
 main $@ &>/dev/null
 #mpv $1
