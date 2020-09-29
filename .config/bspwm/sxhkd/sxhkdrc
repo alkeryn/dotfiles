@@ -109,9 +109,9 @@ super + ctrl + {w,x,c,v}
 
 # Focus/swap -------------------------------------------------------------------------------------------
 
-# focus the node in the given direction
-super + {_,shift + }{h,j,k,l}
-	bspc node -{f,s} {west,south,north,east}
+# focus the node or monitor in the given direction
+super + {h,j,k,l} + {_,shift + }
+	A={west,south,north,east};{bspc node -f "$A" || bspc monitor -f "$A",bspc node -s "$A" --follow || bspc node -d "$A":focused --follow }
 
 # focus the node for the given path jump
 super + {b,n,colon,exclam}
@@ -191,8 +191,6 @@ super + {_,shift + } BackSpace
 #Transplant
 super + shift + t
 	bspc node -n @/
-#super + alt + {h,j,k,l}
-#	bspc node -n {west,south,north,east}
 #Sounds
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
