@@ -115,6 +115,19 @@ ydlmusic(){
     cd -
 }
 
+mpdswap(){ # update current playlist
+    (mpc update;mpc idle update) >/dev/null
+
+    directory="$(dirname "$(mpc playlist | head -n1)")"
+    mpc crop
+    mpc ls "$directory" | tac | mpc add
+
+    playlist=$(mpc playlist)
+    N=$(nl -w1 -s" " <<<"$playlist" | grep "$(head -n1 <<<"$playlist")" | tail -n1 | cut -d" " -f1)
+    mpc mv 1 "$N"
+    mpc del $((N-1))
+}
+
 wolpc(){
 wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
 }

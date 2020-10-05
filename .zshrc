@@ -1,7 +1,7 @@
 source ~/.zsh/antigen.zsh
 source ~/bin/wpc
 
-setopt extendedglob notify
+setopt extendedglob notify nonomatch
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"
 
 # ZSH
