@@ -111,21 +111,33 @@ stty sane
 
 ydlmusic(){
     cd ~/Music/Musiques/Autres/Youtube
-    youtube-dl --playlist-reverse -f bestaudio/best --download-archive list.txt -cio '%(playlist_index)s-%(id)s %(title)s.%(ext)s' https://www.youtube.com/playlist\?list\=PLtuQ0P--dLnwb78V9LdEy0DAFGvZKfMnt 2>> errors.log
+    youtube-dl --playlist-reverse -f bestaudio --add-metadata --download-archive list.txt -cio '%(playlist_index)s-%(id)s %(title)s.%(ext)s' https://www.youtube.com/playlist\?list\=PLtuQ0P--dLnwb78V9LdEy0DAFGvZKfMnt 2>> errors.log
     cd -
+}
+
+__mpdswap() {
+    playlist=$(mpc playlist -f %file%)
+    N=$(nl -w1 -s" " <<<"$playlist" | grep "$(head -n1 <<<"$playlist")" | tail -n1 | cut -d" " -f1)
+    mpc mv 1 "$N"
+    mpc del $((N-1))
 }
 
 mpdswap(){ # update current playlist
     (mpc update;mpc idle update) >/dev/null
 
-    directory="$(dirname "$(mpc playlist | head -n1)")"
+    directory="$(dirname "$(mpc current -f %file%)")"
     mpc crop
     mpc ls "$directory" | tac | mpc add
 
-    playlist=$(mpc playlist)
-    N=$(nl -w1 -s" " <<<"$playlist" | grep "$(head -n1 <<<"$playlist")" | tail -n1 | cut -d" " -f1)
-    mpc mv 1 "$N"
-    mpc del $((N-1))
+    __mpdswap
+}
+
+mpdfilesort(){
+    playlist=$(mpc playlist -f %file% | sort)
+    mpc crop
+    mpc add <<<"$playlist"
+
+    __mpdswap
 }
 
 wolpc(){
