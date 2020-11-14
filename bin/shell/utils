@@ -31,10 +31,6 @@ xev(){
 command -p xev | awk -F'[ )]+' '/^KeyPress/ { a[NR+2] } NR in a { printf "%-3s %s\n", $5, $8 }'
 }
 
-cpufreq(){
-while true;do  grep MHz /proc/cpuinfo;sleep 0.5;clear;done
-}
-
 dockerpull(){
 mkdir -p $2
 docker pull $1
