@@ -14,7 +14,7 @@ urxvt.font: xft:hack:size=9
 urxvt.boldfont: xft:hack:bold:size=9
 URxvt.letterSpace: 0
 
-Xft.dpi: 96
+Xft.dpi: 120
 Xft.antialias: true
 Xft.hinting: true
 Xft.rgba: rgb
