@@ -23,7 +23,7 @@ mipsl(){
 #Command
 
 vpn(){
-    local name=$(~/bin/vpnfilter | tail -n2 | head -n -1 | awk '{print $3}')
+    local name=$(~/bin/vpnfilter | tail -n1 | awk '{print $3}')
     command sudo openvpn "$VPNDIR"/"$name"
 }
 
