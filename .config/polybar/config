@@ -262,7 +262,6 @@ label-urgent-padding = 2
 label-empty = %index%
 label-empty-foreground = ${colors.foreground-alt}
 label-empty-padding = 2
-bspwm.label-urgent-padding}
 
 [module/mpd]
 type = internal/mpd
