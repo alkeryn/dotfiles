@@ -52,14 +52,6 @@ Plug 'neoclide/coc-tsserver', {'do': 'yarn install --frozen-lockfile'}
 Plug 'neoclide/coc-html', {'do': 'yarn install --frozen-lockfile'}
 Plug 'neoclide/coc-css', {'do': 'yarn install --frozen-lockfile'}
 
-" Plug 'Shougo/deoplete.nvim', { 'do': ':UpdateRemotePlugins' }
-" Plug 'zchee/deoplete-clang'
-" Plug 'carlitux/deoplete-ternjs', { 'for': ['javascript', 'javascript.jsx'] }
-" Plug 'zchee/deoplete-jedi'
-" Plug 'zchee/deoplete-zsh'
-" let g:deoplete#enable_at_startup = 1
-
-
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'yarn install --frozen-lockfile' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 
@@ -82,7 +74,9 @@ Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitesp
 Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
 Plug 'KabbAmine/vCoolor.vim' " color picker
-Plug 'direnv/direnv.vim' " direnv integration
+if executable("direnv")
+    Plug 'direnv/direnv.vim' " direnv integration
+endif
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
@@ -112,7 +106,12 @@ Plug 'vim-scripts/Color-Scheme-Explorer'
 call plug#end()
 
 syntax enable
-colorscheme monokai_pro
+
+try
+    colorscheme monokai_pro
+catch
+    echom "couldn't find colorscheme"
+endtry
 
 tnoremap <Esc> <C-\><C-n>
 

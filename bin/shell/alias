@@ -62,6 +62,8 @@ type -p nix >/dev/null && {
     alias nenv="nix-env"
 }
 
+if [[ -a /etc/os-release ]]
+then
 case $(source /etc/os-release;echo $ID) in
     nixos)
 	alias symld="sudo mkdir /lib64;sudo ln -sf $(file -L /usr/bin/env | cut -d"," -f5 | cut -d" " -f3) /lib64/ld-linux-x86-64.so.2"
@@ -75,3 +77,4 @@ case $(source /etc/os-release;echo $ID) in
 	alias up='sudo su -c "apt update; apt upgrade;apt full-upgrade"'
 	;;
 esac
+fi
