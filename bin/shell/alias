@@ -50,6 +50,7 @@ alias adblock="(sed '/AdAway/q' /etc/hosts;curl -s https://adaway.org/hosts.txt)
 alias cpufreq="watch -tn 0.5 grep MHz /proc/cpuinfo"
 alias incognito='unset HISTFILE'
 alias :q="exit"
+alias qread="zbarimg -q --raw  <(xclip -selection clipboard -o)"
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 
 unalias rm
