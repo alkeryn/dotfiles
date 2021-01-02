@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-xrdb -merge <(echo "Xft.dpi: 96")
+xrdb -merge <<<"Xft.dpi: 96"

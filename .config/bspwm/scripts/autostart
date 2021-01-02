@@ -14,8 +14,8 @@ $laptop && xss-lock -q ~/bin/lock &
 xset r rate 250 75 &
 
 xrdb ~/.Xresources
-$laptop && xrdb -merge <(echo "Xft.dpi: 180")
-$laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")
+$laptop && xrdb -merge <<<"Xft.dpi: 180"
+$laptop && xrdb -merge <<<"rofi.font: sans-serif bold 30"
 
 #$mainpc && nvidia-settings --load-config-only --assign="SyncToVBlank=0" & #Unlimited Framerate
 setxkbmap -option "lv3:caps_switch" &

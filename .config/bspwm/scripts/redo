@@ -8,5 +8,5 @@ xset s off -dpms &
 xset r rate 250 75 &
 #$mainpc && optirun nvidia-settings --load-config-only --assign="SyncToVBlank=1" & #Unlimited Framerate
 xrdb ~/.Xresources
-$laptop && xrdb -merge <(echo "Xft.dpi: 180")
-$laptop && xrdb -merge <(echo "rofi.font: sans-serif bold 30")
+$laptop && xrdb -merge <<<"Xft.dpi: 180"
+$laptop && xrdb -merge <<<"rofi.font: sans-serif bold 30"

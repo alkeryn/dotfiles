@@ -65,9 +65,6 @@ case $PC in
 	    bspc rule -a discord desktop='10'
 	    bspc rule -a skypeforlinux desktop='10'
 	    xrdb ~/.Xresources
-	    xrdb -merge <(echo "Xft.dpi: 180")
-	    xrdb -merge <(echo "rofi.font: sans-serif bold 30")
-
 	fi
 	;;
 esac
