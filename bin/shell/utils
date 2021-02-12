@@ -83,6 +83,10 @@ wscale(){
     waifu scale $@
 }
 
+vich(){
+    su -pc "chattr -i $@;nvim $@;chattr +i $@"
+}
+
 revshell(){
 local port
 [[ -z "$1" ]] && port=8080 || port="$1"

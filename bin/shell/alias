@@ -50,7 +50,9 @@ alias adblock="(sed '/AdAway/q' /etc/hosts;curl -s https://adaway.org/hosts.txt)
 alias cpufreq="watch -tn 0.5 grep MHz /proc/cpuinfo"
 alias incognito='unset HISTFILE'
 alias :q="exit"
-alias qread="zbarimg -q --raw  <(xclip -selection clipboard -o)"
+alias qread="zbarimg -q --raw  <(xclip -selection clipboard -t image/png -o)"
+alias ocread="xclip -selection clipboard -t image/png -o | tesseract stdin stdout 2>/dev/null"
+tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 
 unalias rm
