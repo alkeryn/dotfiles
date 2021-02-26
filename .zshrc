@@ -25,7 +25,7 @@ antigen bundle sorin-ionescu/prezto modules/completion
 # antigen bundle sorin-ionescu/prezto modules/prompt
 
 antigen bundle mafredri/zsh-async
-antigen bundle sindresorhus/pure
+antigen bundle --branch=main sindresorhus/pure
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
 antigen bundle spwhitt/nix-zsh-completions.git
