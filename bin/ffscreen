@@ -13,4 +13,6 @@ OY=$(cut -d"+" -f3 <<< "$monitor")
 RES="$X"x"$Y"
 offset=$DISPLAY+"$OX","$OY"
 
-ffmpeg -f x11grab -framerate 60 -video_size $RES -i $offset -vcodec rawvideo -pix_fmt yuv420p  -f v4l2 /dev/video2
+[ "$2" ] && scale="-vf scale=$2"
+
+ffmpeg -f x11grab -framerate 60 -video_size $RES -i $offset $scale -vcodec rawvideo -pix_fmt yuv420p  -f v4l2 /dev/video2
