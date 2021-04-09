@@ -2,7 +2,7 @@
 font             = Hack 9
 scrollback_lines = 100000
 clickable_url    = true
-browser          = chromium
+browser          = xdg-open
 allow_bold       = true
 allow_italic     = true
 visible_bell     = true

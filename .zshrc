@@ -30,7 +30,7 @@ antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
 antigen bundle spwhitt/nix-zsh-completions.git
 
-antigen bundle 'endaaman/lxd-completion-zsh'
+antigen bundle endaaman/lxd-completion-zsh
 antigen apply
 
 # Source
