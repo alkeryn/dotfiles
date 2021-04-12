@@ -20,3 +20,5 @@
   fzf = !git log --pretty=oneline | fzf | cut -d' ' -f1
 [pull]
 	rebase = false
+[init]
+	defaultBranch = master
