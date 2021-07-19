@@ -20,11 +20,29 @@ mipsl(){
     ip addr |  awk '/inet6.*global/{print substr($2,1,length($2)-3)}'
 }
 
+clipic(){
+    xclip -selection clipboard -t image/png <(convert $1 png:-)
+}
+
 #Command
 
 vpn(){
     local name=$(~/bin/vpnfilter | tail -n1 | awk '{print $3}')
     command sudo openvpn "$VPNDIR"/"$name"
+}
+
+clipshare(){
+    filename=clipshare
+    xclip -selection clipboard -o >| /tmp/"$filename"
+
+    ext=$(grep "$(file -b --mime-type /tmp/"$filename")" /etc/mime.types | awk '{print $2}')
+    ext="${ext:+.}${ext}"
+    hash=$(md5sum /tmp/"$filename" | cut -d" " -f1)
+
+    scp -q /tmp/"$filename" vps:public/files/"$hash$ext"
+    uri="https://alkeryn.com/$hash$ext"
+    echo -n $uri | xclip -selection clipboard
+    echo $uri
 }
 
 xev(){
