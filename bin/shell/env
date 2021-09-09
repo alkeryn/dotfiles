@@ -16,7 +16,7 @@ VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
-if [[ $TERM == xterm-termite ]]; then #Termite directory set
+if [[ "$TERM" == xterm-* ]]; then #Termite directory set
     # source ./etc/vte.sh
     source $(dirname $0)/etc/vte.sh
     __vte_osc7
