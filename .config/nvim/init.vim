@@ -59,6 +59,7 @@ Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 Plug 'dart-lang/dart-vim-plugin' " Dart
 Plug 'sirtaj/vim-openscad' " openscad
 Plug 'https://github.com/ziglang/zig.vim'
+Plug 'evanleck/vim-svelte', {'branch': 'main'}
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
@@ -169,7 +170,7 @@ nnoremap <leader>Q :q!<cr>
 noremap <silent> k gk
 noremap <silent> j gj
 
-" nnoremap <leader>f :call CocActionAsync('jumpDefinition')<cr>
+nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition','drop','tabe')<cr>
 
 "Augroup
 augroup AutoGroup

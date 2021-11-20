@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 export VISUAL=nvim
 export EDITOR=nvim
-export MANPAGER='nvim -c "set ft=man"'
+export MANPAGER="nvim +Man!"
 export PATH=$PATH:~/bin:~/.local/bin:~/.cargo/bin
 export MAKEFLAGS="-j$(nproc)"
 
