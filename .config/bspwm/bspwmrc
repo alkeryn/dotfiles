@@ -64,7 +64,6 @@ case $PC in
 	    bspc rule -a qBittorrent desktop='9' follow=on
 	    bspc rule -a discord desktop='10'
 	    bspc rule -a skypeforlinux desktop='10'
-	    xrdb ~/.Xresources
 	fi
 	;;
 esac
