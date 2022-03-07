@@ -78,6 +78,7 @@ Plug 'KabbAmine/vCoolor.vim' " color picker
 if executable("direnv")
     Plug 'direnv/direnv.vim' " direnv integration
 endif
+Plug 'mbbill/undotree'
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
