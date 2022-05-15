@@ -77,6 +77,8 @@ bin/Software
 .config/termite/*
 !.config/termite/config
 
+!.config/alacritty
+
 !.config/vis
 .config/vis/*
 !.config/vis/config

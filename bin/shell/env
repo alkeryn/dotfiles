@@ -16,13 +16,6 @@ VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
-if [[ "$TERM" == xterm-* ]]; then #Termite directory set
-    # source ./etc/vte.sh
-    source $(dirname $0)/etc/vte.sh
-    __vte_osc7
-    TERM=xterm-256color
-fi
-
 $mainpc && export PATH=$PATH:/opt/rocm/hip/bin:/opt/hipSYCL/CUDA/bin
 
 $mainpc && export NIXOS_CONFIG=~/.config/nixos/mainpc.nix
