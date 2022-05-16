@@ -1,5 +1,6 @@
 source ~/.zsh/antigen.zsh
 source ~/bin/wpc
+HISTFILE=~/.zhistory
 
 setopt extendedglob notify nonomatch
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"
@@ -42,6 +43,5 @@ source ~/bin/shell/zsh
 
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff"
 
-HISTFILE=~/.zhistory
 HISTSIZE=999999999
 SAVEHIST=$HISTSIZE
