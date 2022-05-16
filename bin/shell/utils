@@ -165,12 +165,12 @@ wol -p 999 -i alkeryn.freeboxos.fr 70:85:c2:5a:0c:0b
 # Installs
 
 antigen-install(){
-curl -sLo ~/.zsh/antigen.zsh --create-dirs --proto-redir -all,https \
+\curl -sLo ~/.zsh/antigen.zsh --create-dirs --proto-redir -all,https \
     git.io/antigen
 }
 
 vimplug-install(){
-curl -sLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
+\curl -sLo ~/.local/share/nvim/site/autoload/plug.vim --create-dirs \
     https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim
 pip2 install --user neovim
 pip3 install --user neovim
@@ -179,7 +179,7 @@ rm -f ~/package-lock.json
 }
 
 gef-install(){
-curl -sLo ~/.local/share/gdb/gef.py --create-dirs \
+\curl -sLo ~/.local/share/gdb/gef.py --create-dirs \
     https://github.com/hugsy/gef/raw/master/gef.py
 pip2 install --user capstone unicorn keystone-engine ropper
 pip3 install --user capstone unicorn keystone-engine ropper
