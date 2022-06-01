@@ -1,11 +1,11 @@
 {
-    "languageserver": {
-	"clangd": {
-	    "command": "clangd",
-	    "args": ["--background-index"],
-	    "rootPatterns": ["compile_flags.txt", "compile_commands.json", ".vim/", ".git/", ".hg/"],
-	    "filetypes": ["c", "cpp", "objc", "objcpp"]
-	}
-    },
-    "svelte.enable-ts-plugin": true
+	"languageserver": {
+		"clangd": {
+			"command": "clangd",
+			"args": ["--background-index"],
+			"rootPatterns": ["compile_flags.txt", "compile_commands.json", ".vim/", ".git/", ".hg/"],
+			"filetypes": ["c", "cpp", "objc", "objcpp"]
+		}
+	},
+	"svelte.enable-ts-plugin": true
 }

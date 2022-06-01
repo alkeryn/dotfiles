@@ -51,15 +51,14 @@ Plug 'fannheyward/coc-pyright', {'do': 'yarn install --frozen-lockfile'}
 Plug 'neoclide/coc-tsserver', {'do': 'yarn install --frozen-lockfile'}
 Plug 'neoclide/coc-html', {'do': 'yarn install --frozen-lockfile'}
 Plug 'neoclide/coc-css', {'do': 'yarn install --frozen-lockfile'}
+Plug 'coc-extensions/coc-svelte', {'do': 'yarn install --frozen-lockfile'}
 
 Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'yarn install --frozen-lockfile' }
 Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 
 "Highlighting
-Plug 'dart-lang/dart-vim-plugin' " Dart
-Plug 'sirtaj/vim-openscad' " openscad
-Plug 'https://github.com/ziglang/zig.vim'
-Plug 'evanleck/vim-svelte', {'branch': 'main'}
+Plug 'sheerun/vim-polyglot'
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
@@ -74,6 +73,9 @@ Plug 'junegunn/fzf.vim'
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
 Plug 'tpope/vim-repeat' "repeat last command from plugin
 Plug 'tpope/vim-commentary' "Comment shortcut
+if executable("tree-sitter")
+Plug 'JoosepAlviste/nvim-ts-context-commentstring' "multilang files comments
+endif
 Plug 'KabbAmine/vCoolor.vim' " color picker
 if executable("direnv")
     Plug 'direnv/direnv.vim' " direnv integration
@@ -91,7 +93,6 @@ Plug 'vim-airline/vim-airline'
 Plug 'vim-airline/vim-airline-themes'
 Plug 'miyakogi/seiya.vim' "background transparent again
 Plug 'kovetskiy/sxhkd-vim'
-Plug 'LnL7/vim-nix' "nix vim syntax
 
 "Themes
 Plug 'chriskempson/base16-vim'
@@ -191,3 +192,15 @@ augroup Binary
 augroup END
 
 exec "source " . expand("<sfile>:p:h") . "/types.vim"
+
+if executable("tree-sitter")
+lua <<EOF
+require'nvim-treesitter.configs'.setup {
+    ensure_installed = { "c", "lua", "rust", "svelte","javascript", "html", "css", "vim" },
+    sync_install = false,
+    context_commentstring = {
+        enable = true
+        }
+    }
+EOF
+endif
