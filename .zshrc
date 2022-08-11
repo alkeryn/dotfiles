@@ -45,3 +45,5 @@ ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff"
 
 HISTSIZE=999999999
 SAVEHIST=$HISTSIZE
+
+bindkey -r '^ ' # disable ctrl+space expand alias which is annoying
