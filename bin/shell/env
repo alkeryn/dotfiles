@@ -27,3 +27,17 @@ $mainpc && export PATH=$PATH:/opt/rocm/hip/bin:/opt/hipSYCL/CUDA/bin
 
 $mainpc && export NIXOS_CONFIG=~/.config/nixos/mainpc.nix
 $laptop && export NIXOS_CONFIG=~/.config/nixos/laptop.nix
+
+export AGENTPATH=$XDG_RUNTIME_DIR
+if [[ -z "$XDG_RUNTIME_DIR" ]]
+then
+    AGENTPATH="/tmp"
+fi
+if type -p ssh-agent > /dev/null;then
+    if ! pgrep -u "$USER" ssh-agent > /dev/null; then
+        ssh-agent -t 1h >| "$AGENTPATH/.ssh-agent.env"
+    fi
+    if [[ ! -f "$SSH_AUTH_SOCK" ]]; then
+        source "$AGENTPATH/.ssh-agent.env" >/dev/null
+    fi
+fi
