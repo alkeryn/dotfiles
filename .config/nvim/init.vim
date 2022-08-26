@@ -11,7 +11,7 @@ set ignorecase "not case sensitive
 set smartcase "case smart
 
 "set foldmethod=syntax
-"set clipboard=unnamedplus
+set clipboard=unnamedplus
 set mouse=ni
 
 "Indent settings
@@ -64,10 +64,8 @@ Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'Townk/vim-autoclose' "autclose brackets
 Plug 'tpope/vim-surround' "sourounding
 Plug 'honza/vim-snippets' "snippets
-Plug 'SirVer/ultisnips' "snippets engine
 
 "Tools
-Plug 'ervandew/supertab'
 Plug 'scrooloose/nerdtree'
 Plug 'junegunn/fzf.vim'
 Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
@@ -106,6 +104,20 @@ Plug 'mhinz/vim-startify' "A nice start menu
 Plug 'vim-scripts/Color-Scheme-Explorer'
 
 "Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
+
+inoremap <silent><expr> <TAB>
+      \ coc#expandableOrJumpable() ? "\<C-r>=coc#rpc#request('doKeymap', ['snippets-expand-jump',''])\<CR>" :
+      \ coc#pum#visible() ? coc#pum#next(1) :
+      \ CheckBackSpace() ? "\<TAB>" :
+      \ coc#refresh()
+
+function! CheckBackSpace() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
+endfunction
+
+let g:coc_snippet_next = '<tab>'
+inoremap <silent><expr> <cr> coc#pum#visible() ? coc#_select_confirm() : "\<C-g>u\<CR>"
 call plug#end()
 
 syntax enable
@@ -122,6 +134,7 @@ tnoremap <Esc> <C-\><C-n>
 let mapleader = " "
 
 let g:AutoClosePumvisible = {"ENTER": "<C-Y>", "ESC": "<ESC>"} "fix autoclose breaking escape exit autocompletion
+let g:AutoClosePreserveDotReg = 0 " fix autoclose up/down key on insert fucking shit up
 let g:NERDTreeDirArrowExpandable = '▸'
 let g:NERDTreeDirArrowCollapsible = '▾'
 
@@ -146,7 +159,6 @@ noremap <C-n> :NERDTreeToggle<CR>
 nnoremap <C-_> :noh<CR>
 nnoremap <C-ç> :set hlsearch!<CR>
 nnoremap Q <nop> "Disable annoying EX mode
-let g:SuperTabDefaultCompletionType = "<c-n>"
 
 "tab nav with shift
 nnoremap <C-j> gT
@@ -177,7 +189,6 @@ nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition','drop','tabe')<
 "Augroup
 augroup AutoGroup
     au!
-    " autocmd FileType javascript let g:SuperTabDefaultCompletionType = "<c-x><c-o>"
 augroup END
 
 augroup Binary
