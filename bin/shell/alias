@@ -54,6 +54,8 @@ alias qread="zbarimg -q --raw  <(xclip -selection clipboard -t image/png -o)"
 alias ocread="xclip -selection clipboard -t image/png -o | tesseract stdin stdout 2>/dev/null"
 alias curl="curl --fail-with-body"
 alias yay="yay --sudoloop"
+alias qrand="curl https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_binary.php"
+
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 
