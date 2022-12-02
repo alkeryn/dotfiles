@@ -6,7 +6,17 @@ else
 Eraser=$(xsetwacom --list devices | awk /eraser/'{print $8}')
 Stylus=$(xsetwacom --list devices | awk /stylus/'{print $8}')
 fi
-xsetwacom --set $Stylus MapToOutput 1920x1080+1920+0
-xsetwacom --set $Eraser MapToOutput 1920x1080+1920+0
+
+monitor=$(xrandr --listactivemonitors | grep "${1:-0}": | cut -d" " -f4)
+X=$(cut -d"/" -f1 <<< "$monitor")
+Y=$(cut -d"/" -f2  <<< "$monitor" | cut -d"x" -f2)
+OX=$(cut -d"+" -f2 <<< "$monitor")
+OY=$(cut -d"+" -f3 <<< "$monitor")
+
+RES="$X"x"$Y"
+offset=$DISPLAY+"$OX","$OY"
+
+xsetwacom --set $Stylus MapToOutput $RES+$OX+$OY
+xsetwacom --set $Eraser MapToOutput $RES+$OX+$OY
 xsetwacom --set $Stylus Area 0 0 31488 17712
 xsetwacom --set $Eraser Area 0 0 31488 17712
