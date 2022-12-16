@@ -30,6 +30,7 @@ in
     mosh
     neofetch
     neovim
+    pulseaudio # for pactl and whatnot
     ranger
     unzip
     zsh
@@ -44,9 +45,9 @@ in
     GTK2_RC_FILES="$HOME/.gtkrc-2.0";
   };
 
-  nix.nixPath = [
-    "nixpkgs=/home/alkeryn/.nixpkgs"
-  ];
+  # nix.nixPath = [
+  #   "nixpkgs=/home/alkeryn/.nixpkgs"
+  # ];
 
   boot.tmpOnTmpfs = true;
 
@@ -54,12 +55,13 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = ["zfs"];
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
   virtualisation.libvirtd = {
     enable = true;
-    qemuOvmf = true;
+    qemu.ovmf.enable = true;
   };
+  virtualisation.lxd.enable = true;
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -68,15 +70,16 @@ in
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
   # Select internationalisation properties.
+  console.keyMap = "fr";
   i18n = {
     # consoleFont = "Lat2-Terminus16";
-    consoleKeyMap = "fr";
     defaultLocale = "fr_FR.UTF-8";
   };
 
   # Set your time zone.
   time.timeZone = "Europe/Paris";
-  services.localtime.enable = true;
+  services.geoclue2.enable = true;
+  services.localtimed.enable = true;
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
@@ -100,13 +103,19 @@ in
 
   # Enable sound.
   sound.enable = true;
-  hardware.pulseaudio.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+    jack.enable = true;
+  };
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.root.shell = pkgs.zsh;
   users.users.alkeryn = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "adbusers" "libvirtd" "systemd-journald" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "adbusers" "libvirtd" "systemd-journald" "lxd" ]; # Enable ‘sudo’ for the user.
     uid = 1000;
     shell = pkgs.zsh;
   };
@@ -115,6 +124,5 @@ in
   # compatible, in order to avoid breaking some software such as database
   # servers. You should change this only after NixOS release notes say you
   # should.
-  system.stateVersion = "19.03"; # Did you read the comment?
-
+  system.stateVersion = "23.05"; # Did you read the comment?
 }

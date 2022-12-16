@@ -47,9 +47,8 @@ XF86AudioMute + {_,super}
 	pactl {set-sink-mute @DEFAULT_SINK@ toggle,set-sink-volume @DEFAULT_SINK@ 100%}
 #Backlight ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 {XF86MonBrightnessDown,XF86MonBrightnessUp}
-	{xbacklight -10,xbacklight +10}
-super + Insert
-	xbacklight -get
+	{light -U 10,light -A 10}
+
 # Shortcut -------------------------------------------------------------------------------------------
 
 #wifi toggle

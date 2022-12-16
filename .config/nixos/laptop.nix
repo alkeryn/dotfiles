@@ -1,9 +1,18 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
+let
+  nvidia-offload = pkgs.writeShellScriptBin "prime" ''
+    export __NV_PRIME_RENDER_OFFLOAD=1
+    export __NV_PRIME_RENDER_OFFLOAD_PROVIDER=NVIDIA-G0 export __GLX_VENDOR_LIBRARY_NAME=nvidia
+    export __VK_LAYER_NV_optimus=NVIDIA_only
+    exec "$@"
+  '';
+in
 {
   imports =
     [
       ./hardware-configuration.nix
+      ./ath11k.nix
     ]
     ++
     [
@@ -12,24 +21,41 @@
       ./pkgs/xorg
     ];
 
-    boot.kernelParams = [ "button.lid_init_state=open" ];
     environment.systemPackages = with pkgs; [
       networkmanagerapplet
       unclutter
-      xorg.xbacklight
       xss-lock
+      nvidia-offload
     ];
 
+    boot.extraModprobeConfig = "options kvm_amd nested=1";
+
+    # boot.kernelParams = [ "amdgpu.backlight=0" ]; # fix backlight
     services.tlp.enable = true;
-    services.xserver.videoDrivers = [ "intel" ];
+    programs.light.enable = true;
+    hardware.bluetooth.enable = true;
+
+    systemd.services.lxd.wantedBy = lib.mkForce [];
+
     services.xserver.libinput = {
       enable = true;
-      naturalScrolling = true;
-      accelSpeed = "0.6";
+      touchpad = {
+        naturalScrolling = true;
+        accelSpeed = "0.6";
+      };
     };
 
-    hardware.cpu.intel.updateMicrocode = true;
-    hardware.openrazer.enable = true;
+    services.xserver.videoDrivers = [ "nvidia" ];
+    hardware.nvidia.powerManagement.enable = true;
+    hardware.nvidia.prime = {
+      offload.enable = true;
+
+      # Bus ID of the Amd GPU. You can find it using lspci, either under 3D or VGA
+      amdgpuBusId = "PCI:100:0:0";
+
+      # Bus ID of the NVIDIA GPU. You can find it using lspci, either under 3D or VGA
+      nvidiaBusId = "PCI:1:0:0";
+    };
 
     networking = {
       hostName = "Blade";
@@ -37,5 +63,5 @@
       networkmanager.enable = true;
       wireless.enable = false;
     };
-    users.users.alkeryn.extraGroups = [ "networkmanager" ];
-  }
+    users.users.alkeryn.extraGroups = [ "networkmanager" "video" ];
+}

@@ -2,7 +2,7 @@
 
 let
   languages = with pkgs;[
-    clisp
+    # clisp
     dart
     go
     nodejs yarn

@@ -3,7 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     nmap
-    pythonPackages.binwalk
+    # pythonPackages.binwalk
     radare2
     socat
     tcpdump

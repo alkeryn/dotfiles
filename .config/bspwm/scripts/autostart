@@ -13,7 +13,7 @@ $laptop && xss-lock -q ~/bin/lock &
 xset r rate 250 75 &
 
 xrdb ~/.Xresources
-$laptop && xrdb -merge <<<"Xft.dpi: 180"
+$laptop && xrdb -merge <<<"Xft.dpi: 150"
 $laptop && xrdb -merge <<<"rofi.font: sans-serif bold 30"
 xsetroot -cursor_name left_ptr & # after xrdb for consistent cursor size
 

@@ -4,8 +4,8 @@
     environment.systemPackages = with pkgs; [
       gqrx
       limesuite
-      gr-limesdr
-      gnuradio-with-packages
+      # gr-limesdr
+      # gnuradio-with-packages
     ];
     boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
     services.udev = {

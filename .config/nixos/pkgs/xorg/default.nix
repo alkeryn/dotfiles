@@ -2,7 +2,7 @@
 
 let
   overlays = with pkgs; [ ueberzug ];
-  qt = with pkgs; [ libsForQt512.qtstyleplugins ];
+  qt = with pkgs; [ libsForQt5.qtstyleplugins ];
 in
 {
   imports = [
@@ -21,7 +21,7 @@ in
     conky
     feh
     imv
-    lxappearance-gtk3
+    lxappearance
     maim
     numlockx
     polybar
@@ -41,14 +41,8 @@ in
 
   services.xserver = {
     enable = true;
-    autorun = true;
     layout = "fr";
-    desktopManager.default = "none";
     windowManager.bspwm.enable = true;
-    windowManager.default = "bspwm";
-    displayManager.auto.enable = true;
-    displayManager.auto.user = "alkeryn";
-    # displayManager.startx.enable = true;
+    displayManager.startx.enable = true;
   };
-
 }

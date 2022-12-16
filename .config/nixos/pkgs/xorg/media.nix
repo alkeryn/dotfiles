@@ -5,7 +5,7 @@
     mpd
     mpc_cli
     mpv
-    pythonPackages.subliminal #subtitle fetcher
+    # pythonPackages.subliminal #subtitle fetcher
     ncmpcpp
     pavucontrol
   ];
