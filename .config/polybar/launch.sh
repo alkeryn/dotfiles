@@ -4,8 +4,9 @@ killall -q polybar &
 
 export hwmon
 
-exp=(/sys/devices/platform/coretemp*/hwmon/hwmon*/temp1_input)
+exp=(/sys/class/hwmon/hwmon*/temp1_input)
 hwmon=$exp
+$laptop && hwmon=${exp[1]}
 
 # Wait until the processes have been shut down
 while pgrep -x polybar >/dev/null; do sleep 1; done
