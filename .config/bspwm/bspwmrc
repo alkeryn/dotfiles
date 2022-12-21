@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 source ~/bin/wpc # To use $mainpc and $laptop
+export XCURSOR_THEME=$(grep gtk-cursor-theme-name .gtkrc-2.0 | cut -d'"' -f2)
+
 # Exec ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 if [[ $(pgrep -c sxhkd) -eq 0 ]]
 then
