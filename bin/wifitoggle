@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-STATE=$(nmcli networking)
+STATE=$(nmcli radio wifi)
 if [ $STATE == "enabled" ]
 then
 echo disabling
-nmcli networking off
+nmcli radio wifi off
 echo disabled
 else
 echo enabling
-nmcli networking on
+nmcli radio wifi on
 echo enabled
 fi
