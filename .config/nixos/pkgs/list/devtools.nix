@@ -6,8 +6,8 @@ let
     dart
     go
     nodejs yarn
-    python
     python3
+    python3.pkgs.pip
   ];
 in
 {
