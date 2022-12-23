@@ -33,7 +33,6 @@ in
     pulseaudio # for pactl and whatnot
     ranger
     unzip
-    zsh
   ]
   ++ rangertools
   ++ nixtools;
@@ -119,6 +118,7 @@ in
     uid = 1000;
     shell = pkgs.zsh;
   };
+  programs.zsh.enable = true;
 
   # This value determines the NixOS release with which your system is to be
   # compatible, in order to avoid breaking some software such as database
