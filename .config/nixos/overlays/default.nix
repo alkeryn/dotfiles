@@ -19,7 +19,6 @@ self: super:
      withNodeJs = true;
    };
 
-   ueberzug = super.callPackage ./pkgs/ueberzug.nix {};
    sycl = super.callPackage ./pkgs/sycl {};
 
 }
