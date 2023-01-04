@@ -45,6 +45,9 @@ in
       };
     };
 
+    hardware.openrazer.enable = true;
+    hardware.openrazer.users = [ "alkeryn" ];
+
     services.xserver.videoDrivers = [ "nvidia" ];
     hardware.nvidia.powerManagement.enable = true;
     hardware.nvidia.prime = {

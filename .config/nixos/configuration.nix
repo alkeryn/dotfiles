@@ -59,7 +59,9 @@ in
   virtualisation.libvirtd = {
     enable = true;
     qemu.ovmf.enable = true;
+    qemu.swtpm.enable = true;
   };
+  programs.dconf.enable = true; # needed for virt manager to remember connection
   virtualisation.lxd.enable = true;
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
