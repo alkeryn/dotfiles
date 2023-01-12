@@ -185,6 +185,7 @@ noremap <silent> k gk
 noremap <silent> j gj
 
 nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition','drop','tabe')<cr>
+nnoremap <silent><leader>F :call CocActionAsync('jumpDefinition','tabe')<cr>
 
 "Augroup
 augroup AutoGroup
