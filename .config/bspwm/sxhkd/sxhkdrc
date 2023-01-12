@@ -21,8 +21,8 @@ super + p
 	termite -e ncmpcpp
 
 # Rofi
-super + {_,ctrl,alt} + Return
-	rofi -terminal termite -show {drun -modi drun,run,emoji -modi emoji}
+super + {_,ctrl,alt,shift} + Return
+	rofi -terminal termite -show {drun -modi drun,run,emoji -modi emoji,calc -modi calc -no-show-match -no-sort}
 # Rofi Show Windows
 super + Tab
 	rofi -show window
