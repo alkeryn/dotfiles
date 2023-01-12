@@ -11,15 +11,10 @@ self: super:
    waifu2x-converter-cpp = (super.waifu2x-converter-cpp.override {
      cudaSupport = true;
    });
-   chromium = (super.chromium.override {
-     enableWideVine = true;
-   });
 
    neovim = super.neovim.override {
      withNodeJs = true;
    };
-
-   sycl = super.callPackage ./pkgs/sycl {};
 
 }
 
