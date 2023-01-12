@@ -16,6 +16,13 @@ self: super:
      withNodeJs = true;
    };
 
+   rofi = super.rofi.override {
+      plugins = with super; [
+         rofi-calc
+         rofi-emoji
+      ];
+   };
+
 }
 
 )]
