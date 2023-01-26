@@ -59,6 +59,9 @@ in
       # Bus ID of the NVIDIA GPU. You can find it using lspci, either under 3D or VGA
       nvidiaBusId = "PCI:1:0:0";
     };
+    services.xserver.screenSection = ''
+      Option "TearFree" "true"
+    ''; # tearing and 144hz
 
     networking = {
       hostName = "Blade";
@@ -66,5 +69,8 @@ in
       networkmanager.enable = true;
       wireless.enable = false;
     };
+    hardware.logitech.wireless.enable = true;
+    hardware.logitech.wireless.enableGraphical = true; # for solaar to be included
+
     users.users.alkeryn.extraGroups = [ "networkmanager" "video" ];
 }
