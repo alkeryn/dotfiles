@@ -23,10 +23,16 @@ self: super:
       ];
    };
 
+   openai-whisper = (super.openai-whisper.overrideAttrs (old: rec {
+      src = builtins.fetchGit "https://github.com/openai/whisper";
+   })).override {
+      torch = super.python3.pkgs.torch-bin;
+   };
+
 }
 
 )]
-++
-[
-  (import (fetchGit "https://github.com/nixos-rocm/nixos-rocm" ) )
-]
+# ++
+# [
+#   (import (fetchGit "https://github.com/nixos-rocm/nixos-rocm" ) )
+# ]
