@@ -94,9 +94,9 @@ bin/Software
 
 !.local/share/applications
 .local/share/applications/*
-!.local/share/applications/Mine
+!.local/share/applications/mine
 !.local/share/applications/wine
-!.local/share/applications/Scripts
+!.local/share/applications/scripts
 
 !.local/share/fonts
 .local/share/fonts/.uuid

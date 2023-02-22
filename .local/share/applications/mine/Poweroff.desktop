@@ -5,4 +5,4 @@ Name=Poweroff
 GenericName=Shutdown the computer
 Comment=Shutdown
 Icon=utilities-terminal
-Exec=termite -e /home/alkeryn/bin/poweroff
+Exec=poweroff
