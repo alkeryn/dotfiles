@@ -13,6 +13,8 @@ zstyle ':completion:*' rehash true #reload path when new software installed
 
 # Zplug
 
+ZSH_FZF_HISTORY_SEARCH_BIND="^t"
+ZSH_FZF_HISTORY_SEARCH_END_OF_LINE="t"
 
 antigen use prezto
 antigen bundle sorin-ionescu/prezto modules/environement
@@ -30,6 +32,7 @@ antigen bundle --branch=main sindresorhus/pure
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
 antigen bundle spwhitt/nix-zsh-completions.git
+antigen bundle joshskidmore/zsh-fzf-history-search
 
 antigen bundle endaaman/lxd-completion-zsh
 antigen apply
