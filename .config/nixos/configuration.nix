@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 let
   rangertools = with pkgs; [
@@ -63,6 +63,7 @@ in
   };
   programs.dconf.enable = true; # needed for virt manager to remember connection
   virtualisation.lxd.enable = true;
+  systemd.enableUnifiedCgroupHierarchy = lib.mkForce true;
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
