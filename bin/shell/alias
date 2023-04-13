@@ -57,7 +57,14 @@ alias yay="yay --sudoloop"
 alias qrand="curl https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_binary.php"
 
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
-lxs() { lxc exec $1 -- su - $USER }
+lxs() {
+    get_lxc_shell() {
+        SCRIPT='basename $(getent passwd | awk -F: "/'$2'/{print $NF}")'
+        echo "$SCRIPT" | lxc exec $1 -- sh
+    }
+
+    lxc exec $1 -- sudo -iu $USER NWTOP=$$ $(get_lxc_shell $1 $USER)
+}
 # alias msfconsole="msfconsole --quiet -x \"db_connect ${USER}@msf\""
 
 unalias rm
