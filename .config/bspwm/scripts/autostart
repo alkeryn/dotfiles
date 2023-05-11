@@ -21,6 +21,7 @@ xsetroot -cursor_name left_ptr & # after xrdb for consistent cursor size
 setxkbmap -option "lv3:caps_switch" &
 #Others ---------------------
 $laptop && unclutter --timeout 3 -b &
+$laptop && xhost +local:
 $mainpc && conky -q &
 nm-applet &
 (pkill -x mpd;mpd;mpDris2) &
