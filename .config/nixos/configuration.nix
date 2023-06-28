@@ -48,7 +48,7 @@ in
   #   "nixpkgs=/home/alkeryn/.nixpkgs"
   # ];
 
-  boot.tmpOnTmpfs = true;
+  boot.tmp.useTmpfs = true;
 
   # Use the systemd-boot EFI boot loader.
   boot.loader.systemd-boot.enable = true;
