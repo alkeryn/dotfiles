@@ -44,12 +44,20 @@ in
         accelSpeed = "0.6";
       };
     };
+    hardware.nvidia.package = (config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs {
+      src = pkgs.fetchurl {
+        url = "https://download.nvidia.com/XFree86/Linux-x86_64/525.147.05/NVIDIA-Linux-x86_64-525.147.05.run";
+        sha256 = "1wgyyd53s1ivxccyazpyprlk72km0zd8cyad0kii4zjwakm86la3";
+      };
+    });
 
     hardware.openrazer.enable = true;
     hardware.openrazer.users = [ "alkeryn" ];
 
     services.xserver.videoDrivers = [ "nvidia" ];
     hardware.nvidia.powerManagement.enable = true;
+    hardware.nvidia.powerManagement.finegrained = true;
+
     hardware.nvidia.prime = {
       offload.enable = true;
 
