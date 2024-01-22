@@ -59,6 +59,7 @@ Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
 "Highlighting
 Plug 'sheerun/vim-polyglot'
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+Plug 'kaarmu/typst.vim'
 
 "Behavior
 Plug 'Townk/vim-autoclose' "autclose brackets
