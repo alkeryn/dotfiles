@@ -55,6 +55,7 @@ alias ocread="xclip -selection clipboard -t image/png -o | tesseract stdin stdou
 alias curl="curl --fail-with-body"
 alias yay="yay --sudoloop"
 alias qrand="curl https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_block_binary.php"
+alias lxc="incus"
 
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 lxs() { lxc exec $1 -- su - $USER }
