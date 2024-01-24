@@ -32,9 +32,9 @@ set binary "warning disable expandtab if set after
 "Tabs settings
 
 set shiftwidth=4 "tab indent size
-" set tabstop=4 "tab display
+set tabstop=4 "tab display
 set softtabstop=4 "insert tab
-" set expandtab "tabs are space
+set expandtab "tabs are space
 
 set completeopt=noinsert,menuone,noselect
 
@@ -181,6 +181,7 @@ nnoremap <leader>sv :source $MYVIMRC<cr>
 nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 nnoremap <leader>Q :q!<cr>
+nnoremap <leader>g :FZF<cr>
 
 "up down wrap line
 noremap <silent> k gk
@@ -188,6 +189,7 @@ noremap <silent> j gj
 
 nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition','drop','tabe')<cr>
 nnoremap <silent><leader>F :call CocActionAsync('jumpDefinition','tabe')<cr>
+nmap <silent> <leader>x <Plug>(coc-references)
 
 
 "Augroup
