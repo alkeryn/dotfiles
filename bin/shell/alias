@@ -7,7 +7,6 @@ alias cpa="cp -axvuf"
 alias rarchiv="rsync -azvP"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
-alias sudo='sudo -E'
 alias vim='nvim'
 alias v='nvim'
 alias vz='nvim $(fzf)'
