@@ -1,6 +1,5 @@
 source ~/.zsh/antigen.zsh
 source ~/bin/wpc
-HISTFILE=~/.zhistory
 
 setopt extendedglob notify nonomatch
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"
@@ -27,7 +26,7 @@ antigen bundle sorin-ionescu/prezto modules/utility
 antigen bundle sorin-ionescu/prezto modules/completion
 # antigen bundle sorin-ionescu/prezto modules/prompt
 
-antigen bundle mafredri/zsh-async
+antigen bundle mafredri/zsh-async@main
 antigen bundle --branch=main sindresorhus/pure
 antigen bundle zsh-users/zsh-autosuggestions
 antigen bundle zsh-users/zsh-history-substring-search
@@ -47,6 +46,7 @@ source ~/bin/shell/zsh
 ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE="fg=#ff00ff"
 
 HISTSIZE=999999999
+HISTFILE=~/.zhistory
 SAVEHIST=$HISTSIZE
 
 bindkey -r '^ ' # disable ctrl+space expand alias which is annoying
