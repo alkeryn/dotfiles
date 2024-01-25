@@ -4,7 +4,7 @@
   environment.systemPackages = with pkgs; [
     glxinfo
     megasync
-    virtmanager
+    virt-manager
     xorg.xev
     xsel
     xwinwrap

@@ -12,7 +12,7 @@ let
   ];
   nixtools = with pkgs; [
     nix-prefetch-git
-    nix-review
+    nixpkgs-review
     patchelf
   ];
 in
@@ -62,7 +62,10 @@ in
     qemu.swtpm.enable = true;
   };
   programs.dconf.enable = true; # needed for virt manager to remember connection
-  virtualisation.lxd.enable = true;
+
+  virtualisation.incus.enable = true;
+  virtualisation.incus.socketActivation = true;
+
   systemd.enableUnifiedCgroupHierarchy = lib.mkForce true;
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -117,7 +120,7 @@ in
   users.users.root.shell = pkgs.zsh;
   users.users.alkeryn = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "adbusers" "libvirtd" "systemd-journald" "lxd" ]; # Enable ‘sudo’ for the user.
+    extraGroups = [ "wheel" "adbusers" "libvirtd" "systemd-journald" "incus-admin" ]; # Enable ‘sudo’ for the user.
     uid = 1000;
     shell = pkgs.zsh;
   };
@@ -127,5 +130,5 @@ in
   # compatible, in order to avoid breaking some software such as database
   # servers. You should change this only after NixOS release notes say you
   # should.
-  system.stateVersion = "23.05"; # Did you read the comment?
+  system.stateVersion = "23.11"; # Did you read the comment?
 }
