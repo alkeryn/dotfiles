@@ -1,6 +1,6 @@
 [user]
-	name = alkeryn
-	email = plbraundev@gmail.com
+  name = alkeryn
+  email = plbraundev@gmail.com
 [merge]
   tool = vimdiff
 [mergetool]
@@ -19,6 +19,8 @@
   ignored = !git status -s --ignored | grep \"^!!\"
   fzf = !git log --pretty=oneline | fzf | cut -d' ' -f1
 [pull]
-	rebase = false
+  rebase = false
+[push]
+  autoSetupRemote = true
 [init]
-	defaultBranch = master
+  defaultBranch = master
