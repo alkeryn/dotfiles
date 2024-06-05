@@ -83,6 +83,7 @@ Plug 'mbbill/undotree'
 Plug 'rhysd/git-messenger.vim'
 Plug 'tpope/vim-fugitive'
 Plug 'krady21/compiler-explorer.nvim'
+Plug 'averms/black-nvim', {'do': ':UpdateRemotePlugins'}
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
