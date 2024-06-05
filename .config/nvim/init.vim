@@ -82,6 +82,7 @@ endif
 Plug 'mbbill/undotree'
 Plug 'rhysd/git-messenger.vim'
 Plug 'tpope/vim-fugitive'
+Plug 'krady21/compiler-explorer.nvim'
 
 " Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
 " Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
@@ -183,14 +184,16 @@ nnoremap <leader>w :w<cr>
 nnoremap <leader>q :q<cr>
 nnoremap <leader>Q :q!<cr>
 nnoremap <leader>g :FZF<cr>
-
-"up down wrap line
-noremap <silent> k gk
-noremap <silent> j gj
+nnoremap <leader>t :Windows<cr>
 
 nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition','drop','tabe')<cr>
 nnoremap <silent><leader>F :call CocActionAsync('jumpDefinition','tabe')<cr>
 nmap <silent> <leader>x <Plug>(coc-references)
+"
+"up down wrap line
+noremap <silent> k gk
+noremap <silent> j gj
+
 
 
 "Augroup
