@@ -50,6 +50,7 @@ alias cpufreq="watch -tn 0.5 grep MHz /proc/cpuinfo"
 alias incognito='unset HISTFILE'
 alias :q="exit"
 alias qread="zbarimg -q --raw  <(xclip -selection clipboard -t image/png -o)"
+alias qrshow="xclip -selection clipboard -o | qrencode -o - | imv -"
 alias ocread="xclip -selection clipboard -t image/png -o | tesseract stdin stdout 2>/dev/null"
 alias curl="curl --fail-with-body"
 alias yay="yay --sudoloop"
