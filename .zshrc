@@ -49,4 +49,5 @@ HISTSIZE=999999999
 HISTFILE=~/.zhistory
 SAVEHIST=$HISTSIZE
 
+setopt interactive_comments
 bindkey -r '^ ' # disable ctrl+space expand alias which is annoying
