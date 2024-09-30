@@ -22,6 +22,6 @@
       unrar
       usbutils
       wget
-      youtube-dl
+      yt-dlp
     ];
 }

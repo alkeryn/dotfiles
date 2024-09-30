@@ -42,7 +42,7 @@ in
 
   services.xserver = {
     enable = true;
-    layout = "fr";
+    xkb.layout = "fr";
     windowManager.bspwm.enable = true;
     displayManager.startx.enable = true;
   };
@@ -55,6 +55,7 @@ in
     wantedBy = [ "graphical.target" ];
     serviceConfig = {
       User = "alkeryn";
+      Restart = "no";
       WorkingDirectory = "~";
       PAMName = "login";
       Environment = [ "XDG_SESSION_TYPE=x11" ];

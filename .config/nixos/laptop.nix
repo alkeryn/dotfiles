@@ -37,7 +37,7 @@ in
 
     systemd.services.lxd.wantedBy = lib.mkForce [];
 
-    services.xserver.libinput = {
+    services.libinput = {
       enable = true;
       touchpad = {
         naturalScrolling = true;
