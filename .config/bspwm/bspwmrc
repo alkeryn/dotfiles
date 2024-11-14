@@ -48,6 +48,7 @@ bspc config directional_focus_tightness low
 case $PC in
     mainpc)
 	bspc rule -a discord desktop='^1'
+	bspc rule -a Signal desktop='^1'
 	bspc rule -a skypeforlinux desktop='1'
 	bspc rule -a qBittorrent desktop='2' follow=on
 	;;

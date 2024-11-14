@@ -28,7 +28,8 @@ nm-applet &
 # APPS ~~~~~~~~~~~~~~~~~
 megasync &
 lorri daemon &>/dev/null &
-$mainpc && (discord-canary || discord || Discord) &
+# $mainpc && (discord-canary || discord || Discord) &
+$mainpc && signal-desktop &
 $mainpc && optirun true &
 #$mainpc && /bin/Software/mpd_discord_richpresence &
 (sleep 3;picom -b) & # run picom after as it being start before cause discord to pop up on top of i3
