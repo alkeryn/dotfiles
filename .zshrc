@@ -7,6 +7,7 @@ setopt extendedglob notify nonomatch
 # ZSH
 
 eval $(dircolors -b)
+eval "$(zoxide init zsh)"
 zstyle ':completion:*' list-colors ${(s.:.)LS_COLORS} #completion colors
 zstyle ':completion:*' rehash true #reload path when new software installed
 
