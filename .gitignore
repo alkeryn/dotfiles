@@ -27,6 +27,8 @@ bin/Software
 # !.config/ckb-next/*
 # !.config/ckb-next/ckb-next.conf
 
+!.config/alacritty
+
 !.config/conky
 .config/conky/*
 !.config/conky/conky.conf

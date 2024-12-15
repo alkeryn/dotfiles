@@ -15,21 +15,21 @@ super + a
 	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
 # terminal emulator
 super + {_,alt} + space
-	termite {_,--class=floating}
+	alacritty {_,--class=floating}
 # Music
 super + p
-	termite -e ncmpcpp
+	alacritty -e ncmpcpp
 
 # Rofi
 super + {_,ctrl,alt,shift} + Return
-	rofi -terminal termite -show {drun -modi drun,run,emoji -modi emoji,calc -modi calc -no-show-match -no-sort}
+	rofi -terminal alacritty -show {drun -modi drun,run,emoji -modi emoji,calc -modi calc -no-show-match -no-sort}
 # Rofi Show Windows
 super + Tab
 	rofi -show window
 
 #Ranger
 super + e
-	source ~/bin/shell/env;termite -e ranger
+	source ~/bin/shell/env;alacritty -e ranger
 # Sound  -------------------------------------------------------------------
 #MPC/MPRIS control
 
