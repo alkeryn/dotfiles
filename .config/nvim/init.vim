@@ -190,7 +190,7 @@ nnoremap <leader>g :FZF<cr>
 nnoremap <leader>t :Windows<cr>
 
 nnoremap <silent><leader>f :call CocActionAsync('jumpDefinition')<cr>
-nnoremap <silent><leader>F :call CocActionAsync('jumpDefinition','drop','tabe')<cr>
+nnoremap <silent><leader>F :call CocActionAsync('jumpDefinition','tabe')<cr>
 nmap <silent> <leader>x <Plug>(coc-references)
 "
 "up down wrap line
