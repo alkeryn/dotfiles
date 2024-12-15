@@ -5,6 +5,6 @@ Comment=Launches the ranger file manager
 Icon=utilities-terminal
 Hidden=true
 Terminal=false
-Exec=termite -e ranger
+Exec=alacritty -e ranger
 Categories=ConsoleOnly;System;FileTools;FileManager
 MimeType=inode/directory;

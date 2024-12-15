@@ -1,0 +1,85 @@
+[colors]
+draw_bold_text_with_bright_colors = true
+
+[[keyboard.bindings]]
+action = "ResetFontSize"
+key = "Equals"
+mods = "Control"
+
+[[keyboard.bindings]]
+action = "IncreaseFontSize"
+key = "Plus"
+mods = "Control|Shift"
+
+[[keyboard.bindings]]
+action = "IncreaseFontSize"
+key = "NumpadAdd"
+mods = "Control"
+
+[[keyboard.bindings]]
+action = "DecreaseFontSize"
+key = "Minus"
+mods = "Control"
+
+[[keyboard.bindings]]
+action = "DecreaseFontSize"
+key = "NumpadSubtract"
+mods = "Control"
+
+[[keyboard.bindings]]
+action = "SpawnNewInstance"
+key = "T"
+mods = "Control|Shift"
+
+[[keyboard.bindings]]
+action = "ToggleViMode"
+key = "I"
+mods = "Control|Shift"
+
+[font]
+size = 9.0
+
+[font.normal]
+family = "Hack"
+
+[mouse]
+hide_when_typing = true
+
+[window]
+opacity = 0.6
+
+[window.dimensions]
+columns = 81
+lines = 24
+
+[keyboard]
+
+[colors.primary]
+background = "#000000"
+bright_foreground = "#FF00B6"
+foreground = "#00ffff"
+
+[colors.cursor]
+cursor = "#93a1a1"
+text = "CellForeground"
+
+[colors.normal]
+black = "#073642"
+red = "#dc322f"
+green = "#00FF00"
+# green = "#859900"
+yellow = "#b58900"
+blue = "#268bd2"
+magenta = "#d33682"
+cyan = "#2aa198"
+white = "#eee8d5"
+
+[colors.bright]
+black = "#002b36"
+red = "#cb4b16"
+green = "#586e75"
+yellow = "#657b83"
+blue = "#839496"
+magenta = "#6c71c4"
+cyan = "#93a1a1"
+white = "#fdf6e3"
