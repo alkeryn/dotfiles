@@ -24,6 +24,10 @@ clipic(){
     xclip -selection clipboard -t image/png <(convert $1 png:-)
 }
 
+clipout() {
+    xclip -selection clipboard -t image/png -o >| "$1.png"
+}
+
 #Command
 
 vpn(){
