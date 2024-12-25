@@ -54,7 +54,6 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = ["zfs"];
-  boot.kernelPackages = config.boot.zfs.package.latestCompatibleLinuxPackages;
 
   virtualisation.libvirtd = {
     enable = true;
@@ -66,7 +65,6 @@ in
   virtualisation.incus.enable = true;
   virtualisation.incus.socketActivation = true;
 
-  systemd.enableUnifiedCgroupHierarchy = lib.mkForce true;
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
@@ -82,7 +80,7 @@ in
   };
 
   # Set your time zone.
-  time.timeZone = "Europe/Paris";
+  time.timeZone = lib.mkForce "Europe/Paris";
   services.geoclue2.enable = true;
   services.localtimed.enable = true;
 
@@ -114,8 +112,6 @@ in
   # Enable CUPS to print documents.
   # services.printing.enable = true;
 
-  # Enable sound.
-  sound.enable = true;
   services.pipewire = {
     enable = true;
     alsa.enable = true;
@@ -138,5 +134,5 @@ in
   # compatible, in order to avoid breaking some software such as database
   # servers. You should change this only after NixOS release notes say you
   # should.
-  system.stateVersion = "24.05"; # Did you read the comment?
+  system.stateVersion = "24.11"; # Did you read the comment?
 }
