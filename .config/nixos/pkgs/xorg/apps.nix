@@ -6,7 +6,7 @@
     discord
     epiphany
     evince
-    gnome3.nautilus
+    nautilus
     imagemagick
     qbittorrent
     spotify

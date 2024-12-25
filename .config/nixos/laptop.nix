@@ -58,6 +58,7 @@ in
     hardware.nvidia.powerManagement.enable = true;
     hardware.nvidia.powerManagement.finegrained = true;
 
+    hardware.nvidia.open = false;
     hardware.nvidia.prime = {
       offload.enable = true;
 
