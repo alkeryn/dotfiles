@@ -222,9 +222,6 @@ lua <<EOF
 require'nvim-treesitter.configs'.setup {
     ensure_installed = { "c", "lua", "rust", "svelte","javascript", "html", "css", "vim" },
     sync_install = false,
-    context_commentstring = {
-        enable = true
-        }
-    }
+}
 EOF
 endif
