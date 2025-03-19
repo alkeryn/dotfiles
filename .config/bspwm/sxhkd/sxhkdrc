@@ -10,6 +10,9 @@
 # Screenshot
 super + {_,shift,ctrl} + Print
 	 {maim -u -s -c 255\,0\,0 --format png | xclip -selection clipboard -t image/png -i, maim -u -s -c 255\,0\,0 ~/Images/scrot/$(date +%Y%m%d_%H%M%S).png, scrot ~/Images/scrot/%Y%m%d_%H%M%S.png}
+# pipe clipboard to named socket
+super + {_, shift} + z
+	{xclip -selection clipboard -o, maim -g 3840x2160+3840} | nc -NU /tmp/clip
 # Lock
 super + a
 	$laptop && ~/bin/lock; $mainpc && ~/bin/blurlock
