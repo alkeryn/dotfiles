@@ -35,8 +35,6 @@ in
     programs.light.enable = true;
     hardware.bluetooth.enable = true;
 
-    systemd.services.lxd.wantedBy = lib.mkForce [];
-
     services.libinput = {
       enable = true;
       touchpad = {

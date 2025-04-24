@@ -64,6 +64,7 @@ in
 
   virtualisation.incus.enable = true;
   virtualisation.incus.socketActivation = true;
+  systemd.services.incus.wantedBy = lib.mkForce [];
 
   # networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -100,6 +101,7 @@ in
   # Or disable the firewall altogether.
   networking.firewall.enable = false;
   networking.nameservers = [ "1.1.1.1#one.one.one.one" "1.0.0.1#one.one.one.one" ];
+  services.netbird.enable = true;
 
   services.resolved = {
     enable = true;
