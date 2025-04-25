@@ -76,6 +76,16 @@ in
       networkmanager.enable = true;
       wireless.enable = false;
     };
+
+    services.openssh = {
+      enable = true;
+      listenAddresses = [ { addr = "100.74.54.104"; } ];
+      settings = {
+        PasswordAuthentication = false;
+        PermitRootLogin = "no";
+      };
+    };
+
     hardware.logitech.wireless.enable = true;
     hardware.logitech.wireless.enableGraphical = true; # for solaar to be included
 
