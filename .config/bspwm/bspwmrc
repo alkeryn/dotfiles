@@ -54,7 +54,7 @@ case $PC in
 	;;
     laptop)
 	# If docked
-	if [ `xrandr | grep -c "^DP1 connected"` -gt 0 ]
+	if [ `xrandr | grep -c " connected"` -gt 1 ]
 	then
 	    bspc monitor \^1 -d 1 2 3 4
 	    bspc monitor \^2 -d 5 6 7 8 9 10
