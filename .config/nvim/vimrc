@@ -1,0 +1,36 @@
+syntax enable
+
+try
+    colorscheme monokai_pro
+catch
+    echom "couldn't find colorscheme"
+endtry
+
+" Default mapping
+" let g:multi_cursor_use_default_mapping=0
+" let g:multi_cursor_start_word_key      = '<C-b>'
+" let g:multi_cursor_select_all_word_key = '<A-n>'
+" let g:multi_cursor_start_key           = 'g<C-n>'
+" let g:multi_cursor_select_all_key      = 'g<A-n>'
+" let g:multi_cursor_next_key            = '<C-b>'
+" let g:multi_cursor_prev_key            = '<C-p>'
+" let g:multi_cursor_skip_key            = '<C-x>'
+" let g:multi_cursor_quit_key            = '<Esc>'
+
+"Augroup
+augroup AutoGroup
+    au!
+augroup END
+
+augroup Binary
+    au!
+    au BufReadPre  *.bin let &bin=1
+    au BufReadPost *.bin if &bin | %!xxd
+    au BufReadPost *.bin set ft=xxd | endif
+    au BufWritePre *.bin if &bin | %!xxd -r
+    au BufWritePre *.bin endif
+    au BufWritePost *.bin if &bin | %!xxd
+    au BufWritePost *.bin set nomod | endif
+augroup END
+
+exec "source " . expand("<sfile>:p:h") . "/types.vim"

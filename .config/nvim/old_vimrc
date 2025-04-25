@@ -1,0 +1,89 @@
+call plug#begin('~/.vim/plugged')
+"Auto complete
+
+" Plug 'neoclide/coc.nvim', {'branch': 'release'}
+" Plug 'neoclide/coc-snippets', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'jsfaint/coc-neoinclude', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'Shougo/neoinclude.vim' "also check completion in includes
+
+" Plug 'neoclide/coc-json', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'fannheyward/coc-pyright', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'neoclide/coc-tsserver', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'neoclide/coc-html', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'neoclide/coc-css', {'do': 'yarn install --frozen-lockfile'}
+" Plug 'coc-extensions/coc-svelte', {'do': 'yarn install --frozen-lockfile'}
+
+" Plug 'ternjs/tern_for_vim', { 'for': ['javascript', 'javascript.jsx'] , 'do' : 'yarn install --frozen-lockfile' }
+" Plug 'othree/jspc.vim', { 'for': ['javascript', 'javascript.jsx'] }
+
+"Highlighting
+" Plug 'sheerun/vim-polyglot'
+" Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+" Plug 'kaarmu/typst.vim'
+
+"Behavior
+
+" Plug 'Townk/vim-autoclose' "autclose brackets
+" Plug 'tpope/vim-surround' "sourounding
+" Plug 'honza/vim-snippets' "snippets
+
+"Tools
+Plug 'scrooloose/nerdtree'
+" Plug 'junegunn/fzf.vim'
+" Plug 'ntpeters/vim-better-whitespace' "show when there is gross trailing whitespace
+Plug 'tpope/vim-repeat' "repeat last command from plugin
+" Plug 'tpope/vim-commentary' "Comment shortcut
+" if executable("tree-sitter")
+" Plug 'JoosepAlviste/nvim-ts-context-commentstring' "multilang files comments
+" endif
+Plug 'KabbAmine/vCoolor.vim' " color picker
+" if executable("direnv")
+"     Plug 'direnv/direnv.vim' " direnv integration
+" endif
+" Plug 'mbbill/undotree'
+" Plug 'rhysd/git-messenger.vim'
+" Plug 'tpope/vim-fugitive'
+Plug 'krady21/compiler-explorer.nvim'
+Plug 'averms/black-nvim', {'do': ':UpdateRemotePlugins'}
+
+" Plug 'iago-lito/vim-visualMarks' "breaks '<<' indent
+" Plug 'terryma/vim-multiple-cursors' " Multiple Cursors
+
+"Looks
+Plug 'luochen1990/rainbow' "rainbow highlight brackets
+let g:rainbow_active = 0 "set to 0 if you want to enable it later via :RainbowToggle
+Plug 'lilydjwg/colorizer' " Colorize hexa or rgb
+Plug 'neomake/neomake' "do full syntax checking for most languages
+" Plug 'vim-airline/vim-airline'
+" Plug 'vim-airline/vim-airline-themes'
+" Plug 'miyakogi/seiya.vim' "background transparent again
+" Plug 'kovetskiy/sxhkd-vim'
+
+"Themes
+" Plug 'chriskempson/base16-vim'
+" Plug 'kaicataldo/material.vim'
+" Plug 'phanviet/vim-monokai-pro'
+
+"Fancy
+" Plug 'aurieh/discord.nvim', { 'do': ':UpdateRemotePlugins'}
+" Plug 'anned20/vimsence' "discord
+" Plug 'mhinz/vim-startify' "A nice start menu
+" Plug 'vim-scripts/Color-Scheme-Explorer'
+
+"Plug 'ryanoasis/vim-devicons' "Icons should always be last plugin
+
+inoremap <silent><expr> <TAB>
+      \ coc#expandableOrJumpable() ? "\<C-r>=coc#rpc#request('doKeymap', ['snippets-expand-jump',''])\<CR>" :
+      \ coc#pum#visible() ? coc#pum#next(1) :
+      \ CheckBackSpace() ? "\<TAB>" :
+      \ coc#refresh()
+
+function! CheckBackSpace() abort
+  let col = col('.') - 1
+  return !col || getline('.')[col - 1]  =~# '\s'
+endfunction
+
+let g:coc_snippet_next = '<tab>'
+inoremap <silent><expr> <cr> coc#pum#visible() ? coc#_select_confirm() : "\<C-g>u\<CR>"
+call plug#end()
+
