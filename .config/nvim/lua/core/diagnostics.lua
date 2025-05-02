@@ -8,14 +8,28 @@ local function newmax(max, str)
   end
 end
 
-local diag_i
-local diag_total
+---@param diagnostic vim.Diagnostic
+local function get_diag_count(diagnostic) -- TODO use line number and character position
+  local diags = vim.diagnostic.get(diagnostic.bufnr, {
+    namespace = diagnostic.namespace,
+    lnum = diagnostic.lnum,
+  })
+  local total = 0
+  for _, v in ipairs(diags) do
+    local col = v.col == diagnostic.col
+    local col_end = v.end_col == diagnostic.end_col
+    if col and col_end then
+      total = total + 1
+    end
+  end
+  return total
+end
+
+local diag_i = 1
 local suffix_size = { 0 }
 ---@param diagnostic vim.Diagnostic
----@param i integer
----@param total integer
 ---@return string
-local function format_function(diagnostic, i, total)
+local function format_function(diagnostic)
   newmax(suffix_size, diagnostic.message)
 
   local lsp_info = diagnostic.user_data.lsp.relatedInformation or {}
@@ -46,6 +60,7 @@ local function format_function(diagnostic, i, total)
     newmax(suffix_size, mes)
   end
 
+  local diag_total = get_diag_count(diagnostic)
   -- change behavior if there is a code and codeDescription
   local newline = "\n"
   if diag_i == diag_total then
@@ -53,7 +68,6 @@ local function format_function(diagnostic, i, total)
   end
   local endstr = string.format("\n (%s)%s", diagnostic.source, newline)
   table.insert(ret, endstr)
-
   diag_i = diag_i + 1
   return table.concat(ret)
 end
@@ -92,9 +106,15 @@ vim.diagnostic.config({
 
 vim.api.nvim_create_autocmd({ "CursorHold" }, {
   callback = function(args)
-    suffix_size = { 0 }
     diag_i = 1
-    diag_total = #vim.diagnostic.get(args.buf)
-    vim.diagnostic.open_float(nil, { focus = false })
+    suffix_size = { 0 }
+    -- could be overriden by making my own window like
+    -- vim.api.nvim_open_win(diagnostic.bufnr, true, { relative = "cursor", row = 0, col = 1, width = 10, height = 5})
+    vim.diagnostic.open_float({
+        bufnr = args.buf,
+        scope = "cursor"
+      },
+      { focus = false }
+    )
   end,
 })
