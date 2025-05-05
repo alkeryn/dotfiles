@@ -85,6 +85,7 @@ in
         PermitRootLogin = "no";
       };
     };
+    systemd.services.sshd.after = ["network-online.target"];
 
     hardware.logitech.wireless.enable = true;
     hardware.logitech.wireless.enableGraphical = true; # for solaar to be included
