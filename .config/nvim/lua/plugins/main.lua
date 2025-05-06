@@ -53,6 +53,7 @@ return {
   },
 
   -- Looks
+  'lilydjwg/colorizer', -- Colorize hexa or rgb
   'vim-airline/vim-airline', -- UPGRADE?
   'vim-airline/vim-airline-themes',
   'miyakogi/seiya.vim', -- background transparent again
