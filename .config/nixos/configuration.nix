@@ -44,6 +44,13 @@ in
     GTK2_RC_FILES="$HOME/.gtkrc-2.0";
   };
 
+  environment = {
+    extraSetup = ''
+      mkdir -p $out/lib64
+      ln -sf ${pkgs.glibc}/lib64/ld-linux-x86-64.so.2 $out/lib64/ld-linux-x86-64.so.2
+    '';
+  };
+
   # nix.nixPath = [
   #   "nixpkgs=/home/alkeryn/.nixpkgs"
   # ];
