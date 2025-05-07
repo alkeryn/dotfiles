@@ -1,0 +1,25 @@
+[user]
+email = "plbraundev@gmail.com"
+name = "alkeryn"
+
+[ui]
+default-command = ["log", "-r all()"]
+
+[ui.movement]
+edit = true
+
+[revset-aliases]
+"immutable_heads()" = "(trunk().. & ~mine())"
+'closest_bookmark(to)' = 'heads(::to & bookmarks())'
+'closest_pushable(to)' = 'heads(::to & mutable() & ~description(exact:"") & (~empty() | merges()))'
+
+[aliases]
+tug = ["util", "exec", "--", "sh", "-c", """
+if [ "x$1" = "x" ]; then
+  jj bookmark move --from "closest_bookmark(@)" --to "closest_pushable(@)"
+else
+  jj bookmark move --to "closest_pushable(@)" "$@"
+fi
+""", ""]
+
+push = ["git", "push"]
