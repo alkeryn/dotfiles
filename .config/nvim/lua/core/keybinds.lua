@@ -30,6 +30,7 @@ k.set('n', '<leader>Q', ':q!<cr>')
 k.set('n', '<leader>j', fzf.files)
 k.set('n', '<leader>t', fzf.tabs)
 k.set('n', '<leader>b', fzf.builtin)
+k.set('n', '<leader>n', fzf.live_grep_native)
 
 -- Up down wrap line
 k.set('n', 'k', 'gk', { silent = true })
