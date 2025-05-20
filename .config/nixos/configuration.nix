@@ -42,6 +42,7 @@ in
     _JAVA_AWT_WM_NONREPARENTING="1";
     QT_STYLE_OVERRIDE="gtk2";
     GTK2_RC_FILES="$HOME/.gtkrc-2.0";
+    MOZ_USE_XINPUT2="1";
   };
 
   environment = {
