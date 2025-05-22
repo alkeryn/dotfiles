@@ -7,14 +7,14 @@ self: super:
    });
 
    netbird = super.netbird.overrideAttrs (old: rec {
-     version = "0.42.0";
+     version = "0.45.1";
      src = super.fetchFromGitHub {
        owner = "netbirdio";
        repo = "netbird";
        rev = "v${version}";
-       hash = "sha256-xVk5vAU9G4HTaHmK1i8HvvYUxN0B2T2w+Vj4Ypg7N4s=";
+       hash = "sha256-55Vyhzt0WtJRq9CcH7mXw7cklAce/lvC1S+MBMDnMbo=";
      };
-     vendorHash = "sha256-vy725OvkYLyCDYEmnPpXJWqyofb29GiP4GkLn1GInm0=";
+     vendorHash = "sha256-EVhtxYDinmid5C/3N8UGmCzWw1qIE3m0rXes4uFpcOM=";
      ldflags = old.ldflags or [] ++ [
        "-X github.com/netbirdio/netbird/version.version=${version}"
        ];
