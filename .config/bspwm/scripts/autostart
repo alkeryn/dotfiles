@@ -8,7 +8,8 @@ numlockx on
 $mainpc && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/mainpc &
 $laptop && sxhkd -c ~/.config/bspwm/sxhkd/sxhkdrc ~/.config/bspwm/sxhkd/laptop &
 
-xset s off -dpms &
+$mainpc && xset +dpms
+$laptop && xset s off -dpms &
 $laptop && xss-lock -q ~/bin/lock &
 xset r rate 250 75 &
 
