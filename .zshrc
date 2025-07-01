@@ -52,3 +52,6 @@ SAVEHIST=$HISTSIZE
 
 setopt interactive_comments
 bindkey -r '^ ' # disable ctrl+space expand alias which is annoying
+
+[[ -f ~/.env ]] && source ~/.env
+: # returns true
