@@ -30,15 +30,6 @@ return {
           automatic_installation = true,
         })
 
-      require("mason-lspconfig").setup_handlers {
-        -- The first entry (without a key) will be the default handler
-        -- and will be called for each installed server that doesn't have
-        -- a dedicated handler.
-        function (server_name) -- default handler (optional)
-          vim.lsp.enable(server_name)
-        end
-      }
-
       -- Additional tools to install (formatters, linters, etc)
       require("mason-tool-installer").setup({
           ensure_installed = {
