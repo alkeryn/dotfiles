@@ -28,6 +28,7 @@ return {
       require("mason-lspconfig").setup({
           ensure_installed = lsp_list,
           automatic_installation = true,
+          automatic_enable = true
         })
 
       -- Additional tools to install (formatters, linters, etc)
