@@ -2,6 +2,7 @@
 
 # Utils
 md(){ command mkdir -p "$@" && cd "$1"; }
+sum() { awk $@ '{sum += $1} END {print sum}' }
 winvm () {
     ~/bin/winvm $1 &
 }
