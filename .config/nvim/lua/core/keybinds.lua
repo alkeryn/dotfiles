@@ -57,7 +57,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
       nmap('<leader>wr', vim.lsp.buf.remove_workspace_folder, 'Remove Workspace Folder')
       nmap('<leader>wl', function() print(vim.inspect(vim.lsp.buf.list_workspace_folders())) end, 'List Workspace Folders')
       nmap('<leader>rn', vim.lsp.buf.rename, 'Rename')
-      nmap('<leader>ca', vim.lsp.buf.code_action, 'Code Action')
+      nmap('<leader>a', vim.lsp.buf.code_action, 'Code Action')
       nmap('<leader>=', function() vim.lsp.buf.format { async = true } end, 'Format')
     end,
   })

@@ -47,3 +47,5 @@ vim.g.NERDTreeDirArrowCollapsible = "▾"
 vim.g.seiya_auto_enable = 1
 -- Default value: ['ctermbg']
 vim.g.seiya_target_groups = vim.fn.has('nvim') == 1 and {'guibg'} or {'ctermbg'}
+
+vim.o.timeoutlen = 500 -- i don't like waiting
