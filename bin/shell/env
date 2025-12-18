@@ -15,6 +15,9 @@ export TERM=xterm-256color
 unset SSH_ASKPASS
 
 VPNDIR=$HOME"/Documents/VPN/ovpn_tcp"
+export NB_DAEMON_ADDR=${NB_DAEMON_ADDR:-"unix:///var/run/netbird/$USER.sock"}
+export NB_SERVICE=${NB_SERVICE:-"netbird@$USER"}
+
 stock=/run/media/alkeryn/Stock
 stock2=/run/media/alkeryn/Stock2
 
