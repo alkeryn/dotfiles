@@ -207,14 +207,15 @@ zsnap(){
 	sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r "$1" | head -n1)
     done
 }
-$mainpc && zsnap stock/stock/Media
+$mainpc && zsnap stock/files
 
 for i in $(zfs list -Hro name linux/root | tail -n +2)
 do
     zsnap $i
 done
 
-zsnap linux/data/home
+$laptop && zsnap linux/data/home
+$mainpc && zsnap stock/data/home
 
 )
 }
