@@ -199,23 +199,23 @@ pip install --user ueberzug
 # ~~~~~~~~~~~~~~~~~~~~
 
 zsnap () {
-(
-zsnap(){
-    sudo zfs snapshot "$1"@$(date +%Y%m%d_%H%M%S)
-    while [ $(zfs list -t snapshot -H -r "$1" | wc -l) -gt 3 ]
+    (
+        zsnap(){
+            sudo zfs snapshot "$1"@$(date +%Y%m%d_%H%M%S)
+            while [ $(zfs list -t snapshot -H -r "$1" | wc -l) -gt 3 ]
+            do
+                sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r "$1" | head -n1)
+            done
+        }
+
+    for i in $(zfs list -Hro name linux/root | tail -n +2)
     do
-	sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r "$1" | head -n1)
+        zsnap $i
     done
-}
-$mainpc && zsnap stock/files
 
-for i in $(zfs list -Hro name linux/root | tail -n +2)
-do
-    zsnap $i
-done
-
-$laptop && zsnap linux/data/home
-$mainpc && zsnap stock/data/home
+    $laptop && zsnap linux/data/home
+    $mainpc && zsnap stock/data/home
+    $mainpc && zsnap stock/files
 
 )
 }
