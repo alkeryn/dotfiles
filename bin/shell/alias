@@ -4,7 +4,7 @@ alias mips="curl -6 ifconfig.co 2>/dev/null"
 alias mipa="curl -4 ifconfig.co 2>/dev/null; curl -6 ifconfig.co 2>/dev/null"
 alias cpd="cp -axrfT"
 alias cpa="cp -axvuf"
-alias rarchiv="rsync -azvP"
+alias rarchiv="rsync -azvAXUUP"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
 alias vim='nvim'
