@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# this is used because for whatever reason it may switch back to the monitor the mouse is on
+focused_monitor=$(hyprctl activeworkspace -j | jq -r '.monitorID')
+active_window=$(hyprctl activewindow -j | jq -r '.address')
+hyprctl dispatch killactive
+
+# Wait for the window to actually close
+while hyprctl clients -j | jq -e ".[] | select(.address == \"$active_window\")" > /dev/null 2>&1; do
+    sleep 0.001
+done
+hyprctl dispatch focusmonitor $focused_monitor

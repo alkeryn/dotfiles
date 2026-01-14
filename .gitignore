@@ -40,6 +40,8 @@ bin/Software
 .config/htop/*
 !.config/htop/htoprc
 
+!.config/hypr
+
 !.config/jj
 
 !.config/mpd
