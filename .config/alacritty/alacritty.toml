@@ -37,7 +37,7 @@ key = "I"
 mods = "Control|Shift"
 
 [font]
-size = 9.0
+size = 11.0
 
 [font.normal]
 family = "Hack"
