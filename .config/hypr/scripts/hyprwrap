@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# hyprctl doesn't return an exit code, this is some hack to fix that
+hyprctl $@ | grep -q '^ok'
