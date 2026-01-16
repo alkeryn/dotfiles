@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+sandbox=~/.local/share/sandboxes/sandbox
+mkdir -p $sandbox
+PWD="$(realpath $PWD)"
+PWDARG="--bind $PWD $PWD"
+
+if [ "$PWD" == "$HOME" ]
+then
+    echo PWD is HOME, not binding it
+    PWDARG=""
+fi
+
+bwrap \
+    --ro-bind /bin /bin \
+    --ro-bind /lib /lib \
+    --ro-bind /lib64 /lib64 \
+    --ro-bind /etc /etc \
+    --ro-bind /sbin /sbin \
+    --ro-bind /usr /usr \
+    --dev /dev \
+    --tmpfs /tmp \
+    --proc /proc \
+    --bind $sandbox $HOME \
+    $PWDARG \
+    --die-with-parent \
+    --unshare-all \
+    --share-net \
+    $@
