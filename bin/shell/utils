@@ -196,6 +196,10 @@ gef-install
 pip install --user ueberzug
 }
 
+strim_meta() {
+    mogrify -auto-orient -strip $1;jpegoptim --size=3000 $1
+}
+
 # ~~~~~~~~~~~~~~~~~~~~
 
 zsnap () {
