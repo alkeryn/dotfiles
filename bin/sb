@@ -17,6 +17,7 @@ bwrap \
     --ro-bind /etc /etc \
     --ro-bind /sbin /sbin \
     --ro-bind /usr /usr \
+    --ro-bind /run/systemd/resolve /run/systemd/resolve \
     --dev /dev \
     --tmpfs /tmp \
     --proc /proc \
