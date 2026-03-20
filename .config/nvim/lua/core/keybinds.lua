@@ -1,4 +1,18 @@
 local fzf = require("fzf-lua")
+
+local fzf_newtab = setmetatable({}, {
+  __index = function(_, key)
+    return function()
+      fzf[key]({
+        jump1_action = fzf.actions.file_tabedit,
+        actions = {
+          ["enter"] = fzf.actions.file_tabedit,
+        }
+      })
+    end
+  end
+})
+
 local k = vim.keymap
 k.set('t', '<Esc>', '<C-\\><C-n>') -- terminal stuff
 -- Shortcuts
@@ -28,6 +42,7 @@ k.set('n', '<leader>w', ':w<cr>')
 k.set('n', '<leader>q', ':q<cr>')
 k.set('n', '<leader>Q', ':q!<cr>')
 k.set('n', '<leader>j', fzf.files)
+k.set('n', '<leader>J', fzf_newtab.files)
 k.set('n', '<leader>t', fzf.tabs)
 k.set('n', '<leader>b', fzf.builtin)
 k.set('n', '<leader>n', fzf.live_grep_native)
@@ -48,6 +63,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
 
       nmap('<leader>d', fzf.lsp_declarations, 'Go to Declaration')
       nmap('<leader>f', fzf.lsp_definitions, 'Go to Definition')
+      nmap('<leader>F', fzf_newtab.lsp_definitions, 'Go to definition, newtab')
       nmap('<leader>D', fzf.lsp_typedefs, 'Type Definition')
       nmap('K', vim.lsp.buf.hover, 'Hover Documentation')
       nmap('gi', fzf.lsp_implementations, 'Go to Implementation')
