@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 sandbox=~/.local/share/sandboxes/sandbox
 mkdir -p $sandbox
 PWD="$(realpath $PWD)"
