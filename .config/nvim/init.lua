@@ -9,10 +9,7 @@ require("core.diagnostics")
 
 -- Treesitter setup if available
 if utils.executable("tree-sitter") then
-  require'nvim-treesitter.configs'.setup {
-    ensure_installed = { "c", "lua", "rust", "svelte","javascript", "html", "css", "vim" },
-    sync_install = false,
-  }
+  require'nvim-treesitter'.install { "c", "lua", "rust", "svelte","javascript", "html", "css", "vim" }
 end
 
 -- Hide all semantic highlights
