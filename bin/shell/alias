@@ -58,6 +58,7 @@ alias qrand="curl https://qrng.anu.edu.au/wp-content/plugins/colours-plugin/get_
 alias lxc="incus"
 alias mosh="mosh --no-init"
 alias opencode="sb opencode"
+alias ffmpeg="sb ffmpeg"
 
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 lxs() { lxc exec $1 -- su - $USER }
