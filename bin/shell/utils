@@ -205,10 +205,10 @@ strip_meta() {
 zsnap () {
     (
         zsnap(){
-            sudo zfs snapshot "$1"@$(date +%Y%m%d_%H%M%S)
-            while [ $(zfs list -t snapshot -H -r "$1" | wc -l) -gt 3 ]
+            sudo zfs snapshot -r "$1"@$(date +%Y%m%d_%H%M%S)
+            while [ $(zfs list -t snapshot -H -d 1 "$1" | wc -l) -gt 3 ]
             do
-                sudo zfs destroy $(zfs list -t snapshot -s creation -o name -H -r "$1" | head -n1)
+                sudo zfs destroy -r $(zfs list -t snapshot -s creation -o name -H -d 1 "$1" | head -n1)
             done
         }
 
@@ -220,6 +220,5 @@ zsnap () {
     $laptop && zsnap linux/data/home
     $mainpc && zsnap stock/data/home
     $mainpc && zsnap stock/files
-
 )
 }
