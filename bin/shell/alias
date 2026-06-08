@@ -8,8 +8,7 @@ alias rarchiv="rsync -azvAXUUP"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
 alias vim='nvim'
-alias v='nvim'
-alias vz='nvim $(fzf)'
+alias v='nvim' alias vz='nvim $(fzf)'
 alias vs='nvim -S'
 alias visudo='sudo EDITOR=nvim visudo'
 alias vipw='sudo EDITOR=nvim vipw'
@@ -59,6 +58,7 @@ alias lxc="incus"
 alias mosh="mosh --no-init"
 alias opencode="sb opencode"
 alias ffmpeg="sb ffmpeg"
+alias fli="flatpak --user install"
 
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 lxs() { lxc exec $1 -- su - $USER }
