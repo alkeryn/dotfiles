@@ -59,6 +59,7 @@ alias mosh="mosh --no-init"
 alias opencode="sb opencode"
 alias ffmpeg="sb ffmpeg"
 alias fli="flatpak --user install"
+alias pi="TMPDIR=~/.cache/tmpdir sb --bind ~/.config/pi ~/.pi/agent pi"
 
 tornew(){ printf 'AUTHENTICATE "'"$1"'"\nSIGNAL NEWNYM\n' | nc -c 127.0.0.1 9051 ;}
 lxs() { lxc exec $1 -- su - $USER }
