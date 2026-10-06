@@ -782,7 +782,7 @@ hl.layout.register("bspwm_b", layout_impl)
 
 local M = {}
 
--- Optional native renderer kept separate from the layout's tree logic.
+-- Optional renderer kept separate from the layout's tree logic.
 function M.set_feedback_sink(sink)
 	feedback_sink = sink
 	publish_feedback()

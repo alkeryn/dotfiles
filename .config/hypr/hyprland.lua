@@ -13,8 +13,7 @@
 --   hyprpaper hypridle hyprlock waybar dunst grim slurp wl-clipboard cliphist
 --   rofi (wayland build) alacritty brightnessctl playerctl pactl ckb-next
 --   conky (XWayland) megasync signal-desktop mpd mpDris2
---   libwayland-client (native feedback; build: cc, pkg-config, wayland-scanner,
---   wayland-protocols -- no Python/GTK/Cairo dependency)
+--   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
 local bspwm = require("bspwm") -- registers the "lua:bspwm" layout

@@ -1,87 +1,81 @@
-# Native preselection feedback
+# Script-only preselection feedback
 
-`hyprland.lua` enables `lua/presel_feedback.lua`. It predicts the next tile's
-bordered footprint and exports connector names and monitor-local logical
-coordinates to `scripts/presel_feedback`, a native Wayland client.
+`lua/presel_feedback.lua` does all geometry prediction. The small display helper,
+`scripts/presel_feedback.py`, runs through Python and GTK3/layer-shell. There is
+**no compiler, build step, generated protocol code, custom binary or plugin**.
 
-## Appearance and geometry
+## Behavior
 
-- **Opaque `#100000`, no outline**: the original bspwm `presel_feedback_color`.
-- Supports preselection on leaves and whole subtrees, including unequal ratios.
-- Reflows the tree using the **future** work area: opening a second tile removes
-  this config's single-window gap override. Monitor reservations and outer gaps
-  are applied before splitting; inner gaps are applied after splitting.
-- The rectangle includes the future window border, not the surrounding gaps.
-  Border width is reserved *inside* that footprint by Hyprland; it is not
-  subtracted twice.
-- Uses connector identity (`DP-4`, etc.) rather than GTK's monitor coordinates.
-  Positions account for output transforms and logical scale. Viewporter scales
-  one solid pixel to the exact logical surface size, including fractional scale.
-- Empty input region, no keyboard interactivity, no reserved screen space.
-- Hidden on inactive/fullscreen/monocle workspaces and powered-off outputs.
-- Layer-shell's top layer is above application windows, including floating ones;
-  this stacking order differs from bspwm. The preview is always click-through.
+- Opaque `#100000`, no outline, matching the original bspwm feedback color.
+- Correct direction/ratio for leaf or subtree preselection.
+- Predicts the future work area, including monitor reservations and the removal
+  of the single-window smart-gap rule when the second tile opens. Inner gaps are
+  applied after splitting; the preview includes the future window border.
+- Fully click-through, no keyboard focus and no reserved screen space.
+- Hidden for inactive/fullscreen/monocle workspaces and powered-off outputs.
 
-Prediction matches the **normal tiled-window rules in this config**. A future
-application's floating rule, custom size constraints, grouping decorations, or
-new workspace-specific gap rules cannot be inferred before the application
-exists. If adding such rules, update the predictor as needed.
+Lua exports runtime output names, full logical monitor bounds and local preview
+coordinates. The renderer matches those bounds against GDK's current monitor
+geometry; it does not assume connector names or monitor ordering. Ambiguous or
+unmatched geometry is hidden and logged instead of guessing a display. Mirrored
+outputs with identical geometry can therefore require extra handling.
 
-## Build and runtime
+Layer-shell's top layer is above floating windows too, unlike bspwm's exact
+stacking order. Also, the preview predicts a normal tiled window: future
+application-specific floating/size rules or additional workspace gap overrides
+cannot be known in advance.
 
-Runtime: **libwayland-client only**, plus standard C libraries. No Python, GTK,
-Cairo, JSON library, or compositor plugin.
+## Runtime and maintenance
 
-Build tools (already installed): C compiler, pkg-config, wayland-scanner,
-wayland-protocols. `scripts/presel_feedback` builds on first use and when its C
-source/protocols change. The binary lives in:
+Dependencies already available here: Python 3, PyGObject/GTK3 with Cairo bindings,
+and gtk-layer-shell. A pure in-process Lua renderer isn't available in this
+Hyprland API; Lua's optional GTK binding (`lgi`) is not installed either.
 
-```
-${XDG_CACHE_HOME:-$HOME/.cache}/hypr/presel_feedback/presel_feedback
-```
+The helper starts on reload/startup. A per-session, per-protocol lock prevents
+duplicates. Version 3 uses `.v3.json`, separate from the retired `.state` (native)
+and `.json` (first Python version) protocols. Each old state file receives a valid
+empty message in its own format, so a surviving reader hides instead of rejecting
+new-format data.
 
-A session-specific lock prevents duplicates. After rebuilding, a config reload
-replaces an outdated helper, checking its executable, owner, exact state argument
-and held lock before using a pidfd to stop it. The same identity checks retire
-the previous Python helper during migration; no broad process-name kill is used.
-The Lua publisher also clears the legacy JSON overlay immediately.
+Updated script versions restart on config reload. Legacy cleanup is best-effort:
+only verified previous helpers for the exact session/state file are stopped using
+pidfds. An unrecognized legacy process is left untouched and idle until session
+end; it cannot hold the new renderer's lock or prevent startup. No process-safety
+check is bypassed. The compiled helper/build files are no longer part of this
+configuration.
 
-Geometry is written atomically only when changed. Both processes check visibility
-or state changes at 50 ms intervals. No window titles or content are exported.
+State is written atomically only on changes. Visibility and state are refreshed
+at 50 ms intervals. No window titles or content are exported.
 
 Diagnostics:
 
 ```sh
-state="$XDG_RUNTIME_DIR/bspwm_presel_${HYPRLAND_INSTANCE_SIGNATURE}.state"
+state="$XDG_RUNTIME_DIR/bspwm_presel_${HYPRLAND_INSTANCE_SIGNATURE}.v3.json"
 tail -n 50 "$state.log"
 ```
 
 For a foreground run when no instance is running:
 
 ```sh
-~/.config/hypr/scripts/presel_feedback --state "$state"
+python3 ~/.config/hypr/scripts/presel_feedback.py --state "$state"
 ```
 
-The helper exits with the Wayland session. To disable feedback, comment out the
-`require("lua/presel_feedback").setup(bspwm)` call and remove the session's state
-file; the existing helper hides its surfaces.
+To disable feedback, comment out the `presel_feedback` setup call in
+`hyprland.lua` and remove the session's state file. The helper then hides its
+surfaces and exits with the Wayland session.
 
-## Checks
+## Tests
 
 From `~/.config/hypr`:
 
 ```sh
 lua tests/presel_feedback_test.lua
-scripts/presel_feedback --self-test
-tests/presel_feedback_native_test.sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p '*_test.py'
 ```
 
-The last test runs the real helper against a headless Wayland protocol server.
-It verifies the opaque SHM pixel, empty input region, keyboard mode, viewport
-sizes, margins, resizing and dismissal. It requires libwayland-server for the
-test server, not for the actual helper. Lua tests cover smart gaps, reservations,
-rotated/scaled outputs, subtree geometry, ratios and visibility.
-
-`protocols/wlr-layer-shell-unstable-v1.xml` is vendored from Hyprland commit
-`efb50993780079460b0cbed1363e2166a2de1d9f`; its upstream copyright/license is retained
-inside the file. Other protocol definitions come from system wayland-protocols.
+Tests use synthetic output fixtures and injected geometry, not connected
+monitors or the output names in `lua/vars.lua`. They cover smart gaps, scaling,
+rotated outputs, subtree geometry, names/escaping, monitor reordering, ambiguity,
+opaque drawing, process-identity checks, and startup with a refusing legacy lock.
+Live placement and input pass-through
+still need checking on the desktop.

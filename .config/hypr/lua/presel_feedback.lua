@@ -1,5 +1,5 @@
 -- Predict the next bordered tile, then export output-local logical coordinates
--- to the native Wayland helper. No application titles/content are exported.
+-- to a Python/GTK renderer. No application titles/content are exported.
 local M = {}
 
 local function round(value) return math.floor(value + 0.5) end
@@ -8,24 +8,27 @@ local function gap(value, side)
 	return tonumber(value) or 0
 end
 
+function M.monitor_box(mon)
+	if not mon or not mon.width or not mon.height or not mon.position then return nil end
+	local w, h = mon.width, mon.height
+	if (mon.transform or 0) % 2 == 1 then w, h = h, w end
+	return { x = mon.position.x, y = mon.position.y,
+		w = round(w / (mon.scale or 1)), h = round(h / (mon.scale or 1)) }
+end
+
 -- Space.cpp:recheckWorkArea. In this config the only gap override is the
 -- single-window rule: after insertion there are >=2 tiles, so general gaps win.
 -- Derive the FUTURE area, not the current gapless single-window rectangle.
 function M.future_area(st, ws, gaps_out)
-	local mon = ws.monitor
-	if not mon or not mon.width or not mon.height or not mon.position then
-		return st.tree and st.tree._box -- geometry-only callers without monitor data
-	end
-	local w, h = mon.width, mon.height
-	if (mon.transform or 0) % 2 == 1 then w, h = h, w end
-	w, h = round(w / (mon.scale or 1)), round(h / (mon.scale or 1))
-	local reserved = mon.reserved or {}
+	local bounds = M.monitor_box(ws.monitor)
+	if not bounds then return st.tree and st.tree._box end
+	local reserved = ws.monitor.reserved or {}
 	local left = (reserved.left or 0) + gap(gaps_out, "left")
 	local top = (reserved.top or 0) + gap(gaps_out, "top")
 	local right = (reserved.right or 0) + gap(gaps_out, "right")
 	local bottom = (reserved.bottom or 0) + gap(gaps_out, "bottom")
-	return { x = mon.position.x + left, y = mon.position.y + top,
-		w = w - left - right, h = h - top - bottom }
+	return { x = bounds.x + left, y = bounds.y + top,
+		w = bounds.w - left - right, h = bounds.h - top - bottom }
 end
 
 -- WindowTarget.cpp:updatePos: inner gaps occur only at non-workarea edges.
@@ -87,8 +90,9 @@ function M.rectangles(states, workspaces, windows, options)
 		if valid and node.presel then
 			local preview = M.window_box(M.preview_box(box, node.presel), area, options.gaps_in)
 			preview.output = ws.monitor.name
-			local origin = ws.monitor.position or { x = 0, y = 0 }
-			preview.monitor_x, preview.monitor_y = origin.x, origin.y
+			local bounds = M.monitor_box(ws.monitor) or area
+			preview.monitor_x, preview.monitor_y = bounds.x, bounds.y
+			preview.monitor_w, preview.monitor_h = bounds.w, bounds.h
 			if preview.w > 0 and preview.h > 0 then result[#result + 1] = preview end
 		end
 		return valid
@@ -114,15 +118,24 @@ function M.rectangles(states, workspaces, windows, options)
 	return result
 end
 
+local function json_string(value)
+	return '"' .. value:gsub('[%z\1-\31\\"]', function(c)
+		if c == '"' then return '\\"' end
+		if c == '\\' then return '\\\\' end
+		return string.format('\\u%04x', string.byte(c))
+	end) .. '"'
+end
+
 function M.encode(rectangles)
-	local parts = { "BSPWM_PRESEL_V2\n" }
+	local parts = {}
 	for _, b in ipairs(rectangles) do
-		if b.output and b.output:match("^[%w_.:-]+$") then
-			parts[#parts + 1] = string.format("%s %d %d %d %d\n", b.output,
-				round(b.x - (b.monitor_x or 0)), round(b.y - (b.monitor_y or 0)), round(b.w), round(b.h))
+		if b.output and b.monitor_w and b.monitor_h then
+			parts[#parts + 1] = string.format('{"output":%s,"box":[%d,%d,%d,%d],"monitor":[%d,%d,%d,%d]}',
+				json_string(b.output), round(b.x - b.monitor_x), round(b.y - b.monitor_y), round(b.w), round(b.h),
+				round(b.monitor_x), round(b.monitor_y), round(b.monitor_w), round(b.monitor_h))
 		end
 	end
-	return table.concat(parts)
+	return '{"version":3,"rectangles":[' .. table.concat(parts, ',') .. ']}\n'
 end
 
 local function shell_quote(value)
@@ -177,14 +190,29 @@ function M.setup(layout)
 			report_error("missing/invalid session environment"); return
 		end
 		local base = runtime .. "/bspwm_presel_" .. signature
-		state_path = base .. ".state"
-		-- Hide the old overlay immediately. The native helper retires only the
-		-- verified Python process belonging to this exact session/state file.
-		local legacy = base .. ".json"
-		local file = io.open(legacy .. ".tmp", "w")
-		if file then
-			file:write('{"version":1,"rectangles":[]}\n'); file:close()
-			os.rename(legacy .. ".tmp", legacy)
+		-- Protocol generations must not share either state OR a singleton lock.
+		-- Otherwise a surviving native reader rejects our JSON and blocks GTK.
+		state_path = base .. ".v3.json"
+		local command = "python3 " .. shell_quote(home .. "/.config/hypr/scripts/presel_feedback.py")
+			.. " --state " .. shell_quote(state_path)
+		local legacy_states = {
+			{ path = base .. ".state", empty = "BSPWM_PRESEL_V2\n" },
+			{ path = base .. ".json", empty = '{"version":1,"rectangles":[]}\n' },
+		}
+		for _, legacy in ipairs(legacy_states) do
+			-- Each retired protocol receives its own valid empty message. Even
+			-- if its process cannot safely be stopped, it stays hidden and idle.
+			local tmp = legacy.path .. ".tmp"
+			local file, err = io.open(tmp, "w")
+			if file then
+				local written = file:write(legacy.empty)
+				local closed = file:close()
+				if written and closed then
+					local renamed, rename_err = os.rename(tmp, legacy.path)
+					if not renamed then os.remove(tmp); report_error(rename_err) end
+				else os.remove(tmp); report_error("legacy state reset failed") end
+			else report_error(err) end
+			command = command .. " --legacy-state " .. shell_quote(legacy.path)
 		end
 		started = true
 		publish()
@@ -192,9 +220,7 @@ function M.setup(layout)
 		-- via flock. A timer covers workspace/fullscreen/DPMS changes that don't
 		-- necessarily recalculate the layout. Writes happen only on changes.
 		timer = hl.timer(publish, { timeout = 50, type = "repeat" })
-		hl.exec_cmd(shell_quote(home .. "/.config/hypr/scripts/presel_feedback")
-			.. " --state " .. shell_quote(state_path) .. " --legacy-state " .. shell_quote(legacy)
-			.. " >> " .. shell_quote(state_path .. ".log") .. " 2>&1")
+		hl.exec_cmd(command .. " >> " .. shell_quote(state_path .. ".log") .. " 2>&1")
 	end
 	hl.on("hyprland.start", start)
 	hl.on("config.reloaded", start)
