@@ -1,6 +1,6 @@
 # Super+Y: global send/pull
 
-Reference: `~/tmp/dotfiles/.config/bspwm/sxhkd/sxhkdrc`:
+Reference: `~/.config/bspwm/sxhkd/sxhkdrc`:
 
 ```sh
 bspc query -N -n focused.automatic && bspc node -n last.!automatic || bspc node last.leaf -n focused
