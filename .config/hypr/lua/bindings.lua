@@ -124,11 +124,12 @@ hl.bind("SUPER + CTRL + x",            hl.dsp.window.pin(), { repeating = true }
 -- bspc node -g urgent  -> no equivalent (client-driven only)
 
 -- Focus/swap (bspc node -f/-s west|south|north|east + monitor fallback)
--- previous attempt used binde (hold-to-repeat) on these
-local DIRS = { h = { "left", "l" }, j = { "down", "d" }, k = { "up", "u" }, l = { "right", "r" } }
+-- bspwm's low-tightness search mixes tiles/floats, including overlapping ones.
+-- Keep sxhkd's hold-to-repeat behavior on both focus and swap.
+local DIRS = { h = "l", j = "d", k = "u", l = "r" }
 for key, dir in pairs(DIRS) do
-	hl.bind("SUPER + " .. key,           hl.dsp.focus({ direction = dir[1] }), { repeating = true })
-	hl.bind("SUPER + SHIFT + " .. key,   function() helpers.swap_dir(dir[2]) end, { repeating = true })
+	hl.bind("SUPER + " .. key,           function() helpers.focus_dir(dir) end, { repeating = true })
+	hl.bind("SUPER + SHIFT + " .. key,   function() helpers.swap_dir(dir) end, { repeating = true })
 end
 
 -- focus the node for the given path jump (bspc node -f @{parent,brother,first,second})

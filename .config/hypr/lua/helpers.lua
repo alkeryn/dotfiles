@@ -59,13 +59,17 @@ function M.focus_last()
 end
 
 -- ---------------------------------------------------------------------------
--- Directional swap with monitor fallback
+-- Directional focus/swap with monitor fallback
 -- ---------------------------------------------------------------------------
--- Focus already falls back to the neighbouring monitor through the native
--- dispatcher. Swap needs the selected node's OUTER box: its own children must
--- not hide the monitor fallback. Query first; a rejected layout message would
--- otherwise produce an on-screen error overlay.
 local bspwm = require("lua/extensions/bspwm")
+
+function M.focus_dir(direction) -- l | r | u | d
+	bspwm.focus_dir(direction)
+end
+
+-- Swap needs the selected node's OUTER box: its own children must not hide the
+-- monitor fallback. Query first; a rejected layout message would otherwise
+-- produce an on-screen error overlay.
 
 function M.swap_dir(direction) -- l | r | u | d
 	if bspwm.has_neighbor(direction) then

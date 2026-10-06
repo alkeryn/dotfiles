@@ -11,7 +11,7 @@
 --   * selected-subtree desktop transfers (-d --follow)
 --   * directional subtree swap, leaf move, subtree edge grow/shrink
 --   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
---   * node focus: parent / brother / first / second
+--   * cross-layer directional focus, node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
 --
 -- NOT implemented (see discussion):
@@ -76,6 +76,7 @@ end
 
 -- Pure tree operations are separate from native focus/layout callbacks.
 local tree = require("lua/extensions/bspwm_tree")
+local directional_focus = require("lua/extensions/bspwm_focus")
 local leaf, find_path, collect_ids = tree.leaf, tree.find_path, tree.collect_ids
 local leaves, first_leaf, last_leaf = tree.leaves, tree.first_leaf, tree.last_leaf
 local prune_tree, walk_splits = tree.prune, tree.walk_splits
@@ -1150,6 +1151,13 @@ function M.close()
 	if M.close_selected() then return end
 	local w = hl.get_active_window()
 	if w and w.mapped then hl.dispatch(hl.dsp.window.close({ window = w })) end
+end
+
+-- Floats aren't layout targets, so directional focus is a public callback,
+-- not a layout message (which would run against an unrelated tiled window).
+function M.focus_dir(dir)
+	if rehydrating or transferring then return end
+	directional_focus.focus(dir, states)
 end
 
 -- Use the same selected node/search as `swap`, so an internal neighbour does
