@@ -14,47 +14,48 @@ local H = {}
 -- ---------------------------------------------------------------------------
 
 function H.focus_history(step)
-	local wins = hl.query.get_windows() or {}
+	local wins = hl.get_windows() or {}
 	if #wins < 2 then return end
 	table.sort(wins, function(a, b)
 		return (a.focus_history_id or 0) < (b.focus_history_id or 0)
 	end)
-	local cur = hl.query.get_active_window()
+	local cur = hl.get_active_window()
 	local idx
 	for i, w in ipairs(wins) do
 		if cur and w.address == cur.address then idx = i break end
 	end
 	if not idx then return end
 	local t = wins[((idx - 1 + step) % #wins) + 1]
-	if t then hl.dsp.focus({ window = "address:" .. t.address })() end
+	if t then hl.dsp.focus({ window = t })() end
 end
 
 function H.focus_last()
-	local w = hl.query.get_last_window()
-	if w then hl.dsp.focus({ window = "address:" .. w.address })() end
+	local w = hl.get_last_window()
+	if w then hl.dsp.focus({ window = w })() end
 end
 
 -- ---------------------------------------------------------------------------
--- focus / swap with bspwm-style fallbacks
+-- swap with bspwm-style fallback
 -- ---------------------------------------------------------------------------
+-- Focus needs no helper: hl.dsp.focus({ direction = ... }) already falls back
+-- to the neighbouring monitor (binds:window_direction_monitor_fallback, on by
+-- default), which is `bspc node -f $A || bspc monitor -f $A`.
+--
+-- Swap: `bspc node -s $A --follow || bspc node -d $A:focused --follow`, i.e. swap
+-- with the tree neighbour, or else send the window to the monitor in that
+-- direction. A layout rejecting a message is reported as an ERROR (on-screen
+-- overlay), so we ask the layout whether a neighbour exists instead of using
+-- failure as control flow.
 
-local DIRFULL = { l = "left", r = "right", u = "up", d = "down" }
+local bspwm = require("bspwm")
 
--- NOTE: dispatcher closures return a result table { ok = bool, ... },
--- not a bare boolean -- check .ok
-function H.focus_dir(d)
-	local ok = hl.dsp.focus({ direction = DIRFULL[d] })()
-	if not ok.ok then hl.dsp.focus({ monitor = d })() end
-end
-
-function H.swap_dir(d)
-	-- bspc node -s "$A" --follow (tree-aware swap in the bspwm layout);
-	-- fallback: bspc node -d "$A":focused --follow
-	local ok = hl.dsp.layout("swap " .. d)()
-	if not ok.ok then
-		if d == "l" then hl.dsp.window.move({ workspace = "m-1" })()
-		elseif d == "r" then hl.dsp.window.move({ workspace = "m+1" })() end
+function H.swap_dir(d) -- d: l | r | u | d
+	if bspwm.has_neighbor(d) then
+		hl.dsp.layout("swap " .. d)()
+		return
 	end
+	local mon = hl.get_monitor(d) -- relative to the focused monitor; nil if none
+	if mon then hl.dsp.window.move({ monitor = mon, follow = true })() end
 end
 
 -- ---------------------------------------------------------------------------
@@ -62,52 +63,92 @@ end
 -- ---------------------------------------------------------------------------
 
 function H.swap_with_workspace(sel)
-	local cur = hl.query.get_active_workspace()
-	local tgt = hl.query.get_workspace(sel)
+	local cur = hl.get_active_workspace()
+	local tgt = hl.get_workspace(sel)
 	if not cur or not tgt or cur.id == tgt.id then return end
-	for _, w in ipairs(tgt:get_windows() or {}) do
-		hl.dsp.window.move({ workspace = cur.id, follow = false, window = w.address })()
+	-- snapshot BOTH lists before moving anything, otherwise the second loop
+	-- would also move the windows we just moved over
+	local from_tgt = tgt:get_windows()
+	local from_cur = cur:get_windows()
+	for _, w in ipairs(from_tgt) do
+		hl.dsp.window.move({ workspace = cur.id, follow = false, window = w })()
 	end
-	for _, w in ipairs(cur:get_windows() or {}) do
-		hl.dsp.window.move({ workspace = tgt.id, follow = false, window = "address:" .. w.address })()
+	for _, w in ipairs(from_cur) do
+		hl.dsp.window.move({ workspace = tgt.id, follow = false, window = w })()
 	end
 end
 
 function H.swap_workspace_rel(rel)
-	local cur = hl.query.get_active_workspace()
+	local cur = hl.get_active_workspace()
 	if cur then H.swap_with_workspace(cur.id + rel) end
 end
 
 -- ---------------------------------------------------------------------------
 -- gap presets (bspc config -d focused window_gap)
 -- ---------------------------------------------------------------------------
--- Hyprland gaps are global here (Next/Prior adjust, BackSpace resets to 0,
--- shift+BackSpace restores the default). Per-workspace gaps are possible via
--- hl.workspace_rule({ workspace = "N", gaps_in = X }) at runtime, at the cost
--- of rule churn; global was chosen for predictability.
+-- bspwm: Next/Prior = current gap +/- 5, BackSpace = default, shift+BackSpace = 0.
+-- Hyprland gaps are global here (per-workspace gaps would need workspace-rule
+-- churn); the current value is tracked in this module. A config reload
+-- re-evaluates the modules, which also resets this state to the configured gaps.
 
-function H.set_gaps(v)
-	hl.config({ general = { gaps_in = v, gaps_out = v } })
+local gaps = { inner = vars.GAPS, outer = vars.GAPS_OUT }
+
+local function apply_gaps()
+	hl.config({ general = { gaps_in = gaps.inner, gaps_out = gaps.outer } })
+end
+
+function H.adjust_gaps(delta)
+	gaps.inner = math.max(0, gaps.inner + delta)
+	gaps.outer = math.max(0, gaps.outer + delta)
+	apply_gaps()
+end
+
+function H.reset_gaps()
+	gaps.inner, gaps.outer = vars.GAPS, vars.GAPS_OUT
+	apply_gaps()
+end
+
+function H.zero_gaps()
+	gaps.inner, gaps.outer = 0, 0
+	apply_gaps()
 end
 
 -- ---------------------------------------------------------------------------
--- monitor layout (docked laptop detection, replaces the xrandr branch)
+-- monitor layout (replaces bspwmrc's `bspc monitor ^1/^2 -d ...` + xrandr dock test)
 -- ---------------------------------------------------------------------------
+-- The config is loaded BEFORE the backend starts, so hl.get_monitors() is empty
+-- on first load; callers re-run these from hl.on("monitor.added"/"monitor.removed").
+-- monitor.removed fires while the monitor is still listed, hence `exclude`.
 
-function H.apply_monitor_layout()
-	local mons = hl.query.get_monitors() or {}
-	if vars.PC == "mainpc" or #mons > 1 then
-		-- docked: 1-4 on primary, 5-10 on secondary
-		for i = 1, 4 do
-			hl.workspace_rule({ workspace = tostring(i), monitor = vars.M1, persistent = true })
-		end
-		for i = 5, 10 do
-			hl.workspace_rule({ workspace = tostring(i), monitor = vars.M2, persistent = true })
-		end
-	elseif vars.PC == "laptop" then
-		for i = 1, 10 do
-			hl.workspace_rule({ workspace = tostring(i), monitor = #mons > 0 and mons[1].name or "", persistent = true })
-		end
+local function connected(exclude)
+	local names = {}
+	for _, m in ipairs(hl.get_monitors() or {}) do
+		if not (exclude and m.name == exclude.name) then names[#names + 1] = m.name end
+	end
+	return names
+end
+
+-- bspwmrc: `xrandr | grep -c " connected"` -gt 1 (always true on mainpc)
+function H.is_docked(exclude)
+	return vars.PC == "mainpc" or #connected(exclude) > 1
+end
+
+-- tags 1-4 on the first monitor, 5-10 on the second (all on one when undocked)
+function H.apply_monitor_layout(exclude)
+	local first, second
+	if vars.PC == "mainpc" then
+		first, second = vars.M1, vars.M2 -- pinned by output name
+	else
+		local names = connected(exclude)
+		first, second = names[1], names[2]
+	end
+	if not first then return end -- no monitors known yet
+	for i = 1, 10 do
+		hl.workspace_rule({
+			workspace  = tostring(i),
+			monitor    = (second and i > 4) and second or first,
+			persistent = true,
+		})
 	end
 end
 

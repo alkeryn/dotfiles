@@ -36,31 +36,27 @@ local M2       = vars.M2
 -- Fractional scales were rejected on that attempt ("blurry mess"): scale stays
 -- 1, xwayland force_zero_scaling + QT_FONT_DPI compensate instead.
 
-local function add_monitor(opts)
-	if PC == "mainpc" then
-		hl.monitor({
-			output             = M1,
-			mode               = "3840x2160",
-			position           = "0x0",
-			scale              = 1,
-		})
-		hl.monitor({
-			output             = M2,
-			mode               = "3840x2160@244",
-			position           = "3840x0",
-			scale              = 1,
-			bitdepth           = 10,
-			supports_wide_color = 1,
-			supports_hdr       = 1,
-			-- sdrbrightness = 1.2, -- raise if SDR looks dim under HDR output
-		})
-	else
-		hl.monitor(opts)
-	end
-end
+-- monitor=,preferred,auto,auto -- fallback for any output (laptop, docks, ...)
+hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
 
-add_monitor({ output = M1, mode = "preferred", position = "auto", scale = 1 })
-add_monitor({ output = M2, mode = "preferred", position = "auto-left", scale = 1 })
+if PC == "mainpc" then
+	hl.monitor({
+		output   = M1,
+		mode     = "3840x2160",
+		position = "0x0",
+		scale    = "1",
+	})
+	hl.monitor({
+		output              = M2,
+		mode                = "3840x2160@244",
+		position            = "3840x0",
+		scale               = "1",
+		bitdepth            = 10,
+		supports_wide_color = 1,
+		supports_hdr        = 1,
+		-- sdrbrightness = 1.2, -- raise if SDR looks dim under HDR output
+	})
+end
 
 hl.config({
 	render = {
@@ -124,9 +120,9 @@ hl.config({
 		kb_layout  = "fr",                  -- setxkbmap fr
 		kb_options = "lv3:caps_switch",     -- setxkbmap -option lv3:caps_switch
 		-- NOTE: the previous attempt had these inverted (75/250); sxhkd used
-		-- xset r rate 250 75 = 250 cps, 75 ms delay
-		repeat_rate  = 250,
-		repeat_delay = 75,
+		-- xset r rate 250 75 = 250 ms delay, 75 repeats/s
+		repeat_rate  = 75,
+		repeat_delay = 250,
 		numlock_by_default = true,          -- numlockx on
 		follow_mouse = 2,                   -- previous attempt tuning (was 0 here)
 		float_switch_override_focus = 0,
@@ -136,7 +132,7 @@ hl.config({
 
 	cursor = {
 		no_warps = true,                    -- previous attempt
-		default_monitor = M2,
+		default_monitor = PC == "mainpc" and M2 or "",
 	},
 
 	misc = {
@@ -161,36 +157,31 @@ hl.env("QT_FONT_DPI", "120")
 -- autostart (replaces ~/.config/bspwm/scripts/autostart)
 -- ---------------------------------------------------------------------------
 
--- NOTE: hl.exec_cmd returns a dispatcher closure -- it only spawns when
--- CALLED. Inside an event callback, wrap with hl.dispatch(hl.exec_cmd(...)):
--- a bare `hl.exec_cmd("foo")` statement is a silent no-op.
-local exec = function(cmd) hl.dispatch(hl.exec_cmd(cmd)) end
-
 hl.on("hyprland.start", function()
-	exec("hypridle")                                   -- xss-lock/dpms
-	-- exec("hyprpaper")                                  -- ~/.fehbg
-	-- exec("waybar")                                     -- polybar/launch.sh
-	-- exec("dunst")                                      -- notification daemon
-	-- exec("wl-paste --watch cliphist store")            -- clipboard history
+	hl.exec_cmd("hypridle")                                   -- xss-lock/dpms
+	-- hl.exec_cmd("hyprpaper")                                  -- ~/.fehbg
+	-- hl.exec_cmd("waybar")                                     -- polybar/launch.sh
+	-- hl.exec_cmd("dunst")                                      -- notification daemon
+	-- hl.exec_cmd("wl-paste --watch cliphist store")            -- clipboard history
 
 	-- from the previous attempt's autorun.conf
 	if PC == "mainpc" then
-		exec("ckb-next -b")
-		-- exec("conky -q")                               -- XWayland
-		exec("signal-desktop")
+		hl.exec_cmd("ckb-next -b")
+		-- hl.exec_cmd("conky -q")                               -- XWayland
+		hl.exec_cmd("signal-desktop")
 		-- last-window-close refocus bug workaround (socket2 watcher).
 		-- Still relevant in v0.56.2: when a workspace empties, focus falls
 		-- back to cursor position (InputManager::refocus), which can land on
 		-- the wrong monitor. Drop this script if the bug proves fixed.
 
-		-- exec("$HOME/.config/hypr/scripts/close_refocus_fix")
+		-- hl.exec_cmd("$HOME/.config/hypr/scripts/close_refocus_fix")
 	else
-		exec("signal-desktop")
+		hl.exec_cmd("signal-desktop")
 	end
-	exec("xrdb -merge ~/.Xresources")                  -- XWayland resources
-	exec("sh -c 'pkill -x mpd; mpd; mpDris2'")
-	-- exec("nm-applet")
-	-- exec("megasync")
+	hl.exec_cmd("xrdb -merge ~/.Xresources")                  -- XWayland resources
+	hl.exec_cmd("sh -c 'pkill -x mpd; mpd; mpDris2'")
+	-- hl.exec_cmd("nm-applet")
+	-- hl.exec_cmd("megasync")
 end)
 
 -- hyprctl setcursor is superseded by XCURSOR_THEME/XCURSOR_SIZE env above

@@ -530,26 +530,26 @@ hl.layout.register("bspwm", {
 			return true
 
 		elseif not st or not st.tree then
-			return "bspwm layout: no windows on this workspace"
+			return true -- nothing to act on; silently ignore
 		end
 
 		local fw = focused()
 		local fid = fw and fw.stable_id or nil
-		if not fid then return "bspwm layout: no focused window" end
+		if not fid then return true end -- nothing focused; silently ignore
 
 		if cmd == "swap" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
 			if not nid then return true end -- nothing in that direction: ok
 			local pa = find_path(st.tree, fid)
 			local pb = find_path(st.tree, nid)
-			if not pa or not pb then return false end
+			if not pa or not pb then return true end
 			local la, lb = pa[#pa], pb[#pb]
 			la.id, lb.id = lb.id, la.id
 			return true
 
 		elseif cmd == "move" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
-			if not nid then return false end
+			if not nid then return true end
 			local pa  = find_path(st.tree, fid)
 			local n   = pa and pa[#pa].n or 0
 			remove_leaf(st, fid)
@@ -560,7 +560,8 @@ hl.layout.register("bspwm", {
 
 		elseif cmd == "grow" or cmd == "shrink" then
 			local px = tonumber(parts[3]) or 20
-			return resize(st, fid, parts[2] or "r", cmd == "grow" and px or -px)
+			resize(st, fid, parts[2] or "r", cmd == "grow" and px or -px)
+			return true -- no owning split (e.g. screen edge) is a no-op, not an error
 
 		elseif cmd == "rotate" then
 			local sub = subtree_of(st, fid)
@@ -581,10 +582,12 @@ hl.layout.register("bspwm", {
 			return true
 
 		elseif cmd == "transplant" then
-			return transplant(st, fid)
+			transplant(st, fid)
+			return true
 
 		elseif cmd == "pull" then
-			return pull(st, fid)
+			pull(st, fid)
+			return true
 
 		elseif cmd == "mode" then
 			st.mode = (st.mode == "monocle") and "tiled" or "monocle"
@@ -597,11 +600,30 @@ hl.layout.register("bspwm", {
 		elseif cmd == "focus" then
 			local which = parts[2] or "brother"
 			local tid   = focus_subtree_node(st, fid, which)
-			if not tid then return false end
-			return focus_id(tid)
+			if tid then focus_id(tid) end -- e.g. `focus parent` at the root: no-op
+			return true
 
 		end
 
 		return "bspwm layout: unknown command '" .. cmd .. "'"
 	end,
 })
+
+-- ---------------------------------------------------------------------------
+-- module API (require("bspwm"))
+-- ---------------------------------------------------------------------------
+
+local M = {}
+
+-- true when the focused window has a tiled neighbour in direction `dir`
+-- (l|r|u|d); lets callers pick a fallback without making the layout reject a
+-- message (a rejected layout message is shown as an ERROR overlay).
+function M.has_neighbor(dir)
+	local w = hl.get_active_window()
+	if not w or not w.workspace then return false end
+	local st = S[w.workspace.id]
+	if not st or st.mode == "monocle" then return false end
+	return neighbor_id(st, w.stable_id, dir) ~= nil
+end
+
+return M

@@ -12,7 +12,6 @@
 local vars    = require("lua/vars")
 local helpers = require("lua/helpers")
 
-local GAPS       = vars.GAPS
 local FLOAT_STEP = vars.FLOAT_STEP
 local terminal   = vars.terminal
 
@@ -26,7 +25,7 @@ hl.bind("SUPER + z",              hl.dsp.exec_cmd("wl-paste | cliphist store"))
 hl.bind("SUPER + SHIFT + z",      hl.dsp.exec_cmd("cliphist decode | wl-copy"))
 
 -- Lock
-hl.bind("SUPER + a",              hl.dsp.exec_cmd("sh ~/bin/lock"))
+hl.bind("SUPER + a",              hl.dsp.exec_cmd("hyprlock"))  -- was: sh ~/bin/lock (scrot+i3lock, X11 only)
 
 -- Terminal
 hl.bind("SUPER + space",          hl.dsp.exec_cmd(terminal))
@@ -65,7 +64,7 @@ hl.bind("SUPER + F12",            hl.dsp.exec_cmd("~/bin/wifitoggle"))
 
 -- reload config (sxhkd super+Escape dance; there is no dsp.reload_config --
 -- "reload" is a hyprctl command; the lua config also hot-reloads on file save)
-hl.bind("SUPER + Escape",         hl.exec_cmd("hyprctl reload"))
+hl.bind("SUPER + Escape",         hl.dsp.exec_cmd("hyprctl reload"))
 
 -- keyboard layouts (setxkbmap {fr, us altgr-intl, ru, us colemak})
 local layouts = {
@@ -76,7 +75,7 @@ local layouts = {
 }
 for _, l in ipairs(layouts) do
 	hl.bind("SUPER + " .. l.key, function()
-		hl.config({ input = { kb_layout = l.layout, kb_variant = l.variant, repeat_rate = 250, repeat_delay = 75 } })
+		hl.config({ input = { kb_layout = l.layout, kb_variant = l.variant, repeat_rate = 75, repeat_delay = 250 } })
 	end)
 end
 
@@ -117,9 +116,10 @@ hl.bind("SUPER + CTRL + x",            hl.dsp.window.pin())          -- -g stick
 
 -- Focus/swap (bspc node -f/-s west|south|north|east + monitor fallback)
 -- previous attempt used binde (hold-to-repeat) on these
-for d, key in pairs({ h = "h", j = "j", k = "k", l = "l" }) do
-	hl.bind("SUPER + " .. key, function() helpers.focus_dir(d) end, { repeating = true })
-	hl.bind("SUPER + SHIFT + " .. key, function() helpers.swap_dir(d) end, { repeating = true })
+local DIRS = { h = { "left", "l" }, j = { "down", "d" }, k = { "up", "u" }, l = { "right", "r" } }
+for key, dir in pairs(DIRS) do
+	hl.bind("SUPER + " .. key,           hl.dsp.focus({ direction = dir[1] }), { repeating = true })
+	hl.bind("SUPER + SHIFT + " .. key,   function() helpers.swap_dir(dir[2]) end, { repeating = true })
 end
 
 -- focus the node for the given path jump (bspc node -f @{parent,brother,first,second})
@@ -194,11 +194,11 @@ hl.bind("SUPER + right",         hl.dsp.window.move({ x = FLOAT_STEP, y = 0, rel
 hl.bind("SUPER + up",            hl.dsp.window.move({ x = 0, y = -FLOAT_STEP, relative = true }))
 hl.bind("SUPER + down",          hl.dsp.window.move({ x = 0, y = FLOAT_STEP, relative = true }))
 
--- gaps (per-desktop in bspwm; global here, see note above)
-hl.bind("SUPER + Next",          function() helpers.set_gaps(math.max(0, GAPS + 5)) end)
-hl.bind("SUPER + Prior",         function() helpers.set_gaps(math.max(0, GAPS - 5)) end)
-hl.bind("SUPER + BackSpace",     function() helpers.set_gaps(GAPS) end)
-hl.bind("SUPER + SHIFT + BackSpace", function() helpers.set_gaps(0) end)
+-- gaps (per-desktop in bspwm; global here, see helpers.lua)
+hl.bind("SUPER + Next",              function() helpers.adjust_gaps(5) end)
+hl.bind("SUPER + Prior",             function() helpers.adjust_gaps(-5) end)
+hl.bind("SUPER + BackSpace",         helpers.reset_gaps)
+hl.bind("SUPER + SHIFT + BackSpace", helpers.zero_gaps)
 
 -- Transplant (bspc node -n @/)
 hl.bind("SUPER + SHIFT + t",     hl.dsp.layout("transplant"))
