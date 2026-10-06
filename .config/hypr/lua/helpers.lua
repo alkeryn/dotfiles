@@ -26,12 +26,12 @@ function H.focus_history(step)
 	end
 	if not idx then return end
 	local t = wins[((idx - 1 + step) % #wins) + 1]
-	if t then hl.dsp.focus({ window = t })() end
+	if t then hl.dispatch(hl.dsp.focus({ window = t })) end
 end
 
 function H.focus_last()
 	local w = hl.get_last_window()
-	if w then hl.dsp.focus({ window = w })() end
+	if w then hl.dispatch(hl.dsp.focus({ window = w })) end
 end
 
 -- ---------------------------------------------------------------------------
@@ -51,11 +51,11 @@ local bspwm = require("bspwm")
 
 function H.swap_dir(d) -- d: l | r | u | d
 	if bspwm.has_neighbor(d) then
-		hl.dsp.layout("swap " .. d)()
+		hl.dispatch(hl.dsp.layout("swap " .. d))
 		return
 	end
 	local mon = hl.get_monitor(d) -- relative to the focused monitor; nil if none
-	if mon then hl.dsp.window.move({ monitor = mon, follow = true })() end
+	if mon then hl.dispatch(hl.dsp.window.move({ monitor = mon, follow = true })) end
 end
 
 -- ---------------------------------------------------------------------------
@@ -71,10 +71,10 @@ function H.swap_with_workspace(sel)
 	local from_tgt = tgt:get_windows()
 	local from_cur = cur:get_windows()
 	for _, w in ipairs(from_tgt) do
-		hl.dsp.window.move({ workspace = cur.id, follow = false, window = w })()
+		hl.dispatch(hl.dsp.window.move({ workspace = cur.id, follow = false, window = w }))
 	end
 	for _, w in ipairs(from_cur) do
-		hl.dsp.window.move({ workspace = tgt.id, follow = false, window = w })()
+		hl.dispatch(hl.dsp.window.move({ workspace = tgt.id, follow = false, window = w }))
 	end
 end
 

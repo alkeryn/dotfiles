@@ -501,7 +501,7 @@ hl.layout.register("bspwm", {
 		local function focus_id(id)
 			for _, t in ipairs(ctx.targets) do
 				if t.window and t.window.stable_id == id then
-					hl.dsp.focus({ window = "address:" .. t.window.address })()
+					hl.dispatch(hl.dsp.focus({ window = "address:" .. t.window.address }))
 					return true
 				end
 			end
