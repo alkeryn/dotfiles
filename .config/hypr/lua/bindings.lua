@@ -63,8 +63,9 @@ hl.bind("XF86MonBrightnessUp",    hl.dsp.exec_cmd("light -A 10"), { locked = tru
 -- wifi toggle
 hl.bind("SUPER + F12",            hl.dsp.exec_cmd("~/bin/wifitoggle"))
 
--- reload config (sxhkd super+Escape dance; Hyprland hot-reloads lua anyway)
-hl.bind("SUPER + Escape",         hl.dsp.reload_config())
+-- reload config (sxhkd super+Escape dance; there is no dsp.reload_config --
+-- "reload" is a hyprctl command; the lua config also hot-reloads on file save)
+hl.bind("SUPER + Escape",         hl.exec_cmd("hyprctl reload"))
 
 -- keyboard layouts (setxkbmap {fr, us altgr-intl, ru, us colemak})
 local layouts = {

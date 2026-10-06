@@ -40,16 +40,18 @@ end
 
 local DIRFULL = { l = "left", r = "right", u = "up", d = "down" }
 
+-- NOTE: dispatcher closures return a result table { ok = bool, ... },
+-- not a bare boolean -- check .ok
 function H.focus_dir(d)
 	local ok = hl.dsp.focus({ direction = DIRFULL[d] })()
-	if not ok then hl.dsp.focus({ monitor = d })() end
+	if not ok.ok then hl.dsp.focus({ monitor = d })() end
 end
 
 function H.swap_dir(d)
 	-- bspc node -s "$A" --follow (tree-aware swap in the bspwm layout);
 	-- fallback: bspc node -d "$A":focused --follow
 	local ok = hl.dsp.layout("swap " .. d)()
-	if not ok then
+	if not ok.ok then
 		if d == "l" then hl.dsp.window.move({ workspace = "m-1" })()
 		elseif d == "r" then hl.dsp.window.move({ workspace = "m+1" })() end
 	end
@@ -63,10 +65,10 @@ function H.swap_with_workspace(sel)
 	local cur = hl.query.get_active_workspace()
 	local tgt = hl.query.get_workspace(sel)
 	if not cur or not tgt or cur.id == tgt.id then return end
-	for _, w in ipairs(tgt.windows or {}) do
-		hl.dsp.window.move({ workspace = cur.id, follow = false, window = "address:" .. w.address })()
+	for _, w in ipairs(tgt:get_windows() or {}) do
+		hl.dsp.window.move({ workspace = cur.id, follow = false, window = w.address })()
 	end
-	for _, w in ipairs(cur.windows or {}) do
+	for _, w in ipairs(cur:get_windows() or {}) do
 		hl.dsp.window.move({ workspace = tgt.id, follow = false, window = "address:" .. w.address })()
 	end
 end
