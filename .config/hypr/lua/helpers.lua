@@ -139,29 +139,41 @@ function H.swap_with_workspace(sel)
 	-- focused window belongs to the outgoing desktop, so re-focus it once
 	-- it has landed on the target workspace.
 	local focused = hl.get_active_window()
-	-- snapshot BOTH lists before moving anything, otherwise the second loop
-	-- would also move the windows we just moved over
-	local from_tgt = tgt:get_windows()
-	local from_cur = cur:get_windows()
-	for _, w in ipairs(from_tgt) do
-		hl.dispatch(hl.dsp.window.move({ workspace = cur.id, follow = false, window = w }))
+	local result = bspwm.swap_workspaces(cur, tgt)
+	if result ~= true then
+		print(tostring(result))
+		return
 	end
-	for _, w in ipairs(from_cur) do
-		hl.dispatch(hl.dsp.window.move({ workspace = tgt.id, follow = false, window = w }))
-	end
-	if focused then
+	local selector = tgt.id > 0 and tgt.id or "name:" .. tgt.name
+	if focused and focused.workspace and focused.workspace.id == tgt.id then
 		local result = hl.dispatch(hl.dsp.focus({ window = focused }))
 		if not result or result.ok == false then
-			hl.dispatch(hl.dsp.focus({ workspace = tgt.id }))
+			hl.dispatch(hl.dsp.focus({ workspace = selector }))
 		end
 	else
-		hl.dispatch(hl.dsp.focus({ workspace = tgt.id }))
+		hl.dispatch(hl.dsp.focus({ workspace = selector }))
 	end
 end
 
 function H.swap_workspace_rel(rel)
 	local cur = hl.get_active_workspace()
-	if cur then H.swap_with_workspace(cur.id + rel) end
+	if not cur or not cur.monitor or cur.special then return end
+	-- Workspace IDs are global, not monitor-relative. Include empty persistent
+	-- desktops, sort the actual slots on this monitor and wrap at either end.
+	local workspaces = {}
+	for _, ws in ipairs(hl.get_workspaces() or {}) do
+		if not ws.special and ws.monitor and ws.monitor.name == cur.monitor.name then
+			workspaces[#workspaces + 1] = ws
+		end
+	end
+	table.sort(workspaces, function(a, b) return a.id < b.id end)
+	for i, ws in ipairs(workspaces) do
+		if ws.id == cur.id then
+			local target = workspaces[((i - 1 + rel) % #workspaces) + 1]
+			H.swap_with_workspace(target)
+			return
+		end
+	end
 end
 
 -- ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
--- lua tests/bspwm_pull_test.lua -- native move/recalculation ordering is mocked.
+-- lua tests/bspwm_pull_test.lua -- pull and desktop swap; native move/recalculation ordering is mocked.
 local codec = require("lua/extensions/bspwm_state")
 local tests = {}
+-- Bindings need constants, not the host's ~/bin/wpc machine detection.
+package.loaded["lua/vars"] = { FLOAT_STEP = 20, terminal = "alacritty", GAPS = 4, GAPS_OUT = 8 }
 
 local function find(node, id)
 	if not node then return end
@@ -16,8 +18,16 @@ local function fixture()
 	end
 	function f.workspace(id, monitor)
 		if f.workspaces[id] then return f.workspaces[id] end
-		local mon = monitor or { position = { x = (id - 1) * 2000, y = 0 }, width = 1600, height = 900, scale = 1 }
+		local mon = monitor or { name = "monitor-" .. id, position = { x = (id - 1) * 2000, y = 0 }, width = 1600, height = 900, scale = 1 }
 		local ws = { id = id, name = tostring(id), monitor = mon, tiled_layout = "lua:bspwm", visible = true }
+		function ws:get_windows()
+			local result = {}
+			for _, w in pairs(f.windows) do
+				if w.mapped and w.workspace.id == self.id then result[#result + 1] = w end
+			end
+			table.sort(result, function(a, b) return a.stable_id < b.stable_id end)
+			return result
+		end
 		f.workspaces[id] = ws
 		f.contexts[id] = { area = { x = mon.position.x, y = mon.position.y, w = 1600, h = 900 }, targets = {} }
 		return ws
@@ -66,7 +76,13 @@ local function fixture()
 			}
 		end }
 		local noop = function() return function() return { ok = true } end end
-		local function rule() return { set_enabled = function() end } end
+		f.rules = {}
+		local function rule(spec)
+			local handle = { spec = spec, enabled = true }
+			function handle:set_enabled(enabled) self.enabled = enabled end
+			f.rules[#f.rules + 1] = handle
+			return handle
+		end
 		_G.hl = {
 			layout = { register = function(name, impl)
 				if name ~= "bspwm" then return end
@@ -89,11 +105,30 @@ local function fixture()
 			get_windows = all_windows,
 			get_active_window = function() return f.active end,
 			get_active_workspace = function() return f.active_ws end,
+			get_workspace = function(sel)
+				if type(sel) == "table" then return f.workspaces[sel.id] end
+				if tonumber(sel) then return f.workspaces[tonumber(sel)] end
+				for _, ws in pairs(f.workspaces) do if sel == "name:" .. ws.name then return ws end end
+			end,
+			get_workspaces = function()
+				local result = {}
+				for _, ws in pairs(f.workspaces) do result[#result + 1] = ws end
+				-- Native enumeration is not necessarily numeric workspace order.
+				table.sort(result, function(a, b) return a.id > b.id end)
+				return result
+			end,
 			bind = function(keys, dispatcher) f.binds[keys] = dispatcher end,
 			dispatch = function(dispatcher) return dispatcher() end,
 			dsp = setmetatable({
 				layout = function(message) return function() return f.message(message) end end,
 				focus = function(opts) return function()
+					if opts.workspace then
+						f.active_ws, f.active = assert(hl.get_workspace(opts.workspace)), nil
+						for _, w in pairs(f.windows) do w.active = false end
+						f.emit("workspace.active", f.active_ws)
+						f.emit("window.active", nil)
+						return { ok = true }
+					end
 					f.focus_calls[#f.focus_calls + 1] = opts.window.stable_id
 					if f.before_focus then f.before_focus(opts.window) end
 					if f.fail_focus then return { ok = false } end
@@ -109,7 +144,7 @@ local function fixture()
 					assert(type(opts.workspace) ~= "number" or opts.workspace > 0, "negative IDs parse as relative selectors")
 					assert(opts.follow == false, "defer focus until the whole insertion is complete")
 					f.moves[#f.moves + 1] = opts
-					if f.fail_id == w.stable_id then return { ok = false } end
+					if f.fail_id == w.stable_id or (f.fail_move and f.fail_move(w, dest)) then return { ok = false } end
 					if f.throw_id == w.stable_id then error("synthetic dispatcher exception") end
 					if f.ignore_move then return { ok = true } end
 					local source = w.workspace
@@ -122,7 +157,7 @@ local function fixture()
 						if old.window == w then target = table.remove(f.contexts[source.id].targets, i); break end
 					end
 					f.recalculate(source.id)
-					table.insert(f.contexts[dest.id].targets, assert(target))
+					if not w.floating then table.insert(f.contexts[dest.id].targets, assert(target)) end
 					f.recalculate(dest.id)
 					if w.active then
 						w.active = false
@@ -138,14 +173,17 @@ local function fixture()
 		f.api.set_feedback_sink(function(states) f.states = states end)
 		if saved then f.emit("config.reloaded"); f.emit("config.props_refreshed", true) end
 	end
-	function f.open(id, wsid)
+	function f.open(id, wsid, floating)
 		local ws = f.workspace(wsid or 1)
 		local window = { stable_id = id, workspace = ws, monitor = ws.monitor, mapped = true,
-			active = false, floating = false, hidden = false, fullscreen = 0, focus_history_id = -1 }
+			active = false, floating = floating or false, hidden = false, fullscreen = 0, focus_history_id = -1 }
 		local target = { window = window }
-		function target:place(box) self.box = box end
+		function target:place(box)
+			if f.throw_placement then error("synthetic placement exception") end
+			self.box = box
+		end
 		f.windows[id] = window
-		table.insert(f.contexts[ws.id].targets, target)
+		if not window.floating then table.insert(f.contexts[ws.id].targets, target) end
 		f.recalculate(ws.id); f.focus(id)
 		return window
 	end
@@ -160,6 +198,11 @@ local function fixture()
 		if ratio then assert(f.message("pratio " .. ratio) == true) end
 	end
 	function f.pull() return f.message("pull") end
+	function f.helpers()
+		package.loaded["lua/extensions/bspwm"] = f.api
+		package.loaded["lua/helpers"] = nil
+		return require("lua/helpers")
+	end
 	function f.leaf(id) return find(f.states[f.windows[id].workspace.id].tree, id) end
 	function f.box(id)
 		for _, target in ipairs(f.contexts[f.windows[id].workspace.id].targets) do
@@ -441,6 +484,204 @@ function tests.super_y_binding_reaches_global_pull()
 	assert(f.binds["SUPER + y"])
 	f.binds["SUPER + y"]()
 	assert(f.windows[2].workspace.id == 1 and f.active == f.windows[2])
+	f.consistent()
+end
+
+function tests.workspace_swap_relative_wraps_on_the_current_monitor()
+	local f = fixture()
+	local first, second = f.workspace(1).monitor, f.workspace(5).monitor
+	for id = 1, 10 do f.workspace(id, id <= 4 and first or second) end
+	for _, id in ipairs({ 1, 4, 5, 10 }) do f.open(id, id) end
+	local helpers = f.helpers()
+	f.focus(5); helpers.swap_workspace_rel(-1)
+	assert(f.active_ws.id == 10 and f.active == f.windows[5])
+	assert(f.windows[10].workspace.id == 5 and f.windows[4].workspace.id == 4)
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 5 and f.windows[10].workspace.id == 10)
+	f.focus(1); helpers.swap_workspace_rel(-1)
+	assert(f.active_ws.id == 4 and f.windows[4].workspace.id == 1)
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 1 and f.windows[4].workspace.id == 4)
+	f.consistent()
+end
+
+function tests.workspace_swap_relative_includes_empty_slots_and_skips_specials_and_gaps()
+	local f = fixture()
+	local mon = f.workspace(5).monitor
+	f.workspace(8, mon)
+	f.workspace(10, mon)
+	f.workspace(-99, mon).special = true
+	f.workspace(6) -- another monitor, despite adjacent ID
+	f.open(1, 5)
+	local helpers = f.helpers()
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 8 and f.windows[1].workspace.id == 8)
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 10)
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 5)
+	f.consistent()
+end
+
+function tests.workspace_swap_single_monitor_covers_all_desktops_and_single_slot_is_noop()
+	local f = fixture()
+	f.open(1, 1)
+	local helpers = f.helpers()
+	helpers.swap_workspace_rel(-1)
+	assert(#f.moves == 0 and #f.focus_calls == 0)
+	for id = 2, 10 do f.workspace(id, f.workspaces[1].monitor) end
+	helpers.swap_workspace_rel(-1)
+	assert(f.active_ws.id == 10)
+	helpers.swap_workspace_rel(1)
+	assert(f.active_ws.id == 1)
+	f.active_ws = nil
+	helpers.swap_workspace_rel(1) -- no active desktop during startup
+	f.consistent()
+end
+
+function tests.workspace_swap_preserves_both_trees_ratios_presels_and_geometry()
+	local f = fixture()
+	local mon = f.workspace(5).monitor
+	f.workspace(10, mon)
+	for id = 1, 4 do f.open(id, 5) end
+	f.message("focus parent"); f.message("rotate 90"); f.message("grow r 113")
+	f.message("preselect l"); f.message("pratio 0.27")
+	for id = 5, 7 do f.open(id, 10) end
+	f.message("grow u 81"); f.message("preselect d"); f.message("pratio 0.63")
+	f.focus(3)
+	local a, b = f.states[5], f.states[10]
+	local before = codec.encode({ [5] = a, [10] = b })
+	local boxes = {}
+	for id = 1, 7 do boxes[id] = f.box(id) end
+	f.before_focus = function(w)
+		assert(w == f.windows[3] and #f.moves == 7)
+		assert(f.states[5] == b and f.states[10] == a, "must exchange states before focusing")
+		for id, box in pairs(boxes) do expect_box(f.box(id), box.x, box.y, box.w, box.h) end
+	end
+	f.helpers().swap_workspace_rel(-1)
+	assert(f.active_ws.id == 10 and f.active == f.windows[3])
+	assert(codec.encode({ [5] = f.states[10], [10] = f.states[5] }) == before)
+	f.consistent()
+	f.before_focus = nil
+	for _ = 1, 10 do
+		f.helpers().swap_workspace_rel(1)
+		for id, box in pairs(boxes) do expect_box(f.box(id), box.x, box.y, box.w, box.h) end
+		f.consistent()
+	end
+end
+
+function tests.workspace_swap_monocle_mode_travels_and_tiled_tree_returns_on_toggle()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.message("grow l 120")
+	local tiled = f.box(2)
+	f.message("monocle")
+	f.open(3, 2); f.focus(2)
+	f.helpers().swap_with_workspace(2) -- explicit numbered swap may cross monitors
+	assert(f.states[2].mode == "monocle" and f.states[1].mode == "tiled")
+	expect_box(f.box(2), 2000, 0, 1600, 900)
+	f.message("tiled")
+	expect_box(f.box(2), tiled.x + 2000, tiled.y, tiled.w, tiled.h)
+	f.consistent()
+end
+
+function tests.workspace_swap_empty_and_float_only_desktops_follow_the_outgoing_desktop()
+	local f = fixture()
+	f.workspace(1); f.workspace(2, f.workspaces[1].monitor)
+	f.open(1, 1); f.open(2, 1); f.message("monocle")
+	local original = f.states[1]
+	f.active, f.active_ws = nil, f.workspaces[2]
+	for _, w in pairs(f.windows) do w.active = false end
+	f.helpers().swap_with_workspace(1)
+	assert(f.active_ws.id == 1 and not f.active and not f.states[1].tree)
+	assert(f.states[2] == original and original.mode == "monocle")
+	f.open(3, 1, true)
+	f.helpers().swap_with_workspace(2)
+	assert(f.active == f.windows[3] and f.active_ws.id == 2)
+	assert(f.windows[3].floating and not f.states[2].tree and not next(f.states[2].boxes))
+	assert(f.states[1] == original)
+	for _, rule in ipairs(f.rules) do
+		local selector = rule.spec.workspace or (rule.spec.match or {}).workspace
+		if selector == "r[1-1]" then assert(rule.enabled, "monocle rules must travel to workspace 1") end
+		if selector == "r[2-2]" then assert(not rule.enabled, "empty/float-only workspace must lose monocle rules") end
+	end
+	f.consistent()
+end
+
+function tests.workspace_swap_named_empty_desktop_uses_absolute_focus_selector()
+	local f = fixture()
+	f.workspace(-1337, f.workspace(1).monitor).name = "named"
+	f.open(1, 1)
+	f.helpers().swap_workspace_rel(-1)
+	assert(f.moves[1].workspace == "name:named" and f.active_ws.id == -1337)
+	f.active, f.active_ws = nil, f.workspaces[1]
+	f.windows[1].active = false
+	f.helpers().swap_with_workspace("name:named")
+	assert(f.active_ws.id == -1337 and not f.active and f.windows[1].workspace.id == 1)
+	f.consistent()
+end
+
+for _, failure_kind in ipairs({ "fail_id", "throw_id", "ignore_move" }) do
+	tests["workspace_swap_failure_rolls_back_" .. failure_kind] = function()
+		local f = fixture()
+		f.open(1, 1); f.open(2, 1); f.open(3, 2); f.presel(3, "u", 0.3); f.focus(1)
+		local before = codec.encode(f.states)
+		f[failure_kind] = failure_kind == "ignore_move" and true or 2
+		assert(type(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2])) == "string")
+		assert(codec.encode(f.states) == before, "failed swap must restore original layout")
+		assert(#f.focus_calls == 0)
+		f.consistent()
+		f[failure_kind] = nil
+		assert(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2]) == true)
+		f.consistent()
+	end
+end
+
+function tests.workspace_swap_failed_rollback_reconciles_actual_ownership()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2)
+	f.fail_move = function(w, dest) return w.stable_id == 2 or (w.stable_id == 3 and dest.id == 2) end
+	local result = f.api.swap_workspaces(f.workspaces[1], f.workspaces[2])
+	assert(type(result) == "string" and result:find("rollback incomplete", 1, true))
+	f.consistent()
+	f.fail_move = nil
+	assert(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2]) == true)
+	f.consistent()
+end
+
+function tests.workspace_swap_placement_exception_releases_transfer_guard()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 2)
+	f.throw_placement = true
+	assert(type(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2])) == "string")
+	f.throw_placement = nil
+	assert(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2]) == true)
+	f.consistent()
+end
+
+function tests.workspace_swap_survives_checkpoint_reload()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.message("grow l 110"); f.presel(2, "u", 0.3)
+	f.open(3, 2); f.message("monocle"); f.focus(2)
+	f.load(codec.encode(f.states))
+	f.helpers().swap_with_workspace(2)
+	local before = codec.encode(f.states)
+	assert(f.saved == before, "checkpoint must contain the exchanged trees")
+	f.load(f.saved)
+	assert(codec.encode(f.states) == before)
+	f.consistent()
+end
+
+function tests.workspace_swap_bindings_reach_monitor_local_swap()
+	local f = fixture()
+	f.workspace(10, f.workspace(5).monitor)
+	f.open(1, 5); f.open(2, 10)
+	f.focus(1); f.helpers()
+	package.loaded["lua/bindings"] = nil
+	require("lua/bindings")
+	f.binds["SUPER + ALT + dead_circumflex"]()
+	assert(f.active_ws.id == 10)
+	f.binds["SUPER + ALT + dollar"]()
+	assert(f.active_ws.id == 5)
 	f.consistent()
 end
 

@@ -464,7 +464,7 @@ local function clear_selection(st)
 end
 
 local function clear_selections()
-	if selection_focus or rehydrating then return end
+	if selection_focus or rehydrating or transferring then return end
 	for _, st in pairs(S) do clear_selection(st) end
 end
 
@@ -478,7 +478,7 @@ hl.window_rule({
 })
 
 on_event("window.active", function(w, reason)
-	if rehydrating then return end
+	if rehydrating or transferring then return end
 	local st = w and w.workspace and S[w.workspace.id]
 	if st and st.mode == "monocle" then monocle.raise(w) end
 	if selection_focus then return end
@@ -498,7 +498,7 @@ on_event("workspace.special_active", clear_selections)
 on_event("monitor.focused", clear_selections)
 
 local function window_leaves_selection(w)
-	if not w or rehydrating then return end
+	if not w or rehydrating or transferring then return end
 	for _, st in pairs(S) do
 		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id
 			or st.insertion_window_id == w.stable_id then
@@ -834,6 +834,21 @@ local layout_impl = {
 	end,
 }
 
+-- Replay only targets still owned by each workspace. Empty layouts do not
+-- generate a native callback, so their last snapshot may contain departed tiles.
+local function replay_transfer_contexts(contexts)
+	for wsid, context in pairs(contexts) do
+		local targets = {}
+		for _, target in ipairs(context.targets) do
+			local w = target.window
+			if w and w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
+				targets[#targets + 1] = target
+			end
+		end
+		layout_impl.recalculate({ area = context.area, targets = targets })
+	end
+end
+
 -- Original sxhkd: focused.automatic && node -n last.!automatic || node last.leaf -n focused
 -- "automatic" means NO preselection, not newest; "last" is global focus history.
 pull = function(st, node, focused, area)
@@ -938,18 +953,7 @@ pull = function(st, node, focused, area)
 	transfer_contexts = nil
 
 	-- Replay the latest native snapshots now that ALL windows have moved.
-	-- Filter by current workspace: an earlier source snapshot can still hold
-	-- the last departing target (Hyprland skips callbacks for empty layouts).
-	for wsid, context in pairs(contexts) do
-		local targets = {}
-		for _, target in ipairs(context.targets) do
-			local w = target.window
-			if w and w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
-				targets[#targets + 1] = target
-			end
-		end
-		layout_impl.recalculate({ area = context.area, targets = targets })
-	end
+	replay_transfer_contexts(contexts)
 	transferring = false
 	if not failure then
 		-- Move silently above, then focus ONCE after committing/replaying the
@@ -996,6 +1000,75 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+-- Exchange desktop contents without reinserting every tile into a new tree.
+-- The native API only moves individual windows; defer its intermediate layout
+-- callbacks, exchange the intact states, then replay both final target lists.
+function M.swap_workspaces(cur, tgt)
+	if cur.id == tgt.id then return true end
+	if rehydrating or transferring then return "workspace swap: layout is busy" end
+	local contexts, moves = {}, {}
+	local cur_state, tgt_state = state_for(cur.id), state_for(tgt.id)
+	-- Snapshot BOTH sides before any window (or native group) changes ownership.
+	for _, pair in ipairs({ { tgt, cur }, { cur, tgt } }) do
+		for _, w in ipairs(pair[1]:get_windows() or {}) do
+			if w.mapped then moves[#moves + 1] = { window = w, source = pair[1], dest = pair[2] } end
+		end
+	end
+	local function move_window(w, ws)
+		if w.workspace and w.workspace.id == ws.id then return true end
+		local selector = ws.id > 0 and ws.id or "name:" .. ws.name
+		local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
+		return not (result and result.ok == false) and w.workspace and w.workspace.id == ws.id
+	end
+
+	transferring, transfer_contexts = true, contexts
+	local ok, failure = pcall(function()
+		for _, move in ipairs(moves) do
+			if not move_window(move.window, move.dest) then
+				error("could not move window " .. move.window.stable_id, 0)
+			end
+		end
+	end)
+	if ok then
+		-- Ratios, orientation, ages, preselections and tiled/monocle mode travel
+		-- with the desktop. Geometry is recomputed for the destination monitor.
+		S[cur.id], S[tgt.id] = tgt_state, cur_state
+	else
+		-- Best-effort rollback keeps a rejected move from partially exchanging
+		-- desktops. If rollback also fails, reconcile actual ownership below.
+		for i = #moves, 1, -1 do
+			local move = moves[i]
+			local restored_ok, restored = pcall(move_window, move.window, move.source)
+			if not restored_ok or not restored then failure = tostring(failure) .. "; rollback incomplete" end
+		end
+	end
+
+	local replay_ok, replay_error = pcall(function()
+		local live = { [cur.id] = {}, [tgt.id] = {} }
+		for _, w in ipairs(hl.get_windows()) do
+			local ids = w.workspace and live[w.workspace.id]
+			if ids and w.mapped and not w.floating then ids[w.stable_id] = true end
+		end
+		for _, ws in ipairs({ cur, tgt }) do
+			local st = S[ws.id]
+			st.tree = prune_tree(st.tree, live[ws.id])
+			st.boxes = {}
+			-- Selection is transient; per-node preselection stays in the tree.
+			clear_selection(st)
+			-- Also update empty/float-only workspaces, which never recalculate.
+			monocle.sync(ws, st.mode == "monocle")
+		end
+		transfer_contexts = nil
+		replay_transfer_contexts(contexts)
+	end)
+	-- Always release the guard, even if native rule/placement dispatch throws.
+	transfer_contexts, transferring = nil, false
+	publish_feedback()
+	if not ok then return "workspace swap: " .. tostring(failure) end
+	if not replay_ok then return "workspace swap: " .. tostring(replay_error) end
+	return true
+end
 
 function M.reload()
 	checkpoint()
