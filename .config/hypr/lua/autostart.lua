@@ -20,6 +20,6 @@ hl.on("hyprland.start", function()
 	end
 	hl.exec_cmd("xrdb -merge ~/.Xresources")                  -- XWayland resources
 	hl.exec_cmd("sh -c 'pkill -x mpd; mpd; mpDris2'")
-	-- hl.exec_cmd("nm-applet")
+	hl.exec_cmd("nm-applet")
 	-- hl.exec_cmd("megasync")
 end)
