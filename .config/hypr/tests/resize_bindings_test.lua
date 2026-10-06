@@ -45,6 +45,8 @@ local function fixture()
 	end
 
 	_G.hl = {
+		on = function() end,
+		window_rule = function() end,
 		layout = { register = function(name, impl) if name == "bspwm" then provider = impl end end },
 		get_active_window = function() return f.active end,
 		bind = function(keys, callback, opts) f.binds[keys] = { callback = callback, opts = opts } end,

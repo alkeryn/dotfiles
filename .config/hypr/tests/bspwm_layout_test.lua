@@ -4,7 +4,11 @@ local tests = {}
 
 local function fixture(width, height, x, y)
 	local providers = {}
-	_G.hl = { layout = { register = function(name, impl) providers[name] = impl end } }
+	_G.hl = {
+		layout = { register = function(name, impl) providers[name] = impl end },
+		on = function() end,
+		window_rule = function() end,
+	}
 	dofile("bspwm.lua")
 	local provider = assert(providers.bspwm)
 	local ctx = { area = { x = x or 0, y = y or 0, w = width, h = height }, targets = {} }

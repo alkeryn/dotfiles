@@ -30,8 +30,10 @@
 --   focus <parent|brother|first|second>
 -- ============================================================================
 
-local S    = {}   -- state per workspace id: {tree, boxes, seq, mode, pend}
+local S    = {}   -- per-workspace tree, geometry, preselection and selected node
 local PEND = nil  -- pending preselect for a not-yet-identifiable (empty) ws
+local selection_focus = false -- guard our own representative-window focus events
+local selection_tag = "bspwm_selected"
 
 -- ---------------------------------------------------------------------------
 -- tree primitives
@@ -54,18 +56,14 @@ local function new_is_first(dir)
 	return dir == "l" or dir == "west" or dir == "u" or dir == "up" or dir == "north"
 end
 
-local function find_path(node, id, path)
+-- target can be a stable window id OR an internal node reference.
+local function find_path(node, target, path)
 	if not node then return nil end
 	path = path or {}
 	table.insert(path, node)
-	if node.t == "leaf" then
-		if node.id == id then return path end
-	else
-		local p = find_path(node.a, id, path)
-		if p then return p end
-		table.remove(path) -- undo failed a-branch, try b
-		table.insert(path, node)
-		p = find_path(node.b, id, path)
+	if node == target or (node.t == "leaf" and node.id == target) then return path end
+	if node.t == "split" then
+		local p = find_path(node.a, target, path) or find_path(node.b, target, path)
 		if p then return p end
 	end
 	table.remove(path)
@@ -223,7 +221,7 @@ local function neighbor_id(st, id, dir)
 	return best
 end
 
--- grow/shrink the focused leaf's edge by px.
+-- grow/shrink the focused leaf or selected subtree's edge by px.
 -- Only splits OWNING that edge are adjusted: for axis h, the boundary is
 -- first-child-east (r) or second-child-west (l); for axis v, first-child-south
 -- (d) or second-child-north (u). Otherwise walk up to the next ancestor.
@@ -336,20 +334,19 @@ local function pull(st, focused_id)
 end
 
 local function focus_subtree_node(st, id, which)
-	local path = find_path(st.tree, id)
-	if not path or #path < 2 then return nil end
+	local path = find_path(st.tree, st.selected or id)
+	if not path then return nil end
+	local node = path[#path]
 	local parent = path[#path - 1]
-	local target
-	if which == "brother" or which == "parent" then
-		target = (parent.a == path[#path]) and parent.b or parent.a
+	if which == "parent" then
+		return parent -- already at root: no-op
+	elseif which == "brother" then
+		return parent and ((parent.a == node) and parent.b or parent.a)
 	elseif which == "first" then
-		target = parent.a
+		return node.a -- a leaf has no children
 	elseif which == "second" then
-		target = parent.b
+		return node.b
 	end
-	if not target then return nil end
-	local l = first_leaf(target)
-	return l and l.id or nil
 end
 
 -- ---------------------------------------------------------------------------
@@ -393,7 +390,7 @@ end
 local function state_for(wsid)
 	local st = S[wsid]
 	if not st then
-		st = { seq = 0, mode = "tiled", pend = nil, boxes = {} }
+		st = { seq = 0, mode = "tiled", pend = nil, boxes = {}, highlighted = {} }
 		S[wsid] = st
 	end
 	return st
@@ -405,6 +402,83 @@ local function apply_pend(st)
 	st.pend = nil
 	return pre
 end
+
+-- ---------------------------------------------------------------------------
+-- subtree selection and visual feedback
+-- ---------------------------------------------------------------------------
+
+local function tag_window(w, enabled)
+	if w and w.mapped then
+		hl.dispatch(hl.dsp.window.tag({
+			tag = (enabled and "+" or "-") .. selection_tag, window = w,
+		}))
+	end
+end
+
+local function highlight_selection(st, targets)
+	local ids, desired = {}, {}
+	-- Ordinary leaf selection uses Hyprland's normal active border.
+	if st.selected and st.selected.t == "split" then collect_ids(st.selected, ids) end
+	for _, t in ipairs(targets) do
+		local w = t.window
+		if w and ids[w.stable_id] then desired[w.stable_id] = w end
+	end
+	local previous = st.highlighted
+	st.highlighted = desired -- set before dispatching, in case rules recalculate
+	for id, w in pairs(previous) do
+		if not desired[id] then tag_window(w, false) end
+	end
+	for id, w in pairs(desired) do
+		if not previous[id] then tag_window(w, true) end
+	end
+end
+
+local function clear_selection(st)
+	st.selected, st.selected_focus_id = nil, nil
+	highlight_selection(st, {})
+end
+
+local function clear_selections()
+	if selection_focus then return end
+	for _, st in pairs(S) do clear_selection(st) end
+end
+
+-- A tag-based rule is reversible: removing only OUR tag restores normal
+-- window rules instead of leaving permanent set_prop border overrides behind.
+-- Same red as general.col.active_border in hyprland.lua, for both focus states.
+hl.window_rule({
+	name = "bspwm-subtree-selection",
+	match = { tag = selection_tag },
+	border_color = "rgb(bb0000) rgb(bb0000)",
+})
+
+hl.on("window.active", clear_selections)
+hl.on("workspace.active", clear_selections)
+hl.on("workspace.special_active", clear_selections)
+hl.on("monitor.focused", clear_selections)
+
+local function window_leaves_selection(w)
+	if not w then return end
+	for _, st in pairs(S) do
+		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id then
+			clear_selection(st)
+		end
+	end
+end
+hl.on("window.close", window_leaves_selection)
+-- A client can unmap/remap the same window object, retaining its old tags.
+hl.on("window.open", function(w) tag_window(w, false) end)
+hl.on("window.move_to_workspace", window_leaves_selection)
+hl.on("window.fullscreen", window_leaves_selection)
+hl.on("workspace.removed", function(ws)
+	local st = ws and S[ws.id]
+	if st then clear_selection(st); S[ws.id] = nil end
+end)
+hl.on("config.reloaded", function()
+	clear_selections()
+	-- Tags survive a Lua-state reload; the old selected-node references do not.
+	for _, w in ipairs(hl.get_windows()) do tag_window(w, false) end
+end)
 
 -- ---------------------------------------------------------------------------
 -- the layout
@@ -440,8 +514,13 @@ local layout_impl = {
 			if t.window.active then focused_id = t.window.stable_id end
 		end
 
-		-- prune dead windows
+		-- prune dead windows, including a selection whose node was collapsed
 		st.tree = prune_tree(st.tree, live)
+		if st.selected and (not find_path(st.tree, st.selected)
+			or not live[st.selected_focus_id]
+			or (focused_id and focused_id ~= st.selected_focus_id)) then
+			clear_selection(st)
+		end
 
 		-- insert new windows
 		local present = {}
@@ -463,6 +542,7 @@ local layout_impl = {
 		for _, t in ipairs(targets) do
 			local id = t.window.stable_id
 			if not present[id] then
+				clear_selection(st)
 				st.seq = st.seq + 1
 				local pre = apply_pend(st)
 				if not st.tree then
@@ -501,6 +581,7 @@ local layout_impl = {
 				if b then t:place(b) end
 			end
 		end
+		highlight_selection(st, targets)
 	end,
 
 	layout_msg = function(ctx, msg)
@@ -523,8 +604,10 @@ local layout_impl = {
 		local function focus_id(id)
 			for _, t in ipairs(ctx.targets) do
 				if t.window and t.window.stable_id == id then
-					hl.dispatch(hl.dsp.focus({ window = "address:" .. t.window.address }))
-					return true
+					selection_focus = true
+					local result = hl.dispatch(hl.dsp.focus({ window = t.window }))
+					selection_focus = false
+					return not result or result.ok ~= false
 				end
 			end
 			return false
@@ -558,6 +641,11 @@ local layout_impl = {
 		local fw = focused()
 		local fid = fw and fw.stable_id or nil
 		if not fid then return true end -- nothing focused; silently ignore
+		-- Do not select arbitrary tiles while keyboard focus is on a float.
+		if cmd == "focus" and not fw.active then return true end
+		if st.selected and (st.selected_focus_id ~= fid or not find_path(st.tree, st.selected)) then
+			clear_selection(st)
+		end
 
 		if cmd == "swap" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
@@ -582,16 +670,16 @@ local layout_impl = {
 
 		elseif cmd == "grow" or cmd == "shrink" then
 			local px = tonumber(parts[3]) or 20
-			resize(st, fid, parts[2] or "r", cmd == "grow" and px or -px)
+			resize(st, st.selected or fid, parts[2] or "r", cmd == "grow" and px or -px)
 			return true -- no owning split (e.g. screen edge) is a no-op, not an error
 
 		elseif cmd == "rotate" then
-			local sub = subtree_of(st, fid)
+			local sub = st.selected or subtree_of(st, fid)
 			rotate(sub, tonumber(parts[2]) or 90)
 			return true
 
 		elseif cmd == "flip" then
-			local sub = subtree_of(st, fid)
+			local sub = st.selected or subtree_of(st, fid)
 			flip(sub, parts[2] == "v" and "v" or "h")
 			return true
 
@@ -620,9 +708,14 @@ local layout_impl = {
 			return true
 
 		elseif cmd == "focus" then
-			local which = parts[2] or "brother"
-			local tid   = focus_subtree_node(st, fid, which)
-			if tid then focus_id(tid) end -- e.g. `focus parent` at the root: no-op
+			local target = focus_subtree_node(st, fid, parts[2] or "brother")
+			if not target then return true end
+			-- Hyprland still needs one keyboard-focused window. Keep it when
+			-- climbing; pick a representative only when entering another branch.
+			local tid = find_path(target, fid) and fid or first_leaf(target).id
+			st.selected, st.selected_focus_id = target, tid
+			if tid ~= fid and not focus_id(tid) then clear_selection(st) end
+			highlight_selection(st, ctx.targets)
 			return true
 
 		end
