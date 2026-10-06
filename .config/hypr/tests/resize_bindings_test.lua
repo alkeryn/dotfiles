@@ -64,7 +64,7 @@ local function fixture()
 			end,
 		}, { __index = function() return ignored_dispatcher end }),
 	}
-	for _, name in ipairs({ "bspwm", "lua/helpers", "lua/bindings" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "lua/bspwm", "lua/helpers", "lua/bindings" }) do package.loaded[name] = nil end
 	require("lua/bindings")
 
 	function f.press(key, shrink)

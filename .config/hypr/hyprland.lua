@@ -5,7 +5,7 @@
 --   require("lua/rules")    -- window/workspace rules + monitor assignment
 --   require("lua/bindings") -- keybindings
 --   require("lua/helpers")  -- focus/swap/gap/monitor helpers (used by the two above)
---   require("bspwm")        -- the bspwm-style tree layout
+--   require("lua/bspwm")    -- the bspwm-style tree layout
 --
 -- Migration from ~/.config/bspwm/bspwmrc + sxhkd.
 --
@@ -16,7 +16,7 @@
 --   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
-local bspwm = require("bspwm") -- registers the "lua:bspwm" layout
+local bspwm = require("lua/bspwm") -- registers the "lua:bspwm" layout
 require("lua/presel_feedback").setup(bspwm)
 hl.layer_rule({
 	name = "bspwm-preselection-feedback",
@@ -157,9 +157,9 @@ hl.config({ cursor = { inactive_timeout = PC == "laptop" and 3 or 0 } })
 -- Config reload workaround (Hyprland v0.56.2): a reload closes the Lua state and
 -- re-registers the layout, but workspaces keep their old layout instance when the
 -- layout name is unchanged -- that instance is bound to the dead provider and
--- falls back to a plain grid (windows side by side). See bspwm.lua: the layout
+-- falls back to a plain grid (windows side by side). See lua/bspwm.lua: the layout
 -- is registered under two names; flip to the one the workspaces are NOT using so
--- they all get a fresh instance. bspwm.lua restores the session checkpoint
+-- they all get a fresh instance. lua/bspwm.lua restores the session checkpoint
 -- before registration, preserving the tree/ratios while targets are reattached.
 hl.on("config.reloaded", function()
 	local ws  = hl.get_active_workspace()

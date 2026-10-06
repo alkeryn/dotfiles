@@ -1,6 +1,6 @@
 # Keeping the bspwm layout across config reloads
 
-Hyprland 0.56.2 destroys the Lua state on a successful reload. `bspwm.lua` now
+Hyprland 0.56.2 destroys the Lua state on a successful reload. `lua/bspwm.lua` now
 loads a checkpoint **before registering its layout providers** and checkpoints
 layout commands, recalculations and selection events. `Super+Escape` flushes the
 checkpoint and still runs the real `hyprctl reload`; automatic file reloads are

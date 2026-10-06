@@ -1,6 +1,6 @@
--- bspwm.lua -- bspwm-style binary-tree layout for Hyprland (v0.56.2+)
+-- lua/bspwm.lua -- bspwm-style binary-tree layout for Hyprland (v0.56.2+)
 -- ============================================================================
--- Register with:  require("bspwm")          -- from hyprland.lua (same dir)
+-- Register with:  require("lua/bspwm")    -- from hyprland.lua
 -- Select with:    general.layout = "lua:bspwm"   (or workspace_rule layout=)
 --
 -- Implements a real per-workspace binary tree like bspwm:
@@ -853,7 +853,7 @@ hl.layout.register("bspwm", layout_impl)
 hl.layout.register("bspwm_b", layout_impl)
 
 -- ---------------------------------------------------------------------------
--- module API (require("bspwm"))
+-- module API (require("lua/bspwm"))
 -- ---------------------------------------------------------------------------
 
 local M = {}

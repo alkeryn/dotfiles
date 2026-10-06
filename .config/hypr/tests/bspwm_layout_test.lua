@@ -11,7 +11,7 @@ local function fixture(width, height, x, y)
 		on = function() end,
 		window_rule = function() end,
 	}
-	dofile("bspwm.lua")
+	dofile("lua/bspwm.lua")
 	local provider = assert(providers.bspwm)
 	local ctx = { area = { x = x or 0, y = y or 0, w = width, h = height }, targets = {} }
 	local f = { ctx = ctx }

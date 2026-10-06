@@ -28,7 +28,7 @@ local function fixture(count)
 		dispatch = function(callback) return callback() end,
 		dsp = { window = { tag = function() return function() end end } },
 	}
-	local layout = dofile("bspwm.lua")
+	local layout = dofile("lua/bspwm.lua")
 	layout.set_feedback_sink(function(states)
 		f.states = states
 		f.previews = feedback.rectangles(states, {ws}, f.windows)

@@ -69,7 +69,7 @@ hl.bind("SUPER + F12",            hl.dsp.exec_cmd("~/bin/wifitoggle"))
 
 -- Reload without discarding the tree. Mutations are also checkpointed for
 -- automatic file reloads; the shortcut flushes once more before hyprctl reload.
-hl.bind("SUPER + Escape",         require("bspwm").reload)
+hl.bind("SUPER + Escape",         require("lua/bspwm").reload)
 
 -- keyboard layouts (setxkbmap {fr, us altgr-intl, ru, us colemak})
 local layouts = {
@@ -88,7 +88,7 @@ end
 -- Super+x closes the selected subtree, or just the focused window otherwise.
 -- Plain Ctrl+x is left to applications; Super+Ctrl+x below still pins.
 hl.bind("SUPER + CTRL + ALT + Escape", hl.dsp.exit())
-hl.bind("SUPER + x",                   require("bspwm").close, { repeating = true })
+hl.bind("SUPER + x",                   require("lua/bspwm").close, { repeating = true })
 hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill(), { repeating = true })
 
 -- alternate between the tiled and monocle layout (bspc desktop -l next)

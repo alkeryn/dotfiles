@@ -71,7 +71,7 @@ local function fixture()
 			}, {__index=function() return ignored_dispatcher end}) },
 			{__index=function() return ignored_dispatcher end}),
 		}
-		f.api = dofile("bspwm.lua")
+		f.api = dofile("lua/bspwm.lua")
 		f.api.set_feedback_sink(function(states) f.states = states end)
 	end
 	function f.finish_reload()
@@ -230,7 +230,7 @@ end
 function tests.reload_shortcut_checkpoints_then_invokes_real_reload()
 	local f = fixture()
 	f.open(1); f.open(2)
-	package.loaded.bspwm = f.api
+	package.loaded["lua/bspwm"] = f.api
 	package.loaded["lua/bindings"], package.loaded["lua/helpers"] = nil, nil
 	require("lua/bindings")
 	local saved = read_file(f.path)
