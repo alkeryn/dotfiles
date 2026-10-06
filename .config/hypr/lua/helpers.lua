@@ -105,6 +105,13 @@ function H.swap_with_workspace(sel)
 	local cur = hl.get_active_workspace()
 	local tgt = hl.get_workspace(sel)
 	if not cur or not tgt or cur.id == tgt.id then return end
+	-- bspwm `desktop -s --follow` swaps the desktop OBJECTS (windows travel
+	-- with them) and then focus follows the focused desktop
+	-- (swap_desktops(): focus_node(m2, d1, d1->focus)): after the swap you
+	-- are looking at your own windows, on the target's slot/monitor. The
+	-- focused window belongs to the outgoing desktop, so re-focus it once
+	-- it has landed on the target workspace.
+	local focused = hl.get_active_window()
 	-- snapshot BOTH lists before moving anything, otherwise the second loop
 	-- would also move the windows we just moved over
 	local from_tgt = tgt:get_windows()
@@ -114,6 +121,14 @@ function H.swap_with_workspace(sel)
 	end
 	for _, w in ipairs(from_cur) do
 		hl.dispatch(hl.dsp.window.move({ workspace = tgt.id, follow = false, window = w }))
+	end
+	if focused then
+		local result = hl.dispatch(hl.dsp.focus({ window = focused }))
+		if not result or result.ok == false then
+			hl.dispatch(hl.dsp.focus({ workspace = tgt.id }))
+		end
+	else
+		hl.dispatch(hl.dsp.focus({ workspace = tgt.id }))
 	end
 end
 
