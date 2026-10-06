@@ -14,7 +14,7 @@ local function read_file(path)
 end
 
 local function fixture()
-	local f = { path=temporary_path(), windows={}, contexts={}, providers={}, events={}, binds={}, commands={} }
+	local f = { path=temporary_path(), windows={}, contexts={}, providers={}, events={}, binds={}, commands={}, raises={} }
 	local function context(id)
 		if not f.contexts[id] then
 			f.contexts[id] = { area={ x=(id-1)*1200, y=20, w=1200, h=800 }, targets={} }
@@ -46,7 +46,12 @@ local function fixture()
 		end
 	end
 	function f.load()
-		f.events, f.providers = {}, {}
+		f.events, f.providers, f.workspace_rules, f.window_rules = {}, {}, {}, {}
+		local function rule_handle(spec)
+			spec.enabled = spec.enabled ~= false
+			function spec:set_enabled(enabled) self.enabled = enabled end
+			return spec
+		end
 		package.loaded["lua/bspwm_state"] = { open_session=function() return codec.open(f.path) end }
 		local function ignored_dispatcher() return function() end end
 		_G.hl = {
@@ -57,7 +62,14 @@ local function fixture()
 			on = function(name, fn)
 				f.events[name] = f.events[name] or {}; table.insert(f.events[name], fn)
 			end,
-			window_rule = function() end,
+			window_rule = function(spec)
+				f.window_rules[spec.name] = rule_handle(spec)
+				return spec
+			end,
+			workspace_rule = function(spec)
+				f.workspace_rules[spec.workspace] = rule_handle(spec)
+				return spec
+			end,
 			get_windows = windows,
 			get_active_window = function() return f.active end,
 			exec_cmd = function(command) f.commands[#f.commands+1] = command end,
@@ -67,6 +79,9 @@ local function fixture()
 				tag=function(opts) return function()
 					local tag = opts.tag:sub(2)
 					opts.window.tags[tag] = opts.tag:sub(1,1) == "+" or nil
+				end end,
+				alter_zorder=function(opts) return function()
+					f.raises[#f.raises+1] = opts.window.stable_id
 				end end,
 			}, {__index=function() return ignored_dispatcher end}) },
 			{__index=function() return ignored_dispatcher end}),
@@ -194,7 +209,16 @@ function tests.monocle_keeps_its_underlying_tree()
 	local monocle = f.geometry()
 	f.reload(); f.expect_geometry(monocle)
 	assert(f.states[1].mode == "monocle")
+	f.raises = {}
+	f.before_reload = read_file(f.path)
+	f.load(); f.emit("config.reloaded"); f.replay(f.providers.bspwm_b)
+	assert(#f.raises == 0, "partial reload must not disturb focus/stacking")
+	f.emit("config.props_refreshed", true)
+	assert(#f.raises == 1 and f.raises[1] == f.active.stable_id)
+	f.before_reload = nil
+	assert(f.workspace_rules["r[1-1]"].enabled and f.window_rules["bspwm-monocle-1"].enabled)
 	f.message("tiled"); f.expect_geometry(tiled)
+	assert(not f.workspace_rules["r[1-1]"].enabled and not f.window_rules["bspwm-monocle-1"].enabled)
 end
 
 function tests.inactive_workspaces_restore_independently()

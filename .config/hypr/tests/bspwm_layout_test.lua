@@ -6,10 +6,14 @@ package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture(width, height, x, y)
 	local providers = {}
+	local function rule() return { set_enabled = function() end } end
 	_G.hl = {
 		layout = { register = function(name, impl) providers[name] = impl end },
 		on = function() end,
-		window_rule = function() end,
+		window_rule = rule,
+		workspace_rule = rule,
+		dispatch = function() end,
+		dsp = { window = { alter_zorder = function() end } },
 	}
 	dofile("lua/bspwm.lua")
 	local provider = assert(providers.bspwm)

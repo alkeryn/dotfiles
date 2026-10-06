@@ -24,9 +24,14 @@ local function fixture(count)
 	f.ws, f.ctx = ws, ctx
 	_G.hl = {
 		layout = { register = function(name, impl) if name == "bspwm" then provider = impl end end },
-		window_rule = function() end, on = function() end,
+		window_rule = function() return { set_enabled = function() end } end,
+		workspace_rule = function() return { set_enabled = function() end } end,
+		on = function() end,
 		dispatch = function(callback) return callback() end,
-		dsp = { window = { tag = function() return function() end end } },
+		dsp = { window = {
+			tag = function() return function() end end,
+			alter_zorder = function() return function() end end,
+		} },
 	}
 	local layout = dofile("lua/bspwm.lua")
 	layout.set_feedback_sink(function(states)

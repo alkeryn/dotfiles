@@ -43,6 +43,8 @@ local last_store_error
 local selection_focus = false -- guard our own representative-window focus events
 local selection_tag = "bspwm_selected"
 local feedback_sink
+local monocle_display = require("lua/bspwm_monocle")
+local monocle = monocle_display.new()
 
 local function checkpoint()
 	if not state_store or rehydrating then return end
@@ -499,8 +501,10 @@ hl.window_rule({
 })
 
 on_event("window.active", function(w, reason)
-	if selection_focus or rehydrating then return end
+	if rehydrating then return end
 	local st = w and w.workspace and S[w.workspace.id]
+	if st and st.mode == "monocle" then monocle.raise(w) end
+	if selection_focus then return end
 	-- Re-notification of the same keyboard-focused representative is not a
 	-- new tree selection. An explicit click (FOCUS_REASON_CLICK = 5) is.
 	if st and st.selected_focus_id == w.stable_id and reason ~= 5 then return end
@@ -531,6 +535,7 @@ on_event("window.open", function(w) tag_window(w, false) end)
 on_event("window.move_to_workspace", window_leaves_selection)
 on_event("window.fullscreen", window_leaves_selection)
 on_event("workspace.removed", function(ws)
+	if ws then monocle.remove(ws) end
 	local st = ws and S[ws.id]
 	if st then clear_selection(st); S[ws.id] = nil end
 end)
@@ -571,6 +576,8 @@ on_event("config.props_refreshed", function()
 		end
 		highlight_selection(st, targets[id] or {})
 	end
+	local active_state = active and active.workspace and S[active.workspace.id]
+	if active_state and active_state.mode == "monocle" then monocle.raise(active) end
 	publish_feedback()
 end)
 
@@ -594,6 +601,7 @@ local layout_impl = {
 		local wsid = ws_of(ctx)
 		if not wsid then return end
 		local st = state_for(wsid)
+		monocle.sync(targets[1].window.workspace, st.mode == "monocle")
 		local area = { x = ctx.area.x, y = ctx.area.y, w = ctx.area.w, h = ctx.area.h }
 
 		-- live table: stable_id -> target
@@ -674,9 +682,18 @@ local layout_impl = {
 		-- place
 		st.boxes = {}
 		if st.mode == "monocle" then
+			-- ctx.area has outer gaps and reserved panel space removed. Monocle
+			-- fills the actual monitor; the scoped rules also stop place() from
+			-- adding inner gaps/decorations to this larger box.
+			local box = monocle_display.monitor_box(targets[1].window, area)
 			for _, t in ipairs(targets) do
-				t:place(area)
-				st.boxes[t.window.stable_id] = area
+				t:place(box)
+				st.boxes[t.window.stable_id] = box
+			end
+			if not rehydrating then
+				for _, t in ipairs(targets) do
+					if t.window.active then monocle.raise(t.window) end
+				end
 			end
 		else
 			if not st.tree then
