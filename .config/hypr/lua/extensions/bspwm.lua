@@ -8,6 +8,7 @@
 --   * preselection: direction (-p), ratio (-o), click-through feedback rectangle
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
 --   * transplant (-n @/), global history-based send/pull (super+y)
+--   * selected-subtree desktop transfers (-d --follow)
 --   * directional swap / move / grow / shrink between leaves
 --   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
 --   * node focus: parent / brother / first / second
@@ -1018,6 +1019,133 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+-- bspwm messages.c passes the selected NODE to tree.c:transfer_node for
+-- `node -d --follow`. Native window.move only knows the representative leaf.
+function M.move_to_workspace(selector)
+	if rehydrating or transferring then return "workspace move: layout is busy" end
+	local active = hl.get_active_window()
+	if not active or not active.mapped or not active.workspace then return true end
+	local source = active.workspace
+	local from = S[source.id]
+	local node = from and from.selected
+	local dest = hl.get_workspace(selector)
+	local function ws_selector(ws)
+		return ws.id > 0 and ws.id or "name:" .. ws.name
+	end
+	if dest and dest.id == source.id then return true end
+	if not node or node.t ~= "split" or active.floating or from.selected_focus_id ~= active.stable_id
+		or not find_path(from.tree, node) then
+		-- Unselected tiles, floats and native groups keep their normal behavior.
+		local result = hl.dispatch(hl.dsp.window.move({
+			window = active, workspace = dest and ws_selector(dest) or selector, follow = true,
+		}))
+		return result and result.ok == false and "workspace move: could not move focused window" or true
+	end
+	local function compatible(ws)
+		return ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b"
+	end
+	if not compatible(source) or (dest and not compatible(dest)) then
+		return "workspace move: selected subtree requires the bspwm layout"
+	end
+
+	-- Snapshot handles and the destination anchor before native moves trigger
+	-- synchronous focus/layout events. Never fall back to moving just one leaf
+	-- if part of the selected subtree is stale or belongs to a native group.
+	local windows, moving = {}, {}
+	for _, w in ipairs(hl.get_windows()) do windows[w.stable_id] = w end
+	for _, child in ipairs(leaves(node)) do
+		local w = windows[child.id]
+		if not w or not w.mapped or w.floating or w.hidden or w.group
+			or not w.workspace or w.workspace.id ~= source.id then
+			return "workspace move: selected subtree contains an unavailable window"
+		end
+		moving[#moving + 1] = w
+	end
+	local to, anchor
+	local function set_destination(ws)
+		if not compatible(ws) then error("selected subtree requires the bspwm layout", 0) end
+		to = state_for(ws.id)
+		local path = ws.last_window and find_path(to.tree, ws.last_window.stable_id)
+		anchor = to.selected or (path and path[#path]) or any_leaf(to.tree)
+	end
+	if dest then set_destination(dest) end
+	local function move_window(w, ws)
+		if w.workspace and w.workspace.id == ws.id then return true end
+		local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = ws_selector(ws), follow = false }))
+		return not (result and result.ok == false) and w.workspace and w.workspace.id == ws.id
+	end
+	local contexts = {}
+	transferring, transfer_contexts = true, contexts
+	local ok, failure = pcall(function()
+		for _, w in ipairs(moving) do
+			local moved
+			if not dest then
+				-- A numbered/named desktop may not exist yet. Let the first native
+				-- move create it, then pin every remaining move to its absolute ID.
+				local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
+				if w.workspace and w.workspace.id ~= source.id then
+					dest = w.workspace
+					set_destination(dest)
+				end
+				moved = dest and not (result and result.ok == false)
+			else
+				moved = move_window(w, dest)
+			end
+			if not moved then error("could not move window " .. w.stable_id, 0) end
+		end
+	end)
+	if not ok then
+		-- Best-effort rollback: even a dispatcher that reports failure may
+		-- already have moved its window. Reconcile ownership if rollback fails.
+		for i = #moving, 1, -1 do
+			local restored_ok, restored = pcall(move_window, moving[i], source)
+			if not restored_ok or not restored then failure = tostring(failure) .. "; rollback incomplete" end
+		end
+	end
+	local replay_ok, replay_error = pcall(function()
+		if ok then
+			remove_leaf(from, node)
+			local context = contexts[dest.id]
+			if context then place(to.tree, context.area, {}) end
+			local pre = apply_pend(anchor)
+			insert_adjacent(to, node, anchor, pre and pre.dir, pre and pre.ratio)
+			for _, child in ipairs(leaves(node)) do to.seq = math.max(to.seq, child.n) end
+		end
+		for _, ws in ipairs(dest and { source, dest } or { source }) do
+			local st, live = S[ws.id], {}
+			for _, w in ipairs(ws:get_windows() or {}) do
+				if w.mapped and not w.floating then live[w.stable_id] = true end
+			end
+			if st then
+				st.tree = prune_tree(st.tree, live)
+				st.boxes = {}
+				clear_selection(st)
+			end
+		end
+		transfer_contexts = nil
+		replay_transfer_contexts(contexts)
+	end)
+	transfer_contexts, transferring = nil, false
+	if ok and replay_ok then
+		local focused, result = pcall(function() return hl.dispatch(hl.dsp.focus({ window = active })) end)
+		local current = hl.get_active_window()
+		if not focused or (result and result.ok == false) or not current or current.stable_id ~= active.stable_id then
+			failure = "could not focus moved subtree"
+		else
+			-- Workspace/monitor focus notifications clear selection. Restore it
+			-- afterwards so another send/rotate/close still acts on the subtree.
+			to.selected, to.selected_focus_id = node, active.stable_id
+			local targets = {}
+			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
+			highlight_selection(to, targets)
+		end
+	end
+	publish_feedback()
+	if failure then return "workspace move: " .. tostring(failure) end
+	if not replay_ok then return "workspace move: " .. tostring(replay_error) end
+	return true
+end
 
 -- Exchange desktop contents without reinserting every tile into a new tree.
 -- The native API only moves individual windows; defer its intermediate layout

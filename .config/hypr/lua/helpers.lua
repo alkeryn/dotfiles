@@ -82,7 +82,7 @@ function H.swap_dir(d) -- d: l | r | u | d
 		return
 	end
 	local mon = hl.get_monitor(d) -- relative to the focused monitor; nil if none
-	if mon then hl.dispatch(hl.dsp.window.move({ monitor = mon, follow = true })) end
+	if mon and mon.active_workspace then H.move_to_workspace(mon.active_workspace) end
 end
 
 -- ---------------------------------------------------------------------------
@@ -125,8 +125,18 @@ function H.resize_edge(edge, delta)
 end
 
 -- ---------------------------------------------------------------------------
--- workspace swap helpers (bspc desktop -s)
+-- workspace send/swap helpers (bspc node -d / desktop -s)
 -- ---------------------------------------------------------------------------
+
+function H.move_to_workspace(sel)
+	local result = bspwm.move_to_workspace(sel)
+	if result ~= true then print(tostring(result)) end
+end
+
+function H.move_workspace_rel(rel)
+	local target = H.relative_workspace(rel)
+	if target then H.move_to_workspace(target) end
+end
 
 function H.swap_with_workspace(sel)
 	local cur = hl.get_active_workspace()
@@ -155,7 +165,7 @@ function H.swap_with_workspace(sel)
 	end
 end
 
-function H.swap_workspace_rel(rel)
+function H.relative_workspace(rel)
 	local cur = hl.get_active_workspace()
 	if not cur or not cur.monitor or cur.special then return end
 	-- Workspace IDs are global, not monitor-relative. Include empty persistent
@@ -169,11 +179,14 @@ function H.swap_workspace_rel(rel)
 	table.sort(workspaces, function(a, b) return a.id < b.id end)
 	for i, ws in ipairs(workspaces) do
 		if ws.id == cur.id then
-			local target = workspaces[((i - 1 + rel) % #workspaces) + 1]
-			H.swap_with_workspace(target)
-			return
+			return workspaces[((i - 1 + rel) % #workspaces) + 1]
 		end
 	end
+end
+
+function H.swap_workspace_rel(rel)
+	local target = H.relative_workspace(rel)
+	if target then H.swap_with_workspace(target) end
 end
 
 -- ---------------------------------------------------------------------------

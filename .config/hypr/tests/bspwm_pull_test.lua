@@ -1,4 +1,4 @@
--- lua tests/bspwm_pull_test.lua -- pull, desktop swap and pointer drag;
+-- lua tests/bspwm_pull_test.lua -- pull, selected desktop move, desktop swap and pointer drag;
 -- native move/recalculation ordering and pointer timers are mocked.
 local codec = require("lua/extensions/bspwm_state")
 local tests = {}
@@ -138,19 +138,25 @@ local function fixture()
 					f.focus(opts.window.stable_id)
 					return { ok = true }
 				end end,
-				window = setmetatable({ move = function(opts) return function()
-					local w, dest = opts.window, f.workspaces[opts.workspace]
+				window = setmetatable({ tag = function(opts) return function()
+					opts.window.tags[opts.tag:sub(2)] = opts.tag:sub(1, 1) == "+" or nil
+					return { ok = true }
+				end end, move = function(opts) return function()
+					local w, dest = opts.window or f.active, f.workspaces[tonumber(opts.workspace)]
 					if type(opts.workspace) == "string" and opts.workspace:sub(1, 5) == "name:" then
 						for _, ws in pairs(f.workspaces) do if ws.name == opts.workspace:sub(6) then dest = ws end end
 					end
+					if not dest and tonumber(opts.workspace) and tonumber(opts.workspace) > 0 then
+						dest = f.workspace(tonumber(opts.workspace), f.active_ws.monitor)
+					end
 					assert(dest, "expected an absolute workspace ID or name selector")
 					assert(type(opts.workspace) ~= "number" or opts.workspace > 0, "negative IDs parse as relative selectors")
-					assert(opts.follow == false, "defer focus until the whole insertion is complete")
 					f.moves[#f.moves + 1] = opts
 					if f.fail_id == w.stable_id or (f.fail_move and f.fail_move(w, dest)) then return { ok = false } end
 					if f.throw_id == w.stable_id then error("synthetic dispatcher exception") end
 					if f.ignore_move then return { ok = true } end
 					local source = w.workspace
+					if source == dest then return { ok = true } end
 					w.workspace, w.monitor = dest, dest.monitor
 					-- Like GlobalWindowController: update workspace BEFORE removing
 					-- source target / adding destination target, with synchronous callbacks.
@@ -168,6 +174,8 @@ local function fixture()
 						if remaining then f.focus(remaining.window.stable_id)
 						else f.active = nil; f.emit("window.active", nil) end
 					end
+					if opts.follow then f.focus(w.stable_id) end
+					if f.after_move then f.after_move(w, dest) end
 					return { ok = true }
 				end end }, { __index = function() return noop end }),
 			}, { __index = function() return noop end }),
@@ -179,7 +187,7 @@ local function fixture()
 	function f.open(id, wsid, floating)
 		local ws = f.workspace(wsid or 1)
 		local window = { stable_id = id, workspace = ws, monitor = ws.monitor, mapped = true,
-			active = false, floating = floating or false, hidden = false, fullscreen = 0, focus_history_id = -1 }
+			active = false, floating = floating or false, hidden = false, fullscreen = 0, focus_history_id = -1, tags = { personal = true } }
 		local target = { window = window }
 		function target:place(box)
 			if f.throw_placement then error("synthetic placement exception") end
@@ -232,6 +240,231 @@ end
 local function expect_box(b, x, y, w, h)
 	assert(b.x == x and b.y == y and b.w == w and b.h == h,
 		string.format("unexpected box %g,%g %gx%g", b.x, b.y, b.w, b.h))
+end
+
+function tests.selected_desktop_move_number_binding_transfers_intact_subtree()
+	local f = fixture()
+	for id = 1, 4 do f.open(id, 1) end
+	f.open(5, 2); f.presel(5, "u", 0.3); f.focus(4)
+	f.helpers(); package.loaded["lua/bindings"] = nil; require("lua/bindings")
+	f.binds["SUPER + b"](); f.binds["SUPER + b"]()
+	f.message("grow l 50"); f.message("preselect r"); f.message("pratio 0.4")
+	local node = f.states[1].selected
+	local before = codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } })
+	f.before_focus = function(w)
+		assert(w == f.windows[4] and #f.moves == 3, "follow must wait for all selected windows")
+		assert(f.states[2].tree.a == node, "follow must wait for subtree insertion")
+		assert(f.box(4).x >= 2000, "follow must wait for destination geometry")
+	end
+	f.binds["SUPER + SHIFT + eacute"]()
+	assert(#f.moves == 3, "desktop move only moved the representative, not all selected windows")
+	for id = 2, 4 do
+		assert(f.windows[id].workspace.id == 2 and f.windows[id].tags.bspwm_selected)
+	end
+	for _, move in ipairs(f.moves) do assert(move.follow == false) end
+	assert(f.windows[1].workspace.id == 1 and f.windows[5].workspace.id == 2)
+	assert(f.states[1].tree.id == 1 and f.states[2].tree.a == node and f.states[2].tree.ratio == 0.3)
+	assert(not f.leaf(5).presel and f.states[2].selected == node and f.states[2].selected_focus_id == 4)
+	assert(codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } }) == before)
+	assert(f.active == f.windows[4] and #f.focus_calls == 1)
+	expect_box(f.box(1), 0, 0, 1600, 900)
+	f.consistent()
+end
+
+function tests.selected_desktop_move_whole_tree_into_empty_or_new_workspace()
+	for _, existing in ipairs({ false, true }) do
+		for _, representative in ipairs({ 1, 3 }) do
+			local f = fixture()
+			for id = 1, 3 do f.open(id, 1) end
+			if existing then f.workspace(2) end
+			f.focus(representative); f.message("focus parent"); f.message("focus parent")
+			local node = f.states[1].selected
+			assert(f.api.move_to_workspace("2") == true)
+			assert(#f.moves == 3 and not f.states[1].tree and not next(f.states[1].boxes))
+			assert(f.states[2].tree == node and f.states[2].selected == node)
+			assert(f.active.stable_id == representative and #f.focus_calls == 1)
+			for _, w in pairs(f.windows) do assert(w.workspace.id == 2 and w.tags.bspwm_selected and w.tags.personal) end
+			f.consistent()
+		end
+	end
+end
+
+function tests.selected_desktop_move_relative_bindings_resolve_once_and_repeat_with_selection()
+	local f = fixture()
+	local mon = f.workspace(5).monitor
+	for _, id in ipairs({ 6, 8, 10, -98 }) do f.workspace(id, mon) end
+	f.workspaces[-98].special = true
+	f.workspace(1) -- another monitor must not be included in relative sends
+	f.open(1, 5); f.open(2, 5); f.message("focus parent")
+	local node = f.states[5].selected
+	f.helpers(); package.loaded["lua/bindings"] = nil; require("lua/bindings")
+	for _, step in ipairs({
+		{ "dead_circumflex", 10 }, { "dollar", 5 }, { "dollar", 6 },
+		{ "dollar", 8 }, { "dollar", 10 }, { "dollar", 5 },
+	}) do
+		local moves = #f.moves
+		f.binds["SUPER + SHIFT + " .. step[1]]()
+		assert(#f.moves == moves + 2 and f.active_ws.id == step[2])
+		assert(f.windows[1].workspace.id == step[2] and f.windows[2].workspace.id == step[2])
+		assert(f.states[step[2]].tree == node and f.states[step[2]].selected == node)
+		for i = moves + 1, #f.moves do assert(f.moves[i].workspace == step[2] and not f.moves[i].follow) end
+		f.consistent()
+	end
+end
+
+function tests.selected_desktop_move_all_number_row_bindings()
+	local keys = { "ampersand", "eacute", "quotedbl", "apostrophe", "parenleft",
+		"minus", "egrave", "underscore", "ccedilla", "agrave" }
+	local f = fixture()
+	f.open(1, 11); f.open(2, 11); f.message("focus parent")
+	local node = f.states[11].selected
+	f.helpers(); package.loaded["lua/bindings"] = nil; require("lua/bindings")
+	for id, key in ipairs(keys) do
+		f.binds["SUPER + SHIFT + " .. key]()
+		assert(f.windows[1].workspace.id == id and f.windows[2].workspace.id == id)
+		assert(f.states[id].selected == node and f.states[id].tree == node)
+		f.consistent()
+	end
+end
+
+function tests.selected_desktop_move_same_workspace_and_single_slot_are_noops()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	local before = codec.encode(f.states)
+	assert(f.api.move_to_workspace("1") == true)
+	f.helpers().move_workspace_rel(1)
+	assert(#f.moves == 0 and #f.focus_calls == 0 and codec.encode(f.states) == before)
+end
+
+function tests.selected_desktop_move_named_and_monocle_destination()
+	local f = fixture()
+	f.workspace(-1337).name = "named"
+	f.workspaces[-1337].tiled_layout = "lua:bspwm_b"
+	f.open(3, -1337); f.message("monocle")
+	f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	local node = f.states[1].selected
+	assert(f.api.move_to_workspace("name:named") == true)
+	assert(f.moves[1].workspace == "name:named" and f.moves[2].workspace == "name:named")
+	assert(f.states[-1337].mode == "monocle" and f.states[-1337].selected == node)
+	assert(f.states[1].mode == "tiled")
+	f.message("tiled")
+	assert(f.states[-1337].tree.b == node and f.box(1).x ~= f.box(3).x)
+	f.consistent()
+end
+
+function tests.selected_desktop_move_uses_destination_last_focus_not_arbitrary_leaf()
+	local f = fixture()
+	f.open(4, 2); f.open(5, 2); f.open(6, 2); f.focus(4)
+	local anchor = f.leaf(4)
+	f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	local node = f.states[1].selected
+	assert(f.api.move_to_workspace(2) == true)
+	assert(f.states[2].tree.a.a == anchor and f.states[2].tree.a.b == node)
+	f.consistent()
+end
+
+function tests.selected_desktop_move_monitor_fallback_transfers_entire_selection()
+	local f = fixture()
+	f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	local node = f.states[1].selected
+	hl.get_monitor = function() return f.workspaces[2].monitor end
+	f.helpers().swap_dir("r")
+	assert(#f.moves == 2 and f.states[2].tree == node and f.states[2].selected == node)
+	f.consistent()
+end
+
+function tests.selected_desktop_move_single_window_and_float_keep_native_follow()
+	for _, floating in ipairs({ false, true }) do
+		local f = fixture()
+		f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+		if floating then f.open(3, 1, true) else f.focus(1) end
+		local active = f.active
+		assert(f.api.move_to_workspace(2) == true)
+		assert(#f.moves == 1 and f.moves[1].window == active and f.moves[1].follow)
+		assert(active.workspace.id == 2 and f.active == active and f.windows[2].workspace.id == 1)
+		f.consistent()
+	end
+end
+
+function tests.selected_desktop_move_rejects_unsafe_subtrees_and_other_layouts_without_partial_fallback()
+	for _, kind in ipairs({ "group", "hidden", "floating", "mapped", "layout" }) do
+		local f = fixture()
+		f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+		if kind == "layout" then f.workspaces[2].tiled_layout = "dwindle"
+		else f.windows[1][kind] = kind ~= "mapped" end
+		assert(type(f.api.move_to_workspace(2)) == "string")
+		assert(#f.moves == 0 and #f.focus_calls == 0)
+		assert(f.windows[1].workspace.id == 1 and f.windows[2].workspace.id == 1)
+	end
+end
+
+for _, failure_kind in ipairs({ "fail_id", "throw_id", "ignore_move" }) do
+	tests["selected_desktop_move_rolls_back_and_recovers_" .. failure_kind] = function()
+		local f = fixture()
+		f.open(3, 2); f.presel(3, "u", 0.3)
+		f.open(1, 1); f.open(2, 1); f.message("focus parent")
+		local node, anchor = f.states[1].tree, f.leaf(3)
+		f[failure_kind] = failure_kind == "ignore_move" or 2
+		assert(type(f.api.move_to_workspace(2)) == "string")
+		assert(f.windows[1].workspace.id == 1 and f.windows[2].workspace.id == 1)
+		assert(f.states[1].tree == node and f.states[2].tree == anchor and anchor.presel.ratio == 0.3)
+		assert(#f.focus_calls == 0)
+		f.consistent()
+		f[failure_kind] = nil; f.focus(2); f.message("focus parent")
+		assert(f.api.move_to_workspace(2) == true and f.states[2].selected == node)
+		f.consistent()
+	end
+end
+
+function tests.selected_desktop_move_incomplete_rollback_reconciles_ownership()
+	local f = fixture()
+	f.open(3, 2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	f.fail_move = function(w, dest) return w.stable_id == 2 or (w.stable_id == 1 and dest.id == 1) end
+	local result = f.api.move_to_workspace(2)
+	assert(type(result) == "string" and result:find("rollback incomplete"))
+	assert(f.windows[1].workspace.id == 2 and f.windows[2].workspace.id == 1 and #f.focus_calls == 0)
+	f.consistent()
+	assert(codec.decode(codec.encode(f.states)))
+end
+
+function tests.selected_desktop_move_placement_exception_releases_guard()
+	local f = fixture()
+	f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	f.throw_placement = true
+	assert(type(f.api.move_to_workspace(2)) == "string")
+	assert(#f.focus_calls == 0)
+	f.throw_placement = nil
+	f.focus(2); f.recalculate(2); f.message("focus parent")
+	assert(f.api.move_to_workspace(1) == true)
+	f.consistent()
+end
+
+function tests.selected_desktop_move_failed_focus_keeps_completed_move_without_highlights()
+	local f = fixture()
+	f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	local node = f.states[1].selected
+	f.fail_focus = true
+	assert(type(f.api.move_to_workspace(2)) == "string")
+	assert(f.states[2].tree == node and not f.states[1].tree and not f.states[2].selected)
+	for _, w in pairs(f.windows) do assert(not w.tags.bspwm_selected) end
+	f.consistent()
+end
+
+function tests.selected_desktop_move_checkpoints_only_completed_transfer_and_survives_reload()
+	local f = fixture()
+	f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	f.load(codec.encode(f.states))
+	local before = f.saved
+	f.after_move = function()
+		assert(f.saved == before, "checkpoint exposed an intermediate transfer")
+	end
+	assert(f.api.move_to_workspace(2) == true)
+	local saved = f.saved
+	assert(saved ~= before)
+	f.load(saved)
+	assert(f.saved == saved and f.states[2].selected == f.states[2].tree)
+	assert(f.states[2].selected_focus_id == 2 and f.windows[1].tags.bspwm_selected)
+	f.consistent()
 end
 
 function tests.pulls_last_focused_not_newest_across_monitors()

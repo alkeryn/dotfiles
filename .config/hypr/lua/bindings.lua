@@ -146,10 +146,11 @@ hl.bind("SUPER + c",                   hl.dsp.window.cycle_next(), { repeating =
 hl.bind("SUPER + ALT + c",             hl.dsp.window.cycle_next({ next = false }), { repeating = true })
 
 -- focus/send/swap next/prev desktop (dead_circumflex / dollar)
+-- Sends transfer the selected subtree (Super+b), then follow it once.
 hl.bind("SUPER + dead_circumflex",              hl.dsp.focus({ workspace = "m-1" }), { repeating = true })
 hl.bind("SUPER + dollar",                       hl.dsp.focus({ workspace = "m+1" }), { repeating = true })
-hl.bind("SUPER + SHIFT + dead_circumflex",      hl.dsp.window.move({ workspace = "m-1", follow = true }), { repeating = true })
-hl.bind("SUPER + SHIFT + dollar",               hl.dsp.window.move({ workspace = "m+1", follow = true }), { repeating = true })
+hl.bind("SUPER + SHIFT + dead_circumflex",      function() helpers.move_workspace_rel(-1) end, { repeating = true })
+hl.bind("SUPER + SHIFT + dollar",               function() helpers.move_workspace_rel(1) end, { repeating = true })
 hl.bind("SUPER + ALT + dead_circumflex",        function() helpers.swap_workspace_rel(-1) end, { repeating = true })
 hl.bind("SUPER + ALT + dollar",                 function() helpers.swap_workspace_rel(1) end, { repeating = true })
 
@@ -163,7 +164,7 @@ local NUM_KEYS = { "ampersand", "eacute", "quotedbl", "apostrophe", "parenleft",
 for i, key in ipairs(NUM_KEYS) do
 	local ws = tostring(i == 10 and 10 or i)
 	hl.bind("SUPER + " .. key,            hl.dsp.focus({ workspace = ws }), { repeating = true })
-	hl.bind("SUPER + SHIFT + " .. key,    hl.dsp.window.move({ workspace = ws, follow = true }), { repeating = true })
+	hl.bind("SUPER + SHIFT + " .. key,    function() helpers.move_to_workspace(ws) end, { repeating = true })
 	hl.bind("SUPER + ALT + " .. key,      function() helpers.swap_with_workspace(ws) end, { repeating = true })
 end
 
