@@ -291,6 +291,37 @@ function tests.empty_workspace_mode_and_pending_preselection_round_trip()
 	assert(result.pending.dir == "d" and result.pending.ratio == 0.4)
 end
 
+function tests.remembered_pull_source_round_trips_without_visual_selection()
+	local tree = { t="split", axis="h", ratio=0.37, pull_focus_id=2, pull_ids={ [1]=true, [2]=true },
+		a={ t="leaf", id=1, n=1 }, b={ t="leaf", id=2, n=2 } }
+	local text = codec.encode({ [1]={ tree=tree, seq=2, mode="tiled" } })
+	assert(text:match("^BSPWM_LAYOUT_V2"))
+	local decoded = assert(codec.decode(text))
+	local st = decoded.states[1]
+	assert(not st.selected and st.tree.pull_focus_id == 2)
+	assert(st.tree.pull_ids[1] and st.tree.pull_ids[2])
+	assert(codec.encode(decoded.states) == text)
+end
+
+function tests.legacy_v1_checkpoint_remains_readable()
+	local text = "BSPWM_LAYOUT_V1\nP - -\nW 1 2 tiled . 2 - -\nS h 0.37 - -\nL 1 1 - -\nL 2 2 - -\n"
+	local decoded = assert(codec.decode(text))
+	local st = decoded.states[1]
+	assert(st.selected == st.tree and st.selected_focus_id == 2 and st.tree.ratio == 0.37)
+	assert(not st.tree.pull_focus_id)
+	local upgraded = codec.encode(decoded.states)
+	assert(upgraded:match("^BSPWM_LAYOUT_V2") and codec.decode(upgraded))
+end
+
+function tests.invalid_pull_source_representative_is_rejected()
+	for _, representative in ipairs({ "3", "0", "-1", "nan", "1e100" }) do
+		local text = "BSPWM_LAYOUT_V2\nP - -\nW 1 2 tiled - - - -\nS h 0.5 - - " .. representative
+			.. "\nL 1 1 - -\nL 2 2 - -\n"
+		local value, err = codec.decode(text)
+		assert(not value and err, "accepted invalid pull representative " .. representative)
+	end
+end
+
 function tests.corrupt_or_executable_checkpoint_is_rejected()
 	local bad = {
 		"return (function() _G.checkpoint_executed = true end)()",

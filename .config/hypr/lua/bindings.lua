@@ -94,8 +94,9 @@ hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill(), { repeating = true 
 -- alternate between the tiled and monocle layout (bspc desktop -l next)
 hl.bind("SUPER + v",                   hl.dsp.layout("mode"), { repeating = true })
 
--- send to last preselection, otherwise pull last focused leaf (global history)
--- Across desktops/monitors; focus the inserted node after the move completes.
+-- Send the selected node to last preselection; otherwise pull the last logical
+-- node (a remembered Super+b subtree, or an ordinary window) beside this node.
+-- Across desktops/monitors; reflow first, then focus/select the inserted node.
 hl.bind("SUPER + y",                   hl.dsp.layout("pull"), { repeating = true })
 
 -- Rotate (bspc node -R {90,270})

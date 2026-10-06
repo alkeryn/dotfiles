@@ -12,6 +12,8 @@ Stored per workspace:
 - Window stable IDs and insertion ages/sequence.
 - Tiled/monocle mode and per-node preselection.
 - Selected node and pending insertion anchor, identified by tree paths.
+- Remembered `Super+y` source groups and their representative window IDs,
+  independent of which window currently has focus or selection borders.
 
 Geometry and Hyprland userdata are not serialized. The new config's monitor
 workareas and gaps still apply; this preserves the tree, not overrides to other
@@ -41,6 +43,12 @@ replaced only when serialized state changes. The versioned, bounded parser reads
 data tokens, **never executes Lua from a state file**, and rejects corruption,
 invalid nodes, duplicate leaves, excessive depth or oversized input. Errors are
 logged with `bspwm checkpoint:`; persistence failure does not disable tiling.
+
+V2 adds an optional pull-source representative to split-node records. V1 files
+are still accepted and upgraded on the next save without rebuilding their trees.
+The decoder verifies each remembered representative belongs to its subtree and
+reconstructs its member IDs. If membership changed while the config was reloading,
+the layout drops that stale association during reconciliation.
 
 The first reload installing this feature may rebuild once: the previous code
 never checkpointed its in-memory tree. Arrangements made after installation are

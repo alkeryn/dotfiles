@@ -1,7 +1,8 @@
 -- Session-only layout checkpoints. Data-only, bounded parser: never load/eval
 -- a state file as Lua. Geometry/userdata are rebuilt by the compositor.
 local M = {}
-local HEADER = "BSPWM_LAYOUT_V1"
+local HEADER = "BSPWM_LAYOUT_V2"
+local LEGACY_HEADER = "BSPWM_LAYOUT_V1"
 local MAX_BYTES, MAX_NODES, MAX_DEPTH, MAX_WORKSPACES = 1048576, 8192, 128, 256
 local DIRECTIONS = { l=true, r=true, u=true, d=true, west=true, east=true,
 	north=true, south=true, up=true, down=true }
@@ -44,8 +45,9 @@ function M.encode(states, pending)
 					integer(node.n or 0, 0), presel_tokens(node.presel))
 			else
 				assert(node.t == "split" and node.a and node.b, "invalid split")
-				rows[#rows + 1] = string.format("S %s %.17g %s", node.axis == "h" and "h" or "v",
-					ratio(node.ratio), presel_tokens(node.presel))
+				local pull_focus = node.pull_focus_id and string.format("%.0f", integer(node.pull_focus_id, 1)) or "-"
+				rows[#rows + 1] = string.format("S %s %.17g %s %s", node.axis == "h" and "h" or "v",
+					ratio(node.ratio), presel_tokens(node.presel), pull_focus)
 				visit(node.a, path .. "a", depth + 1)
 				visit(node.b, path .. "b", depth + 1)
 			end
@@ -85,7 +87,8 @@ function M.decode(text)
 			assert(DIRECTIONS[dir], "invalid preselection direction")
 			return { dir=dir, ratio=ratio(tonumber(value)) }
 		end
-		assert(next_token() == HEADER, "unsupported checkpoint version")
+		local header = next_token()
+		assert(header == HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
 		assert(next_token() == "P", "missing pending preselection")
 		local result = { states = {}, pending = read_presel() }
 		while pos < #tokens do
@@ -112,8 +115,18 @@ function M.decode(text)
 				local axis, split_ratio = next_token(), ratio(tonumber(next_token()))
 				assert(axis == "h" or axis == "v", "invalid axis")
 				local node = { t="split", axis=axis, ratio=split_ratio, presel=read_presel() }
+				local pull_focus = header == HEADER and next_token() or "-"
 				node.a, node.b = read_node(depth + 1), read_node(depth + 1)
 				assert(node.a and node.b, "split missing child")
+				if pull_focus ~= "-" then
+					node.pull_focus_id, node.pull_ids = integer(tonumber(pull_focus), 1), {}
+					local function collect(child)
+						if child.t == "leaf" then node.pull_ids[child.id] = true
+						else collect(child.a); collect(child.b) end
+					end
+					collect(node)
+					assert(node.pull_ids[node.pull_focus_id], "pull representative outside subtree")
+				end
 				return node
 			end
 			local tree = read_node(0)

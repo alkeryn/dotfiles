@@ -46,13 +46,16 @@ local last_store_error
 local selection_focus = false -- guard our own representative-window focus events
 local selection_tag = "bspwm_selected"
 local feedback_sink
+local prune_pull_sources
 local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
 local transferring = false -- also suppress checkpoints/feedback through final replay
 local monocle_display = require("lua/extensions/bspwm_monocle")
 local monocle = monocle_display.new()
 
 local function checkpoint()
-	if not state_store or rehydrating or transferring then return end
+	if rehydrating or transferring then return end
+	if prune_pull_sources then prune_pull_sources() end
+	if not state_store then return end
 	local ok, err = state_store:save(S, PEND)
 	if not ok and err ~= last_store_error then print("bspwm checkpoint: " .. tostring(err)) end
 	last_store_error = ok and nil or err
@@ -162,6 +165,52 @@ local function walk_splits(node, fn)
 	fn(node)
 	walk_splits(node.a, fn)
 	walk_splits(node.b, fn)
+end
+
+-- A visual selection is cleared when focus moves to the insertion target.
+-- Keep its logical node in focus history, instead of reducing it to the one
+-- representative window that Hyprland's history can store. Annotations travel
+-- with the node through swaps/transfers and are checkpointed with the tree.
+local function forget_pull_source(node)
+	node.pull_focus_id, node.pull_ids = nil, nil
+end
+
+local function forget_pull_sources_for_window(id)
+	for _, st in pairs(S) do
+		walk_splits(st.tree, function(node)
+			if node.pull_ids and node.pull_ids[id] then forget_pull_source(node) end
+		end)
+	end
+end
+
+local function remember_pull_source(st, node, focus_id)
+	-- Explicitly selecting a child or parent supersedes overlapping groups.
+	walk_splits(st.tree, function(other)
+		if other.pull_focus_id and (find_path(other, node) or find_path(node, other)) then
+			forget_pull_source(other)
+		end
+	end)
+	if node.t == "split" then
+		node.pull_focus_id, node.pull_ids = focus_id, {}
+		collect_ids(node, node.pull_ids)
+	end
+end
+
+prune_pull_sources = function()
+	for _, st in pairs(S) do
+		walk_splits(st.tree, function(node)
+			if not node.pull_focus_id then return end
+			local ids = {}
+			collect_ids(node, ids)
+			local expected = node.pull_ids or {}
+			local valid = ids[node.pull_focus_id] and expected[node.pull_focus_id]
+			for id in pairs(ids) do if not expected[id] then valid = false end end
+			for id in pairs(expected) do if not ids[id] then valid = false end end
+			-- A closed/floated member or an insertion/pointer swap inside the
+			-- group must not silently turn it into a different pull source.
+			if not valid then forget_pull_source(node) end
+		end)
+	end
 end
 
 -- ---------------------------------------------------------------------------
@@ -516,6 +565,9 @@ on_event("window.active", function(w, reason)
 	-- Re-notification of the same keyboard-focused representative is not a
 	-- new tree selection. An explicit click (FOCUS_REASON_CLICK = 5) is.
 	if st and st.selected_focus_id == w.stable_id and reason ~= 5 then return end
+	-- Focusing any member explicitly selects a leaf again. Focusing OUTSIDE
+	-- the group only clears its border, leaving it available as a pull source.
+	if w then forget_pull_sources_for_window(w.stable_id) end
 	local anchor
 	if st and not w.floating and not find_path(st.tree, w.stable_id) then
 		-- A newly mapped window can receive focus BEFORE its first layout pass.
@@ -530,6 +582,7 @@ on_event("monitor.focused", clear_selections)
 
 local function window_leaves_selection(w)
 	if not w or rehydrating or transferring then return end
+	forget_pull_sources_for_window(w.stable_id)
 	for _, st in pairs(S) do
 		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id
 			or st.insertion_window_id == w.stable_id then
@@ -578,6 +631,7 @@ on_event("config.props_refreshed", function()
 		if st.selected and (not find_path(st.tree, st.selected) or not active
 			or active.stable_id ~= st.selected_focus_id
 			or not find_path(st.selected, st.selected_focus_id)) then clear_selection(st) end
+		if st.selected then remember_pull_source(st, st.selected, st.selected_focus_id) end
 		if st.insertion_anchor and (not find_path(st.tree, st.insertion_anchor)
 			or not (live[id] and live[id][st.insertion_window_id])) then
 			st.insertion_anchor, st.insertion_window_id = nil, nil
@@ -844,7 +898,7 @@ local layout_impl = {
 
 		elseif cmd == "pull" then
 			if rehydrating or transferring or not fw.active then return true end
-			return pull(st, node, fw, ctx.area)
+			return pull(st, node, fw, ctx)
 
 		elseif cmd == "mode" then
 			st.mode = (st.mode == "monocle") and "tiled" or "monocle"
@@ -862,6 +916,7 @@ local layout_impl = {
 			local tid = find_path(target, fid) and fid or first_leaf(target).id
 			st.selected, st.selected_focus_id = target, tid
 			if tid ~= fid and not focus_id(tid) then clear_selection(st) end
+			if st.selected then remember_pull_source(st, target, tid) end
 			highlight_selection(st, ctx.targets)
 			return true
 
@@ -887,8 +942,10 @@ local function replay_transfer_contexts(contexts)
 end
 
 -- Original sxhkd: focused.automatic && node -n last.!automatic || node last.leaf -n focused
--- "automatic" means NO preselection, not newest; "last" is global focus history.
-pull = function(st, node, focused, area)
+-- Extend its last.leaf fallback to the previously selected logical node: native
+-- window history alone forgets a subtree as soon as the destination gets focus.
+pull = function(st, node, focused, context)
+	prune_pull_sources()
 	local candidates, windows = {}, {}
 	for _, w in ipairs(hl.get_windows()) do
 		local ws = w.workspace
@@ -932,9 +989,17 @@ pull = function(st, node, focused, area)
 		to = from
 		from = nil
 		for _, candidate in ipairs(candidates) do
-			local last = candidate.path[#candidate.path]
+			local last, representative = candidate.path[#candidate.path], candidate.window
+			for i = #candidate.path - 1, 1, -1 do
+				local group = candidate.path[i]
+				if group.pull_focus_id then
+					last, representative = group, windows[group.pull_focus_id]
+					break
+				end
+			end
 			if disjoint(last) then
-				from = { st = candidate.st, node = last, window = candidate.window }
+				if not representative then return "pull: selected subtree contains an unavailable window" end
+				from = { st = candidate.st, node = last, window = representative }
 				break
 			end
 		end
@@ -943,14 +1008,18 @@ pull = function(st, node, focused, area)
 
 	local moving = {}
 	for _, child in ipairs(leaves(from.node)) do
-		if not windows[child.id] then return true end -- stale/hidden/grouped subtree
+		if not windows[child.id] then return "pull: selected subtree contains an unavailable window" end
 		moving[#moving + 1] = windows[child.id]
 	end
 	local source_ws, dest_ws = from.window.workspace, to.window.workspace
 	local cross_workspace = source_ws.id ~= dest_ws.id
-	local contexts, failure = {}, nil
+	-- Keep the calling workspace's native targets even for a local transplant:
+	-- no native window.move callback will otherwise reflow it before follow.
+	local contexts, failure = { [focused.workspace.id] = context }, nil
+	-- Border-tag updates can synchronously recalculate on the SAME desktop,
+	-- too. Suppress intermediate selection events/checkpoints for both paths.
+	transferring, transfer_contexts = true, contexts
 	if cross_workspace then
-		transferring, transfer_contexts = true, contexts
 		-- Workspace objects stringify to their ID in this API, but negative
 		-- named/special IDs are parsed as relative selectors. Use their name.
 		local selector = dest_ws.id > 0 and dest_ws.id or "name:" .. dest_ws.name
@@ -966,32 +1035,39 @@ pull = function(st, node, focused, area)
 		if not ok then failure = "pull: " .. tostring(err) end
 	end
 
-	if not failure then
-		-- Commit only after native moves succeeded. Reuse the node so split
-		-- ratios, ages and its own preselections travel with it.
-		remove_leaf(from.st, from.node)
-		local dest_area = contexts[dest_ws.id] and contexts[dest_ws.id].area or area
-		place(to.st.tree, dest_area, {})
-		local pre = to.node.presel
-		to.node.presel = nil
-		insert_adjacent(to.st, from.node, to.node, pre and pre.dir, pre and pre.ratio)
-		for _, child in ipairs(leaves(from.node)) do to.st.seq = math.max(to.st.seq, child.n) end
-	end
-	clear_selection(from.st)
-	clear_selection(to.st)
-	-- Prune before replay/checkpointing: an empty source produces no native
-	-- callback, and a partially failed move must not leave duplicate leaves.
-	local live = {}
-	for _, w in ipairs(hl.get_windows()) do
-		if w.mapped and not w.floating and w.workspace and w.workspace.id == source_ws.id then live[w.stable_id] = true end
-	end
-	from.st.tree = prune_tree(from.st.tree, live)
-	if not from.st.tree then from.st.boxes = {} end
-	transfer_contexts = nil
+	local replay_ok, replay_error = pcall(function()
+		if not failure then
+			-- Commit only after native moves succeeded. Reuse the node so split
+			-- ratios, ages and its own preselections travel with it.
+			remove_leaf(from.st, from.node)
+			local dest_area = contexts[dest_ws.id] and contexts[dest_ws.id].area or context.area
+			place(to.st.tree, dest_area, {})
+			local pre = to.node.presel
+			to.node.presel = nil
+			insert_adjacent(to.st, from.node, to.node, pre and pre.dir, pre and pre.ratio)
+			for _, child in ipairs(leaves(from.node)) do to.st.seq = math.max(to.st.seq, child.n) end
+		end
+		clear_selection(from.st)
+		if to.st ~= from.st then clear_selection(to.st) end
+		-- Prune before replay/checkpointing: an empty source produces no native
+		-- callback, and a partially failed move must not leave duplicate leaves.
+		local live = {}
+		for _, w in ipairs(hl.get_windows()) do
+			if w.mapped and not w.floating and w.workspace and w.workspace.id == source_ws.id then live[w.stable_id] = true end
+		end
+		from.st.tree = prune_tree(from.st.tree, live)
+		if not from.st.tree then from.st.boxes = {} end
+		transfer_contexts = nil
 
-	-- Replay the latest native snapshots now that ALL windows have moved.
-	replay_transfer_contexts(contexts)
-	transferring = false
+		-- Apply the final geometry before focusing, including same-desktop
+		-- sends/pulls where no native moves generated layout callbacks.
+		replay_transfer_contexts(contexts)
+	end)
+	-- A rule/placement exception must not disable every later transfer.
+	transfer_contexts, transferring = nil, false
+	if not replay_ok then
+		failure = (failure and failure .. "; " or "pull: ") .. tostring(replay_error)
+	end
 	if not failure then
 		-- Move silently above, then focus ONCE after committing/replaying the
 		-- insertion. Focus the incoming node, not the old destination anchor.
@@ -1005,6 +1081,7 @@ pull = function(st, node, focused, area)
 			-- Workspace/monitor focus events clear selection. Restore the moved
 			-- subtree AFTER those events, retaining its original representative.
 			to.st.selected, to.st.selected_focus_id = from.node, active.stable_id
+			remember_pull_source(to.st, from.node, active.stable_id)
 			local targets = {}
 			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
 			highlight_selection(to.st, targets)
@@ -1154,6 +1231,7 @@ function M.move_to_workspace(selector)
 			-- Workspace/monitor focus notifications clear selection. Restore it
 			-- afterwards so another send/rotate/close still acts on the subtree.
 			to.selected, to.selected_focus_id = node, active.stable_id
+			remember_pull_source(to, node, active.stable_id)
 			local targets = {}
 			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
 			highlight_selection(to, targets)

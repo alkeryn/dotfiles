@@ -43,7 +43,7 @@ local function fixture()
 		-- CLuaTiledAlgorithm skips Lua callbacks when the target list is empty.
 		if #f.contexts[id].targets > 0 then provider.recalculate(f.snapshot(id)) end
 	end
-	function f.focus(id)
+	function f.focus(id, reason)
 		local window = f.windows[id]
 		for _, w in pairs(f.windows) do w.active = w == window end
 		local old_ws = f.active_ws
@@ -56,7 +56,7 @@ local function fixture()
 		for i, old in ipairs(f.history) do if old == id then table.remove(f.history, i); break end end
 		table.insert(f.history, 1, id)
 		for rank, wid in ipairs(f.history) do f.windows[wid].focus_history_id = rank - 1 end
-		f.emit("window.active", window)
+		f.emit("window.active", window, reason)
 	end
 	local function all_windows()
 		local result = {}
@@ -140,6 +140,7 @@ local function fixture()
 				end end,
 				window = setmetatable({ tag = function(opts) return function()
 					opts.window.tags[opts.tag:sub(2)] = opts.tag:sub(1, 1) == "+" or nil
+					if f.after_tag then f.after_tag(opts.window) end
 					return { ok = true }
 				end end, move = function(opts) return function()
 					local w, dest = opts.window or f.active, f.workspaces[tonumber(opts.workspace)]
@@ -199,9 +200,12 @@ local function fixture()
 		f.recalculate(ws.id); f.focus(id)
 		return window
 	end
+	function f.raw_message(message)
+		return provider.layout_msg(f.snapshot(f.active_ws.id), message)
+	end
 	function f.message(message)
 		local id = f.active_ws.id
-		local result = provider.layout_msg(f.snapshot(id), message)
+		local result = f.raw_message(message)
 		f.recalculate(id)
 		return result
 	end
@@ -214,6 +218,9 @@ local function fixture()
 		package.loaded["lua/extensions/bspwm"] = f.api
 		package.loaded["lua/helpers"] = nil
 		return require("lua/helpers")
+	end
+	function f.load_bindings()
+		f.helpers(); package.loaded["lua/bindings"] = nil; require("lua/bindings")
 	end
 	function f.leaf(id) return find(f.states[f.windows[id].workspace.id].tree, id) end
 	function f.box(id)
@@ -717,6 +724,339 @@ function tests.global_history_and_presels_work_after_reload()
 	f.consistent()
 	local restored = assert(codec.decode(f.saved))
 	assert(find(restored.states[1].tree, 2) and not restored.states[2].tree)
+end
+
+function tests.super_y_selected_send_on_same_desktop_reflows_before_focus()
+	local f = fixture()
+	for id = 1, 4 do f.open(id, 1) end
+	f.presel(1, "l", 0.3); f.focus(4); f.message("focus parent")
+	local selected = f.states[1].selected
+	f.helpers(); package.loaded["lua/bindings"] = nil; require("lua/bindings")
+	f.before_focus = function(w)
+		assert(w.stable_id == 4 and #f.moves == 0)
+		-- Detach (3,4), then insert it left of 1 as a single 30% subtree.
+		expect_box(f.box(3), 0, 0, 120, 900)
+		expect_box(f.box(4), 120, 0, 120, 900)
+	end
+	assert(f.binds["SUPER + y"]().ok, "selected send focused before applying the new geometry")
+	assert(f.states[1].tree.a.a == selected and f.states[1].selected == selected)
+	assert(f.windows[3].tags.bspwm_selected and f.windows[4].tags.bspwm_selected)
+	f.consistent()
+end
+
+function tests.super_y_same_desktop_defers_reentrant_tag_callbacks_and_checkpoints()
+	local f = fixture()
+	for id = 1, 4 do f.open(id, 1) end
+	f.presel(1, "l"); f.focus(4); f.message("focus parent")
+	f.load(codec.encode(f.states))
+	local before, selected = f.saved, f.states[1].selected
+	local early_checkpoint = false
+	f.after_tag = function(w)
+		if w.tags.bspwm_selected then return end -- only the intermediate deselection
+		f.recalculate(1)
+		if f.saved ~= before then early_checkpoint = true end
+	end
+	assert(f.pull() == true)
+	assert(not early_checkpoint, "tag recalculation exposed a partially updated selection checkpoint")
+	assert(f.states[1].selected == selected)
+	f.consistent()
+end
+
+function tests.super_y_subtree_placement_error_releases_transfer_guard()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2); f.presel(3, "l")
+	f.focus(2); f.message("focus parent")
+	f.throw_placement = true
+	local ok, result = pcall(f.raw_message, "pull")
+	f.throw_placement = nil
+	assert(ok and type(result) == "string", "placement error escaped instead of releasing the transfer guard")
+	assert(#f.focus_calls == 0, "failed placement must not trigger follow")
+	f.focus(2); f.recalculate(2); f.message("focus parent")
+	assert(f.api.move_to_workspace(1) == true, "failed Super+y left the layout permanently busy")
+	f.consistent()
+end
+
+for _, direction in ipairs({ "l", "r", "u", "d" }) do
+	tests["super_y_selected_send_consumes_target_presel_" .. direction] = function()
+		local f = fixture()
+		for id = 1, 4 do f.open(id, 1) end
+		-- A child's preselection must not make its selected parent manual.
+		f.presel(3, "u", 0.2); f.presel(1, direction, 0.3); f.focus(4)
+		f.load_bindings(); f.binds["SUPER + b"]()
+		local node, target = f.states[1].selected, f.leaf(1)
+		node.ratio = 0.37; f.recalculate(1)
+		local original = codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } })
+		assert(f.binds["SUPER + y"]().ok)
+		local wrapper = f.states[1].tree.a
+		assert(wrapper.ratio == 0.3 and wrapper.axis == ((direction == "l" or direction == "r") and "h" or "v"))
+		if direction == "l" or direction == "u" then assert(wrapper.a == node and wrapper.b == target)
+		else assert(wrapper.a == target and wrapper.b == node) end
+		assert(not target.presel and f.leaf(3).presel.ratio == 0.2)
+		assert(codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } }) == original)
+		assert(f.states[1].selected == node and f.active.stable_id == 4 and #f.focus_calls == 1 and #f.moves == 0)
+		for id = 1, 4 do assert((f.windows[id].tags.bspwm_selected == true) == (id >= 3)) end
+		f.consistent()
+	end
+end
+
+function tests.super_y_pulls_last_leaf_into_whole_selected_node_on_same_desktop()
+	local f = fixture()
+	for id = 1, 3 do f.open(id, 1) end
+	f.focus(1); f.focus(3); f.message("focus parent")
+	f.message("preselect u"); f.message("pratio 0.2")
+	local anchor, a, b = f.states[1].selected, f.leaf(2), f.leaf(3)
+	anchor.ratio = 0.37; f.recalculate(1)
+	f.before_focus = function(w)
+		assert(w.stable_id == 1 and #f.moves == 0)
+		expect_box(f.box(1), 0, 0, 1600, 180)
+		assert(anchor._box.y == 180 and anchor._box.h == 720)
+	end
+	f.load_bindings(); assert(f.binds["SUPER + y"]().ok)
+	assert(f.states[1].tree.b == anchor and anchor.a == a and anchor.b == b and anchor.ratio == 0.37)
+	assert(not anchor.presel and f.active.stable_id == 1 and not f.states[1].selected)
+	f.consistent()
+end
+
+function tests.super_y_automatic_selection_without_manual_target_pulls_external_last_leaf()
+	local f = fixture()
+	for id = 1, 3 do f.open(id, 1) end
+	f.focus(1); f.focus(3); f.message("focus parent")
+	local selected = f.states[1].selected
+	f.load_bindings(); assert(f.binds["SUPER + y"]().ok)
+	assert(f.states[1].tree.a == selected and f.states[1].tree.b.id == 1)
+	assert(f.active.stable_id == 1 and #f.moves == 0)
+	-- This source was an ordinary leaf, not a remembered group. The selected
+	-- destination remains an intact anchor.
+	assert(selected.a.id == 2 and selected.b.id == 3)
+	f.consistent()
+end
+
+function tests.super_y_root_with_only_internal_presels_is_noop()
+	local f = fixture()
+	for id = 1, 4 do f.open(id, 1) end
+	f.presel(3, "u"); f.focus(4)
+	for _ = 1, 3 do f.message("focus parent") end
+	local before = codec.encode(f.states)
+	f.load_bindings(); assert(f.binds["SUPER + y"]().ok)
+	assert(codec.encode(f.states) == before and #f.moves == 0 and #f.focus_calls == 0)
+	f.consistent()
+end
+
+function tests.super_y_sends_between_two_intact_subtrees_across_desktops()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.message("focus parent")
+	f.message("preselect r"); f.message("pratio 0.3")
+	local anchor = f.states[1].selected
+	anchor.ratio = 0.35; f.recalculate(1)
+	f.open(3, 2); f.open(4, 2); f.presel(3, "d", 0.2); f.focus(4)
+	f.load_bindings(); f.binds["SUPER + b"]()
+	local selected = f.states[2].selected
+	selected.ratio = 0.65; f.recalculate(2)
+	assert(f.binds["SUPER + y"]().ok)
+	assert(not f.states[2].tree and not next(f.states[2].boxes))
+	assert(f.states[1].tree.a == anchor and f.states[1].tree.b == selected and f.states[1].tree.ratio == 0.3)
+	assert(anchor.ratio == 0.35 and selected.ratio == 0.65 and not anchor.presel and f.leaf(3).presel.ratio == 0.2)
+	assert(f.states[1].selected == selected and f.active.stable_id == 4 and #f.focus_calls == 1 and #f.moves == 2)
+	for id = 1, 4 do assert((f.windows[id].tags.bspwm_selected == true) == (id >= 3)) end
+	f.consistent()
+end
+
+for _, operation in ipairs({ "swap", "desktop_move" }) do
+	tests["super_y_keeps_selection_after_" .. operation] = function()
+		local f = fixture()
+		for id = 1, 3 do f.open(id, 1) end
+		f.open(4, 2); f.presel(4, "u", 0.25); f.focus(3)
+		f.load_bindings(); f.binds["SUPER + b"]()
+		local selected = f.states[1].selected
+		if operation == "swap" then f.binds["SUPER + SHIFT + h"]()
+		else f.binds["SUPER + SHIFT + quotedbl"]() end
+		assert(f.states[f.active_ws.id].selected == selected)
+		local moves, focuses = #f.moves, #f.focus_calls
+		assert(f.binds["SUPER + y"]().ok)
+		assert(#f.moves == moves + 2 and #f.focus_calls == focuses + 1)
+		assert(f.states[2].tree.a == selected and f.states[2].selected == selected)
+		assert(f.windows[2].workspace.id == 2 and f.windows[3].workspace.id == 2)
+		assert(f.active.stable_id == 3 and f.windows[1].workspace.id == 1)
+		f.consistent()
+	end
+end
+
+function tests.super_y_moved_selection_checkpoint_survives_reload()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2); f.presel(3, "u", 0.3)
+	f.focus(2); f.message("focus parent")
+	f.load(codec.encode(f.states))
+	local before = f.saved
+	f.after_move = function() assert(f.saved == before, "partial transfer overwrote checkpoint") end
+	f.load_bindings(); assert(f.binds["SUPER + y"]().ok)
+	local saved = f.saved
+	assert(saved ~= before)
+	f.load(saved)
+	assert(f.saved == saved and not f.states[1].tree)
+	assert(f.states[2].selected == f.states[2].tree.a and f.states[2].selected_focus_id == 2)
+	assert(f.windows[1].tags.bspwm_selected and f.windows[2].tags.bspwm_selected and not f.windows[3].tags.bspwm_selected)
+	f.consistent()
+end
+
+for _, destination_ws in ipairs({ 1, 2 }) do
+	tests["super_y_pulls_previously_selected_subtree_to_focused_destination_" .. destination_ws] = function()
+		local f = fixture()
+		f.open(1, 1); f.open(2, 1); f.open(3, 1)
+		-- Open the destination beside 1, not inside the source pair (2,3).
+		f.focus(1); f.open(4, destination_ws); f.focus(3)
+		f.load_bindings(); f.binds["SUPER + b"]()
+		local selected = f.states[1].selected
+		assert(find(selected, 2) and find(selected, 3) and not find(selected, 4))
+		local a, b, ratio = selected.a, selected.b, selected.ratio
+		f.focus(4)
+		assert(not f.states[1].selected, "visual selection should clear on destination focus")
+		f.binds["SUPER + CTRL + h"]() -- preselect left at the destination
+		assert(f.binds["SUPER + y"]().ok)
+		local dest = f.states[destination_ws]
+		assert(dest.selected == selected, "Super+y pulled a leaf instead of the previously selected subtree")
+		assert(selected.a == a and selected.b == b and selected.ratio == ratio)
+		assert(f.windows[2].workspace.id == destination_ws and f.windows[3].workspace.id == destination_ws)
+		assert(f.active.stable_id == 3 and f.windows[2].tags.bspwm_selected and f.windows[3].tags.bspwm_selected)
+		assert(not f.windows[1].tags.bspwm_selected and not f.windows[4].tags.bspwm_selected)
+		assert(#f.moves == (destination_ws == 1 and 0 or 2))
+		f.consistent()
+	end
+end
+
+function tests.super_y_pulls_remembered_group_without_destination_preselection()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2)
+	f.focus(2); f.message("focus parent")
+	local selected = f.states[1].selected
+	f.emit("window.active", f.windows[2]) -- duplicate representative notification
+	f.focus(3); f.load_bindings()
+	assert(f.binds["SUPER + y"]().ok)
+	assert(f.states[2].tree.b == selected and f.states[2].selected == selected)
+	assert(not f.states[1].tree and f.active.stable_id == 2 and #f.moves == 2)
+	f.consistent()
+end
+
+function tests.super_y_pulls_remembered_group_into_another_selected_group()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2); f.open(4, 2)
+	f.focus(2); f.message("focus parent")
+	local source = f.states[1].selected
+	f.focus(4); f.message("focus parent"); f.message("preselect u"); f.message("pratio 0.3")
+	local anchor = f.states[2].selected
+	assert(f.pull() == true)
+	assert(f.states[2].tree.a == source and f.states[2].tree.b == anchor and f.states[2].tree.ratio == 0.3)
+	assert(f.states[2].selected == source and not f.states[1].tree and f.active.stable_id == 2)
+	assert(source.a.id == 1 and source.b.id == 2 and anchor.a.id == 3 and anchor.b.id == 4)
+	f.consistent()
+end
+
+function tests.super_y_newer_single_window_beats_an_older_remembered_group()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2); f.open(4, 3)
+	f.focus(2); f.message("focus parent")
+	local group = f.states[1].selected
+	f.focus(3); f.presel(4, "l")
+	assert(f.pull() == true)
+	assert(f.windows[3].workspace.id == 3 and #f.moves == 1)
+	assert(f.states[1].tree == group and f.windows[1].workspace.id == 1 and f.windows[2].workspace.id == 1)
+	f.consistent()
+end
+
+for _, cancellation in ipairs({ "member", "click", "first", "second" }) do
+	tests["super_y_explicit_leaf_focus_cancels_remembered_group_" .. cancellation] = function()
+		local f = fixture()
+		f.open(1, 1); f.open(2, 1); f.open(3, 2)
+		f.focus(2); f.message("focus parent")
+		local selected = f.states[1].selected
+		local expected = 2
+		if cancellation == "member" then f.focus(1); expected = 1
+		elseif cancellation == "click" then f.focus(2, 5)
+		else f.message("focus " .. cancellation); expected = cancellation == "first" and 1 or 2 end
+		assert(not selected.pull_focus_id)
+		f.presel(3, "l")
+		assert(f.pull() == true)
+		assert(#f.moves == 1 and f.moves[1].window.stable_id == expected)
+		assert(f.windows[expected].workspace.id == 2 and f.windows[3 - expected].workspace.id == 1)
+		f.consistent()
+	end
+end
+
+function tests.super_y_changed_membership_invalidates_remembered_group()
+	local f = fixture()
+	for id = 1, 4 do f.open(id, 1) end
+	f.message("focus parent"); f.message("focus parent")
+	local selected = f.states[1].selected
+	f.focus(1)
+	assert(selected.pull_focus_id == 4)
+	f.message("pointer_swap 1 3")
+	assert(not selected.pull_focus_id, "pointer swap left a remembered group with different members")
+	f.consistent()
+end
+
+function tests.super_y_unavailable_member_does_not_fall_back_to_one_leaf()
+	for _, member in ipairs({ 1, 2 }) do
+		for _, kind in ipairs({ "hidden", "group" }) do
+			local f = fixture()
+			f.open(1, 1); f.open(2, 1); f.open(3, 2)
+			f.focus(2); f.message("focus parent")
+			local selected = f.states[1].selected
+			f.presel(3, "l")
+			f.windows[member][kind] = kind == "group" and {} or true
+			local result = f.pull()
+			assert(type(result) == "string" and result:find("unavailable window"))
+			assert(#f.moves == 0 and f.states[1].tree == selected and f.leaf(3).presel)
+			f.windows[member][kind] = nil
+			assert(f.pull() == true and f.states[2].selected == selected and #f.moves == 2)
+			f.consistent()
+		end
+	end
+end
+
+for _, operation in ipairs({ "swap", "desktop_move" }) do
+	tests["super_y_remembers_source_after_" .. operation] = function()
+		local f = fixture()
+		f.open(1, 1); f.open(2, 1); f.open(3, 1); f.open(4, 2)
+		f.focus(3); f.load_bindings(); f.binds["SUPER + b"]()
+		local selected = f.states[1].selected
+		if operation == "swap" then f.binds["SUPER + SHIFT + h"]()
+		else f.binds["SUPER + SHIFT + quotedbl"]() end
+		f.presel(4, "u", 0.25)
+		local moves = #f.moves
+		assert(f.binds["SUPER + y"]().ok)
+		assert(#f.moves == moves + 2 and f.states[2].selected == selected and f.states[2].tree.a == selected)
+		assert(f.active.stable_id == 3 and f.windows[1].workspace.id == 1)
+		f.consistent()
+	end
+end
+
+function tests.super_y_remembered_source_survives_reload_with_destination_focused()
+	local f = fixture()
+	f.open(1, 1); f.open(2, 1); f.open(3, 2)
+	f.focus(2); f.message("focus parent")
+	f.presel(3, "l", 0.3)
+	assert(not f.states[1].selected and f.states[1].tree.pull_focus_id == 2)
+	local saved = codec.encode(f.states)
+	f.load(saved)
+	assert(f.saved == saved and not f.states[1].selected and f.states[1].tree.pull_focus_id == 2)
+	local selected = f.states[1].tree
+	f.load_bindings(); assert(f.binds["SUPER + y"]().ok)
+	assert(f.states[2].selected == selected and not f.states[1].tree and #f.moves == 2)
+	f.consistent()
+end
+
+function tests.super_y_closed_member_does_not_restore_stale_source_after_reload()
+	local f = fixture()
+	for id = 1, 3 do f.open(id, 1) end
+	f.open(4, 2); f.focus(3); f.message("focus parent"); f.message("focus parent")
+	f.presel(4, "l")
+	local saved = codec.encode(f.states)
+	f.windows[2].mapped = false
+	table.remove(f.contexts[1].targets, 2)
+	f.load(saved)
+	assert(not f.states[1].tree.pull_focus_id, "closed member left a stale remembered group")
+	assert(f.pull() == true and #f.moves == 1 and f.windows[3].workspace.id == 2)
+	assert(f.windows[1].workspace.id == 1)
+	f.consistent()
 end
 
 function tests.super_y_binding_reaches_global_pull()
