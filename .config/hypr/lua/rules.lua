@@ -61,6 +61,17 @@ hl.window_rule({
 	float = true,
 })
 
+-- Tiled Alacritty must sample the live background, not Hyprland 0.56.2's
+-- cached wallpaper blur (which can retain a startup frame until config reload).
+-- Explicit per-window xray=false bypasses that cache; global blur.xray=false
+-- alone does not. Keep blur/terminal opacity and other apps' optimizations.
+-- Include --class floating when that terminal is subsequently tiled.
+hl.window_rule({
+	name  = "alacritty-live-blur",
+	match = { class = "(?i)^(alacritty|floating)$", float = false },
+	xray  = false,
+})
+
 -- ---------------------------------------------------------------------------
 -- app rules (bspc rule translation)
 -- ---------------------------------------------------------------------------
