@@ -1,4 +1,4 @@
--- helpers.lua -- shared helper functions (focus, swap, resize, gaps, monitors)
+-- helpers.lua -- shared helper functions (window state, focus, swap, resize, gaps, monitors)
 -- ============================================================================
 -- Module: returns the helpers table. Requires lua/vars.
 -- ============================================================================
@@ -8,6 +8,33 @@
 local vars = require("lua/vars")
 
 local H = {}
+
+-- ---------------------------------------------------------------------------
+-- explicit window states (bspc node -t), never toggles
+-- ---------------------------------------------------------------------------
+
+function H.set_window_state(state)
+	local w = hl.get_active_window()
+	if not w or w.mapped == false then return end
+
+	local fullscreen = state == "fullscreen"
+	-- Clear both compositor and client fullscreen/maximized modes before
+	-- changing float state: Hyprland otherwise restores fullscreen afterward.
+	-- Don't leave/re-enter fullscreen on repeated Super+f.
+	if not fullscreen or w.floating then
+		hl.dispatch(hl.dsp.window.fullscreen_state({
+			internal = 0, client = 0, action = "set", layout_aware = false, window = w,
+		}))
+	end
+	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = w }))
+	hl.dispatch(hl.dsp.window.float({ action = state == "floating" and "on" or "off", window = w }))
+	if fullscreen then
+		-- fullscreen_state uses 2 for full fullscreen (1 is maximized).
+		hl.dispatch(hl.dsp.window.fullscreen_state({
+			internal = 2, client = 2, action = "set", layout_aware = false, window = w,
+		}))
+	end
+end
 
 -- ---------------------------------------------------------------------------
 -- focus history (super + {parenright,equal} -> older/newer)

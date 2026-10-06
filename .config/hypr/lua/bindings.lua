@@ -110,11 +110,11 @@ hl.bind("SUPER + i",                   hl.dsp.layout("flip v"))
 hl.bind("SUPER + ALT + b",             hl.dsp.layout("balance"))
 hl.bind("SUPER + CTRL + b",            hl.dsp.layout("equalize"))
 
--- set the window state (bspc node -t {tiled,floating,fullscreen,pseudo_tiled})
-hl.bind("SUPER + s",                   hl.dsp.window.float({ action = "off" }))
-hl.bind("SUPER + d",                   hl.dsp.window.float({ action = "toggle" }))
-hl.bind("SUPER + f",                   hl.dsp.window.fullscreen())
-hl.bind("SUPER + t",                   hl.dsp.window.pseudo())
+-- Set mutually exclusive states, overriding fullscreen/float/pseudo rather than toggling.
+hl.bind("SUPER + s",                   function() helpers.set_window_state("tiled") end)
+hl.bind("SUPER + d",                   function() helpers.set_window_state("floating") end)
+hl.bind("SUPER + f",                   function() helpers.set_window_state("fullscreen") end)
+hl.bind("SUPER + t",                   function() helpers.set_window_state("pseudo_tiled") end)
 
 -- set the node flags
 -- bspc node -g locked  -> no equivalent (unavailable)
