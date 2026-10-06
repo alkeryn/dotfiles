@@ -27,8 +27,13 @@ hl.bind("SUPER + SHIFT + z",      hl.dsp.exec_cmd("cliphist decode | wl-copy"))
 -- Lock
 hl.bind("SUPER + a",              hl.dsp.exec_cmd("hyprlock"))  -- was: sh ~/bin/lock (scrot+i3lock, X11 only)
 
+-- Binds marked { repeating = true } fire again while held (keyboard repeat:
+-- input.repeat_delay / input.repeat_rate). sxhkd did this for every key; the
+-- previous attempt kept it (binde) on the terminal/file manager, focus, swap,
+-- preselect, workspace move, close/kill and resize binds -- same set here.
+
 -- Terminal
-hl.bind("SUPER + space",          hl.dsp.exec_cmd(terminal))
+hl.bind("SUPER + space",          hl.dsp.exec_cmd(terminal), { repeating = true })
 hl.bind("SUPER + ALT + space",    hl.dsp.exec_cmd(terminal .. " --class floating"))
 
 -- Music
@@ -42,7 +47,7 @@ hl.bind("SUPER + SHIFT + Return", hl.dsp.exec_cmd("rofi -terminal alacritty -mod
 hl.bind("SUPER + Tab",            hl.dsp.exec_cmd("rofi -show window"))
 
 -- Ranger
-hl.bind("SUPER + e",              hl.dsp.exec_cmd("bash -c 'source ~/bin/shell/env; " .. terminal .. " -e ranger'"))
+hl.bind("SUPER + e",              hl.dsp.exec_cmd("bash -c 'source ~/bin/shell/env; " .. terminal .. " -e ranger'"), { repeating = true })
 
 -- Sound / media
 hl.bind("XF86AudioStop",          hl.dsp.exec_cmd("playerctl -p playerctld pause"), { locked = true })
@@ -81,8 +86,8 @@ end
 
 -- quit bspwm / close and kill
 hl.bind("SUPER + CTRL + ALT + Escape", hl.dsp.exit())
-hl.bind("SUPER + x",                   hl.dsp.window.close())
-hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill())
+hl.bind("SUPER + x",                   hl.dsp.window.close(), { repeating = true })
+hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill(), { repeating = true })
 
 -- alternate between the tiled and monocle layout (bspc desktop -l next)
 hl.bind("SUPER + v",                   hl.dsp.layout("mode"))
@@ -123,10 +128,10 @@ for key, dir in pairs(DIRS) do
 end
 
 -- focus the node for the given path jump (bspc node -f @{parent,brother,first,second})
-hl.bind("SUPER + b",                   hl.dsp.layout("focus parent"))
-hl.bind("SUPER + n",                   hl.dsp.layout("focus brother"))
-hl.bind("SUPER + colon",               hl.dsp.layout("focus first"))
-hl.bind("SUPER + exclam",              hl.dsp.layout("focus second"))
+hl.bind("SUPER + b",                   hl.dsp.layout("focus parent"), { repeating = true })
+hl.bind("SUPER + n",                   hl.dsp.layout("focus brother"), { repeating = true })
+hl.bind("SUPER + colon",               hl.dsp.layout("focus first"), { repeating = true })
+hl.bind("SUPER + exclam",              hl.dsp.layout("focus second"), { repeating = true })
 
 -- focus last (bspc node -f last / bspc {node,desktop} -f last)
 hl.bind("SUPER + q",                   helpers.focus_last)
@@ -138,10 +143,10 @@ hl.bind("SUPER + c",                   hl.dsp.window.cycle_next())
 hl.bind("SUPER + ALT + c",             hl.dsp.window.cycle_next({ next = false }))
 
 -- focus/send/swap next/prev desktop (dead_circumflex / dollar)
-hl.bind("SUPER + dead_circumflex",              hl.dsp.focus({ workspace = "m-1" }))
-hl.bind("SUPER + dollar",                       hl.dsp.focus({ workspace = "m+1" }))
-hl.bind("SUPER + SHIFT + dead_circumflex",      hl.dsp.window.move({ workspace = "m-1", follow = true }))
-hl.bind("SUPER + SHIFT + dollar",               hl.dsp.window.move({ workspace = "m+1", follow = true }))
+hl.bind("SUPER + dead_circumflex",              hl.dsp.focus({ workspace = "m-1" }), { repeating = true })
+hl.bind("SUPER + dollar",                       hl.dsp.focus({ workspace = "m+1" }), { repeating = true })
+hl.bind("SUPER + SHIFT + dead_circumflex",      hl.dsp.window.move({ workspace = "m-1", follow = true }), { repeating = true })
+hl.bind("SUPER + SHIFT + dollar",               hl.dsp.window.move({ workspace = "m+1", follow = true }), { repeating = true })
 hl.bind("SUPER + ALT + dead_circumflex",        function() helpers.swap_workspace_rel(-1) end)
 hl.bind("SUPER + ALT + dollar",                 function() helpers.swap_workspace_rel(1) end)
 
@@ -163,10 +168,10 @@ end
 hl.bind("SUPER + SHIFT + m",           hl.dsp.window.bring_to_top())
 
 -- Preselect the direction (bspc node -p {west,south,north,east})
-hl.bind("SUPER + CTRL + h",            hl.dsp.layout("preselect l"))
-hl.bind("SUPER + CTRL + j",            hl.dsp.layout("preselect d"))
-hl.bind("SUPER + CTRL + k",            hl.dsp.layout("preselect u"))
-hl.bind("SUPER + CTRL + l",            hl.dsp.layout("preselect r"))
+hl.bind("SUPER + CTRL + h",            hl.dsp.layout("preselect l"), { repeating = true })
+hl.bind("SUPER + CTRL + j",            hl.dsp.layout("preselect d"), { repeating = true })
+hl.bind("SUPER + CTRL + k",            hl.dsp.layout("preselect u"), { repeating = true })
+hl.bind("SUPER + CTRL + l",            hl.dsp.layout("preselect r"), { repeating = true })
 
 -- preselect the ratio (bspc node -o 0.{1-9})
 local RATIO_KEYS = { "ampersand", "eacute", "quotedbl", "apostrophe", "parenleft",
@@ -176,7 +181,7 @@ for i, key in ipairs(RATIO_KEYS) do
 end
 
 -- cancel preselection (node / desktop)
-hl.bind("SUPER + CTRL + space",              hl.dsp.layout("preselect cancel"))
+hl.bind("SUPER + CTRL + space",              hl.dsp.layout("preselect cancel"), { repeating = true })
 hl.bind("SUPER + CTRL + SHIFT + space",      hl.dsp.layout("preselect clear"))
 
 -- Move/resize (bspc node -z / -v)
