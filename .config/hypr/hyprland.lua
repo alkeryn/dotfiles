@@ -28,41 +28,62 @@ do
 	end
 end
 
-local GAPS   = PC == "mainpc" and 8 or 12   -- bspwm window_gap
+local GAPS   = 4   -- previous attempt: gaps_in 4, gaps_out 8 (bspwm window_gap 8)
+local GAPS_OUT = 8
 local BORDER = PC == "mainpc" and 1 or 2    -- bspwm border_width
 local FLOAT_STEP = PC == "mainpc" and 20 or 40
 
--- monitor names -- ADJUST THESE (hyprctl monitors)
-local M1 = "DP-1"   -- primary:   tags 1-4
-local M2 = "DP-2"   -- secondary: tags 5-10
+-- monitor names from the hyprland-branch attempt (real hardware)
+-- left: HDMI-A-2 (4K), main: DP-4 (4K@244, 10bit, HDR)
+local M1 = "HDMI-A-2"   -- left:      tags 1-4
+local M2 = "DP-4"       -- main:      tags 5-10
 
 -- ---------------------------------------------------------------------------
--- monitors + HDR
+-- monitors + HDR (tuned on the previous attempt)
 -- ---------------------------------------------------------------------------
--- cm="hdr": output in HDR; SDR content tonemapped (tune sdrbrightness below).
--- render:cm_auto_hdr (default 1) auto-flips HDR on/off per fullscreen app,
--- so a plain SDR desktop works too. Per-window opt-out: window rule
--- no_auto_hdr = true.
---
--- If your panel lies about HDR in EDID (DisplayID 2.0), use cm = "hdredid".
+-- Previous attempt kept the output SDR by default and relied on
+-- render:cm_auto_hdr to flip HDR when a fullscreen app requests it -- so the
+-- SDR desktop never pays an HDR penalty. supports_hdr/supports_wide_color=1
+-- force-enables the EDID capability claims (use -1 = trust EDID if unsure).
+-- Fractional scales were rejected on that attempt ("blurry mess"): scale stays
+-- 1, xwayland force_zero_scaling + QT_FONT_DPI compensate instead.
 
 local function add_monitor(opts)
 	if PC == "mainpc" then
-		opts.cm            = "hdr"
-		opts.bitdepth      = 10
-		opts.sdrbrightness = 1.2 -- raise if SDR content looks dim under HDR
-		opts.sdrsaturation = 1.0
+		hl.monitor({
+			output             = M1,
+			mode               = "3840x2160",
+			position           = "0x0",
+			scale              = 1,
+		})
+		hl.monitor({
+			output             = M2,
+			mode               = "3840x2160@244",
+			position           = "3840x0",
+			scale              = 1,
+			bitdepth           = 10,
+			supports_wide_color = 1,
+			supports_hdr       = 1,
+			-- sdrbrightness = 1.2, -- raise if SDR looks dim under HDR output
+		})
+	else
+		hl.monitor(opts)
 	end
-	hl.monitor(opts)
 end
 
-add_monitor({ output = M1, mode = "preferred", position = "auto", scale = PC == "laptop" and 1.5 or 1 })
+add_monitor({ output = M1, mode = "preferred", position = "auto", scale = 1 })
 add_monitor({ output = M2, mode = "preferred", position = "auto-left", scale = 1 })
 
 hl.config({
 	render = {
 		cm_enabled = true,
 		cm_auto_hdr = 1,      -- auto HDR when a fullscreen app requests it
+		direct_scanout = 1,   -- previous attempt: direct_scanout = true
+		-- cm_fs_passthrough: existed on the old build, gone in v0.56.2 --
+		-- cm_auto_hdr + surface-driven metadata cover it.
+	},
+	xwayland = {
+		force_zero_scaling = true, -- with scale 1 + QT_FONT_DPI below
 	},
 })
 
@@ -73,24 +94,40 @@ hl.config({
 hl.config({
 	general = {
 		gaps_in     = GAPS,
-		gaps_out    = GAPS,
+		gaps_out    = GAPS_OUT,
 		border_size = BORDER,
 		layout      = "lua:bspwm",
 
 		col = {
 			-- focused_border_color #bb0000 / normal_border_color #500000
-			active_border   = "rgba(bb0000ff)",
-			inactive_border = "rgba(500000ff)",
+			active_border   = "rgb(bb0000)",
+			inactive_border = "rgb(500000)",
 		},
-		resize_on_border = true,
+		resize_on_border  = false,          -- previous attempt tuning
+		allow_tearing     = false,
+		no_focus_fallback = true,           -- like bspwm: no focus jump when nothing in direction
 	},
 
 	decoration = {
 		rounding = 0, -- bspwm look: square corners
-		shadow = { enabled = false },
-		blur = { enabled = false }, -- picom replacement if wanted: enabled = true
+		active_opacity   = 1.0,
+		inactive_opacity = 1.0,
+		-- previous attempt kept picom-like depth: shadow + blur on
+		shadow = {
+			enabled      = true,
+			range        = 4,
+			render_power = 3,
+			color        = "rgba(1a1a1aee)",
+		},
+		blur = {
+			enabled  = true,
+			size     = 3,
+			passes   = 1,
+			vibrancy = 0.1696,
+		},
 	},
 
+	-- previous attempt: animations off except workspace fade
 	animations = {
 		enabled = true,
 	},
@@ -98,18 +135,36 @@ hl.config({
 	input = {
 		kb_layout  = "fr",                  -- setxkbmap fr
 		kb_options = "lv3:caps_switch",     -- setxkbmap -option lv3:caps_switch
-		repeat_rate  = 250,                 -- xset r rate 250 75
+		-- NOTE: the previous attempt had these inverted (75/250); sxhkd used
+		-- xset r rate 250 75 = 250 cps, 75 ms delay
+		repeat_rate  = 250,
 		repeat_delay = 75,
 		numlock_by_default = true,          -- numlockx on
-		follow_mouse = 0,                   -- click_to_focus button1
+		follow_mouse = 2,                   -- previous attempt tuning (was 0 here)
+		float_switch_override_focus = 0,
+		sensitivity = 0,
+		touchpad = { natural_scroll = false },
+	},
+
+	cursor = {
+		no_warps = true,                    -- previous attempt
+		default_monitor = M2,
 	},
 
 	misc = {
-		disable_hyprland_logo = true,
 		force_default_wallpaper = -1,
+		disable_hyprland_logo = false,
+		mouse_move_focuses_monitor = false, -- previous attempt
+		key_press_enables_dpms = true,      -- wake on key press with dpms off
 		cursor_inactive_timeout = PC == "laptop" and 3 or 0, -- unclutter -t 3
 	},
 })
+
+-- env (from the previous attempt)
+hl.env("XCURSOR_SIZE", "24")
+hl.env("HYPRCURSOR_SIZE", "24")
+hl.env("XCURSOR_THEME", "capitaine-cursors")
+hl.env("QT_FONT_DPI", "120")
 
 -- ---------------------------------------------------------------------------
 -- autostart (replaces ~/.config/bspwm/scripts/autostart)
@@ -122,16 +177,24 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd("dunst")                                      -- notification daemon
 	hl.exec_cmd("wl-paste --watch cliphist store")            -- clipboard history
 
+	-- from the previous attempt's autorun.conf
 	if PC == "mainpc" then
 		hl.exec_cmd("ckb-next -b")
 		hl.exec_cmd("conky -q")                               -- XWayland
 		hl.exec_cmd("signal-desktop")
+		-- last-window-close refocus bug workaround (socket2 watcher)
+		hl.exec_cmd("$HOME/.config/hypr/scripts/close_refocus_fix")
+	else
+		hl.exec_cmd("signal-desktop")
 	end
+	hl.exec_cmd("xrdb -merge ~/.Xresources")                  -- XWayland resources
 
 	hl.exec_cmd("nm-applet")
 	hl.exec_cmd("sh -c 'pkill -x mpd; mpd; mpDris2'")
 	hl.exec_cmd("megasync")
 end)
+
+-- hyprctl setcursor is superseded by XCURSOR_THEME/XCURSOR_SIZE env above
 
 -- wallpaper: ~/.wall lock -> hyprpaper config (~/.config/hypr/hyprpaper.conf):
 --   splash = false
@@ -249,8 +312,31 @@ hl.on("monitor.added", function() apply_monitor_layout() end)
 hl.on("monitor.removed", function() apply_monitor_layout() end)
 
 -- ---------------------------------------------------------------------------
--- window rules (bspc rule translation)
+-- window rules (bspc rule translation + previous attempt's rules.conf)
 -- ---------------------------------------------------------------------------
+
+-- smart gaps / no gaps when only (from the previous attempt's rules.conf)
+hl.workspace_rule({ workspace = "w[tv1]", gaps_in = 0, gaps_out = 0 })
+hl.workspace_rule({ workspace = "f[1]",   gaps_in = 0, gaps_out = 0 })
+hl.window_rule({
+	name        = "no-gaps-wtv1",
+	match       = { float = false, workspace = "w[tv1]" },
+	border_size = 0,
+	rounding    = 0,
+})
+hl.window_rule({
+	name        = "no-gaps-f1",
+	match       = { float = false, workspace = "f[1]" },
+	border_size = 0,
+	rounding    = 0,
+})
+
+-- ignore maximize requests from all apps (previous attempt kept this)
+hl.window_rule({
+	name           = "suppress-maximize-events",
+	match          = { class = ".*" },
+	suppress_event = "maximize",
+})
 
 hl.window_rule({
 	name  = "fix-xwayland-drags",
@@ -323,12 +409,14 @@ hl.bind("SUPER + SHIFT + z",      hl.dsp.exec_cmd("cliphist decode | wl-copy"))
 -- Lock
 hl.bind("SUPER + a",              hl.dsp.exec_cmd("sh ~/bin/lock"))
 
--- Terminal
-hl.bind("SUPER + space",          hl.dsp.exec_cmd("alacritty"))
-hl.bind("SUPER + ALT + space",    hl.dsp.exec_cmd("alacritty --class floating"))
+-- Terminal (previous attempt: alacritty font bumped to 11 on hyprland to
+-- match bspwm's 9pt physical size at scale 1 on 4K)
+local terminal = "alacritty --option font.size=11"
+hl.bind("SUPER + space",          hl.dsp.exec_cmd(terminal))
+hl.bind("SUPER + ALT + space",    hl.dsp.exec_cmd(terminal .. " --class floating"))
 
 -- Music
-hl.bind("SUPER + p",              hl.dsp.exec_cmd("alacritty -e ncmpcpp"))
+hl.bind("SUPER + p",              hl.dsp.exec_cmd(terminal .. " -e ncmpcpp"))
 
 -- Rofi
 hl.bind("SUPER + Return",         hl.dsp.exec_cmd("rofi -terminal alacritty -show drun"))
@@ -338,7 +426,7 @@ hl.bind("SUPER + SHIFT + Return", hl.dsp.exec_cmd("rofi -terminal alacritty -mod
 hl.bind("SUPER + Tab",            hl.dsp.exec_cmd("rofi -show window"))
 
 -- Ranger
-hl.bind("SUPER + e",              hl.dsp.exec_cmd("bash -c 'source ~/bin/shell/env; alacritty -e ranger'"))
+hl.bind("SUPER + e",              hl.dsp.exec_cmd("bash -c 'source ~/bin/shell/env; " .. terminal .. " -e ranger'"))
 
 -- Sound / media
 hl.bind("XF86AudioStop",          hl.dsp.exec_cmd("playerctl -p playerctld pause"), { locked = true })
@@ -410,9 +498,10 @@ hl.bind("SUPER + CTRL + x",            hl.dsp.window.pin())          -- -g stick
 -- bspc node -g urgent  -> no equivalent (client-driven only)
 
 -- Focus/swap (bspc node -f/-s west|south|north|east + monitor fallback)
+-- previous attempt used binde (hold-to-repeat) on these
 for d, key in pairs({ h = "h", j = "j", k = "k", l = "l" }) do
-	hl.bind("SUPER + " .. key, function() focus_dir(d) end)
-	hl.bind("SUPER + SHIFT + " .. key, function() swap_dir(d) end)
+	hl.bind("SUPER + " .. key, function() focus_dir(d) end, { repeating = true })
+	hl.bind("SUPER + SHIFT + " .. key, function() swap_dir(d) end, { repeating = true })
 end
 
 -- focus the node for the given path jump (bspc node -f @{parent,brother,first,second})
@@ -473,10 +562,12 @@ hl.bind("SUPER + CTRL + space",              hl.dsp.layout("preselect cancel"))
 hl.bind("SUPER + CTRL + SHIFT + space",      hl.dsp.layout("preselect clear"))
 
 -- Move/resize (bspc node -z / -v)
+-- previous attempt used resizeactiveedge (removed in v0.56.2); the bspwm
+-- layout's grow/shrink adjusts the owning ancestor split instead
 local RESIZE_KEYS = { h = "l", j = "d", k = "u", l = "r" }
 for key, d in pairs(RESIZE_KEYS) do
-	hl.bind("SUPER + ALT + " .. key,            hl.dsp.layout("grow " .. d .. " 20"))
-	hl.bind("SUPER + ALT + CTRL + " .. key,     hl.dsp.layout("shrink " .. d .. " 20"))
+	hl.bind("SUPER + ALT + " .. key,            hl.dsp.layout("grow " .. d .. " 20"), { repeating = true })
+	hl.bind("SUPER + ALT + CTRL + " .. key,     hl.dsp.layout("shrink " .. d .. " 20"), { repeating = true })
 end
 
 -- move a floating window
@@ -514,6 +605,13 @@ for mods, list in pairs(SOUNDS) do
 end
 hl.bind("SUPER + KP_Insert",     hl.dsp.exec_cmd("pkill paplay"))
 
--- mouse: move/resize
+-- mouse: move/resize. Previous attempt swapped windows by dragging
+-- (bindm swapwindow) -- that mouse mode no longer exists in v0.56.2
+-- (MBIND is move/resize only), so SUPER-drag now moves like stock.
 hl.bind("SUPER + mouse:272",     hl.dsp.window.drag(), { mouse = true })
+hl.bind("SUPER + CTRL + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind("SUPER + mouse:273",     hl.dsp.window.resize(), { mouse = true })
+
+-- mouse scroll workspace nav (from previous attempt)
+hl.bind("SUPER + mouse_down",    hl.dsp.focus({ workspace = "e+1" }))
+hl.bind("SUPER + mouse_up",      hl.dsp.focus({ workspace = "e-1" }))

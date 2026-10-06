@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# this is realy stupid but whenever the last window of a workspace is closed, hyprland will focus to wherever the cursor is, it's focusing back to the previous monitor
+socat -U - UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock | \
+	stdbuf -oL sed -n '/close\(window\|layer\).*/{N;/\nfocusedmon/{s/\n/ -> /p;}}' |\
+	while read -r line; do
+		echo $line
+		hyprctl dispatch focusmonitor -1;
+	done
