@@ -10,9 +10,9 @@
 -- multi-monitor setup that can be a window on another monitor, stealing both
 -- keyboard focus and the monitor where new windows open.
 --
--- Fix, in two phases (see git history for why close-time pre-emption fails:
--- the workspace round-trip back re-focuses the dying window via
--- workspace->getLastFocusedWindow() and undoes itself):
+-- Fix, in two phases. Close-time pre-emption fails because the workspace
+-- round-trip re-focuses the dying window via getLastFocusedWindow(), undoing
+-- the correction:
 --   1. window.close records the workspace that just emptied (focused close).
 --   2. The cursor fallback's own focus change emits window.active; by then
 --      the dying window is unmapped, so a workspace round-trip on the
@@ -27,8 +27,7 @@
 -- hyprland.lua).
 -- ============================================================================
 
--- TEMPORARY instrumentation: trace decisions to /tmp/close_refocus.log and
--- stdout (hyprctl rollinglogger). Remove once the behavior is confirmed.
+-- Optional diagnostics to /tmp/close_refocus.log and the rolling logger.
 local TRACE = false
 local function trace(...)
 	if not TRACE then return end
@@ -37,23 +36,29 @@ local function trace(...)
 	for i = 1, n do parts[i] = tostring(select(i, ...)) end
 	local line = os.date("%H:%M:%S") .. " " .. table.concat(parts, " ")
 	print("[close_refocus] " .. table.concat(parts, " "))
-	local ok, f = pcall(io.open, "/tmp/close_refocus.log", "a")
-	if ok and f then
-		f:write(line .. "\n")
-		f:close()
+	local ok, file = pcall(io.open, "/tmp/close_refocus.log", "a")
+	if ok and file then
+		file:write(line .. "\n")
+		file:close()
 	end
 end
 
 local TAG_COUNT = 10
+local RECHECK_INTERVAL_MS = 10
+local RECHECK_MAX_TICKS = 25
 
 -- { id = ..., mon = "DP-1" } set when a focused close empties a tag workspace
 local pending
 
-local function win_str(w)
-	if not w then return "nil" end
-	return string.format("%s(ws=%s,mon=%s)", tostring(w.stable_id),
-		w.workspace and tostring(w.workspace.id) or "?",
-		w.monitor and tostring(w.monitor.name) or "?")
+local function win_str(window)
+	if not window then return "nil" end
+	return string.format("%s(ws=%s,mon=%s)", tostring(window.stable_id),
+		window.workspace and tostring(window.workspace.id) or "?",
+		window.monitor and tostring(window.monitor.name) or "?")
+end
+
+local function matches_workspace(workspace, id, monitor_name)
+	return workspace and workspace.id == id and workspace.monitor and workspace.monitor.name == monitor_name
 end
 
 local function state_str()
@@ -70,11 +75,11 @@ end
 local function spare_workspace_on(ws_id, mon_name)
 	local spare, spare_empty
 	for i = 1, TAG_COUNT do
-		local cand = hl.get_workspace(tostring(i))
-		if cand and cand.id ~= ws_id and cand.monitor and cand.monitor.name == mon_name then
-			if not spare then spare = cand end
-			if #(cand:get_windows() or {}) == 0 then
-				spare_empty = cand
+		local candidate = hl.get_workspace(tostring(i))
+		if candidate and candidate.id ~= ws_id and candidate.monitor and candidate.monitor.name == mon_name then
+			if not spare then spare = candidate end
+			if #(candidate:get_windows() or {}) == 0 then
+				spare_empty = candidate
 				break
 			end
 		end
@@ -103,15 +108,12 @@ end
 -- what empirically fixed it). A tick that finds the state correct is pure
 -- bookkeeping, so the correction latency is ~one interval, not the full
 -- coverage window.
-local RECHECK_INTERVAL_MS = 10
-local RECHECK_MAX_TICKS   = 25
-
 local function schedule_recheck(ws_id, mon_name)
 	local tick = 0
 	local function run()
 		tick = tick + 1
 		local cur = hl.get_active_workspace()
-		if not (cur and cur.id == ws_id and cur.monitor and cur.monitor.name == mon_name) then
+		if not matches_workspace(cur, ws_id, mon_name) then
 			trace("recheck", tick, "/", RECHECK_MAX_TICKS, ": drifted (", state_str(), ") -- restoring")
 			restore(ws_id, mon_name)
 		end
@@ -170,7 +172,7 @@ hl.on("window.active", function(w)
 		cur.monitor and cur.monitor.name or "?") or "nil"
 	trace("active: current =", cur_str, "expected =", pend.id .. "@" .. pend.mon)
 
-	if cur and cur.id == pend.id and cur.monitor and cur.monitor.name == pend.mon then
+	if matches_workspace(cur, pend.id, pend.mon) then
 		trace("active: focus stayed put -- nothing to do")
 		return
 	end

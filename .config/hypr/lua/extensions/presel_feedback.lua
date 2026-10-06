@@ -1,19 +1,16 @@
 -- Predict the next bordered tile, then export output-local logical coordinates
 -- to a Python/GTK renderer. No application titles/content are exported.
+local geometry = require("lua/extensions/bspwm_geometry")
 local M = {}
+local round = geometry.round
 
-local function round(value) return math.floor(value + 0.5) end
 local function gap(value, side)
 	if type(value) == "table" then return value[side] or 0 end
 	return tonumber(value) or 0
 end
 
-function M.monitor_box(mon)
-	if not mon or not mon.width or not mon.height or not mon.position then return nil end
-	local w, h = mon.width, mon.height
-	if (mon.transform or 0) % 2 == 1 then w, h = h, w end
-	return { x = mon.position.x, y = mon.position.y,
-		w = round(w / (mon.scale or 1)), h = round(h / (mon.scale or 1)) }
+function M.monitor_box(monitor)
+	return geometry.monitor_box(monitor)
 end
 
 -- Space.cpp:recheckWorkArea. In this config the only gap override is the
@@ -74,16 +71,7 @@ function M.rectangles(states, workspaces, windows, options)
 		if node.t == "leaf" then
 			valid = live[node.id] == ws.id
 		else
-			local first, second
-			if node.axis == "h" then
-				local w = math.floor(box.w * node.ratio)
-				first = { x = box.x, y = box.y, w = w, h = box.h }
-				second = { x = box.x + w, y = box.y, w = box.w - w, h = box.h }
-			else
-				local h = math.floor(box.h * node.ratio)
-				first = { x = box.x, y = box.y, w = box.w, h = h }
-				second = { x = box.x, y = box.y + h, w = box.w, h = box.h - h }
-			end
+			local first, second = geometry.split_box(box, node.axis, node.ratio)
 			local a, b = collect(node.a, ws, first, area), collect(node.b, ws, second, area)
 			valid = a and b
 		end
@@ -102,7 +90,7 @@ function M.rectangles(states, workspaces, windows, options)
 		local special = mon and mon.active_special_workspace
 		if st and mon and mon.name and st.mode ~= "monocle" and ws.visible and not ws.has_fullscreen
 			and (ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b")
-			and (not mon or mon.dpms_status ~= false)
+			and mon.dpms_status ~= false
 			and (not special or special.id == ws.id) then
 			local area = M.future_area(st, ws, options.gaps_out)
 			if area and area.w > 0 and area.h > 0 then collect(st.tree, ws, area, area) end
@@ -153,17 +141,34 @@ function M.setup(layout)
 		end
 	end
 
+	local function replace_state(path, payload, write_error)
+		local temporary = path .. ".tmp"
+		local file, err = io.open(temporary, "w")
+		if not file then
+			report_error(err)
+			return false
+		end
+		local written = file:write(payload)
+		local closed = file:close()
+		if not written or not closed then
+			os.remove(temporary)
+			report_error(write_error)
+			return false
+		end
+		local renamed, rename_error = os.rename(temporary, path)
+		if not renamed then
+			os.remove(temporary)
+			report_error(rename_error)
+			return false
+		end
+		return true
+	end
+
 	local function write_state(payload)
 		if not state_path or payload == last_payload then return end
-		local tmp = state_path .. ".tmp"
-		local file, err = io.open(tmp, "w")
-		if not file then report_error(err); return end
-		local ok = file:write(payload)
-		local closed = file:close()
-		if not ok or not closed then os.remove(tmp); report_error("state write failed"); return end
-		local renamed, rename_err = os.rename(tmp, state_path)
-		if not renamed then os.remove(tmp); report_error(rename_err); return end
-		last_payload, warned = payload, false
+		if replace_state(state_path, payload, "state write failed") then
+			last_payload, warned = payload, false
+		end
 	end
 
 	local function publish()
@@ -180,14 +185,18 @@ function M.setup(layout)
 	end)
 
 	local function start()
-		if started then publish(); return end
+		if started then
+			publish()
+			return
+		end
 		-- config.reloaded also fires before outputs exist on compositor startup.
 		if #hl.get_monitors() == 0 then return end
 		local runtime = os.getenv("XDG_RUNTIME_DIR")
 		local signature = os.getenv("HYPRLAND_INSTANCE_SIGNATURE")
 		local home = os.getenv("HOME")
 		if not runtime or not signature or not home or not signature:match("^[%w_.-]+$") then
-			report_error("missing/invalid session environment"); return
+			report_error("missing/invalid session environment")
+			return
 		end
 		local base = runtime .. "/bspwm_presel_" .. signature
 		-- Protocol generations must not share either state OR a singleton lock.
@@ -202,16 +211,7 @@ function M.setup(layout)
 		for _, legacy in ipairs(legacy_states) do
 			-- Each retired protocol receives its own valid empty message. Even
 			-- if its process cannot safely be stopped, it stays hidden and idle.
-			local tmp = legacy.path .. ".tmp"
-			local file, err = io.open(tmp, "w")
-			if file then
-				local written = file:write(legacy.empty)
-				local closed = file:close()
-				if written and closed then
-					local renamed, rename_err = os.rename(tmp, legacy.path)
-					if not renamed then os.remove(tmp); report_error(rename_err) end
-				else os.remove(tmp); report_error("legacy state reset failed") end
-			else report_error(err) end
+			replace_state(legacy.path, legacy.empty, "legacy state reset failed")
 			command = command .. " --legacy-state " .. shell_quote(legacy.path)
 		end
 		started = true

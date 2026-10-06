@@ -2,10 +2,18 @@
 -- v0.56.2 exposes cursor queries/timers but no Lua pointer-motion event.
 -- Sample only during a grab, at bspwm's default pointer_motion_interval (17ms).
 local M = {}
+local MOTION_INTERVAL_MS = 17
+local STOP_EVENTS = { "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }
 
-local function contains(pos, at, size)
-	return at and size and pos.x >= at.x and pos.y >= at.y
-		and pos.x < at.x + size.x and pos.y < at.y + size.y
+local function contains(position, origin, size)
+	return origin and size and position.x >= origin.x and position.y >= origin.y
+		and position.x < origin.x + size.x and position.y < origin.y + size.y
+end
+
+local function stacking_level(window)
+	local level = (window.fullscreen or 0) ~= 0 and 3 or (window.floating and 2 or 1)
+	if window.floating and window.allowed_over_fullscreen then level = 4 end
+	return level
 end
 
 local function pointer_window(pos, monitor)
@@ -15,7 +23,9 @@ local function pointer_window(pos, monitor)
 	-- click-through; keyboard interactivity alone does not imply that.
 	for _, layer in ipairs(hl.get_layers({ monitor = monitor })) do
 		if layer.mapped and layer.layer >= 2 and layer.namespace ~= "bspwm-presel-feedback"
-			and contains(pos, { x = layer.x, y = layer.y }, { x = layer.w, y = layer.h }) then return nil end
+			and contains(pos, { x = layer.x, y = layer.y }, { x = layer.w, y = layer.h }) then
+			return nil
+		end
 	end
 	local best, best_level, best_rank
 	for _, w in ipairs(hl.get_windows()) do
@@ -23,8 +33,7 @@ local function pointer_window(pos, monitor)
 			and (w.workspace.id == ws.id or (w.pinned and w.floating)) and contains(pos, w.at, w.size) then
 			-- Floating windows occlude tiles; fullscreen occludes normal floats.
 			-- Native focus history resolves overlapping floats/monocle windows.
-			local level = (w.fullscreen or 0) ~= 0 and 3 or (w.floating and 2 or 1)
-			if w.floating and w.allowed_over_fullscreen then level = 4 end
+			local level = stacking_level(w)
 			local rank = w.focus_history_id
 			if not rank or rank < 0 then rank = math.huge end
 			if not best or level > best_level or (level == best_level and rank < best_rank) then
@@ -47,9 +56,15 @@ function M.new(layout)
 	end
 
 	local function motion()
-		if not grabbed or not layout.drag_valid(grabbed) or not hl.get_active_window() then drag.stop(); return end
+		if not grabbed or not layout.drag_valid(grabbed) or not hl.get_active_window() then
+			drag.stop()
+			return
+		end
 		local pos, monitor = hl.get_cursor_pos(), hl.get_monitor_at_cursor()
-		if not pos or not monitor then drag.stop(); return end
+		if not pos or not monitor then
+			drag.stop()
+			return
+		end
 		if last_pos and pos.x == last_pos.x and pos.y == last_pos.y then return end
 		last_pos = pos
 		local source_monitor = grabbed.workspace.monitor
@@ -89,12 +104,15 @@ function M.new(layout)
 		if not timer then
 			timer = hl.timer(function()
 				local ok, err = pcall(motion)
-				if not ok then drag.stop(); print("bspwm pointer drag: " .. tostring(err)) end
-			end, { timeout = 17, type = "repeat" })
+				if not ok then
+					drag.stop()
+					print("bspwm pointer drag: " .. tostring(err))
+				end
+			end, { timeout = MOTION_INTERVAL_MS, type = "repeat" })
 			hl.on("window.close", function(closed)
 				if grabbed and closed and closed.stable_id == grabbed.stable_id then drag.stop() end
 			end)
-			for _, event in ipairs({ "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }) do
+			for _, event in ipairs(STOP_EVENTS) do
 				hl.on(event, drag.stop)
 			end
 		else

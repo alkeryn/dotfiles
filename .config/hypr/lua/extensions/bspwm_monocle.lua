@@ -1,15 +1,11 @@
 -- Full-monitor monocle without Hyprland fullscreen (which hides other tiles).
 -- Scoped, reversible rules leave floating windows and other workspaces alone.
+local geometry = require("lua/extensions/bspwm_geometry")
 local M = {}
 
 function M.monitor_box(window, fallback)
-	local mon = window.monitor or (window.workspace and window.workspace.monitor)
-	if not mon or not mon.width or not mon.height or not mon.position then return fallback end
-	local w, h = mon.width, mon.height
-	if (mon.transform or 0) % 2 == 1 then w, h = h, w end
-	local scale = mon.scale or 1
-	return { x = mon.position.x, y = mon.position.y,
-		w = math.floor(w / scale + 0.5), h = math.floor(h / scale + 0.5) }
+	local monitor = window.monitor or (window.workspace and window.workspace.monitor)
+	return geometry.monitor_box(monitor, fallback)
 end
 
 function M.new()
@@ -33,7 +29,10 @@ function M.new()
 			entry.windows = hl.window_rule({
 				name = "bspwm-monocle-" .. ws.id,
 				match = { workspace = selector, float = false },
-				border_size = 0, rounding = 0, decorate = false, no_shadow = true,
+				border_size = 0,
+				rounding = 0,
+				decorate = false,
+				no_shadow = true,
 				-- Renderer::shouldUseNewBlurOptimizations otherwise uses the
 				-- cached wallpaper for tiles, covering the windows underneath.
 				-- Explicit false selects live blur without disabling blur globally.
@@ -54,7 +53,9 @@ function M.new()
 	function instance.raise(window)
 		if raising or not window or not window.mapped or window.floating
 			or (window.fullscreen or 0) ~= 0
-			or (window.workspace and window.workspace.has_fullscreen) then return end
+			or (window.workspace and window.workspace.has_fullscreen) then
+			return
+		end
 		-- Focus alone doesn't raise a tiled target in the Lua layout provider.
 		-- alter_zorder also simulates pointer movement, so guard re-entry.
 		raising = true

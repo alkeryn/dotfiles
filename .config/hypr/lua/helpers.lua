@@ -1,263 +1,239 @@
--- helpers.lua -- shared helper functions (window state, focus, swap, resize, gaps, monitors)
--- ============================================================================
--- Module: returns the helpers table. Requires lua/vars.
--- ============================================================================
-
--- NOTE: module paths are relative to the main config dir; modules in lua/
--- are required as "lua/<name>" (see bindings.lua)
+-- Shared window, focus, workspace, gap and monitor helpers.
+-- Module paths resolve against the main config directory, not lua/.
 local vars = require("lua/vars")
-
-local H = {}
+local M = {}
 
 -- ---------------------------------------------------------------------------
--- explicit window states (bspc node -t), never toggles
+-- Explicit window states (bspc node -t), never toggles
 -- ---------------------------------------------------------------------------
 
-function H.set_window_state(state)
-	local w = hl.get_active_window()
-	if not w or w.mapped == false then return end
+function M.set_window_state(state)
+	local window = hl.get_active_window()
+	if not window or window.mapped == false then return end
 
 	local fullscreen = state == "fullscreen"
-	-- Clear both compositor and client fullscreen/maximized modes before
-	-- changing float state: Hyprland otherwise restores fullscreen afterward.
-	-- Don't leave/re-enter fullscreen on repeated Super+f.
-	if not fullscreen or w.floating then
+	-- Clear compositor AND client fullscreen/maximized modes before changing
+	-- float state, or Hyprland restores fullscreen. Repeated Super+f must not
+	-- leave/re-enter fullscreen unless the window is floating.
+	if not fullscreen or window.floating then
 		hl.dispatch(hl.dsp.window.fullscreen_state({
-			internal = 0, client = 0, action = "set", layout_aware = false, window = w,
+			internal = 0, client = 0, action = "set", layout_aware = false, window = window,
 		}))
 	end
-	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = w }))
-	hl.dispatch(hl.dsp.window.float({ action = state == "floating" and "on" or "off", window = w }))
+	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = window }))
+	hl.dispatch(hl.dsp.window.float({ action = state == "floating" and "on" or "off", window = window }))
 	if fullscreen then
-		-- fullscreen_state uses 2 for full fullscreen (1 is maximized).
+		-- fullscreen_state: 2 = full fullscreen, 1 = maximized.
 		hl.dispatch(hl.dsp.window.fullscreen_state({
-			internal = 2, client = 2, action = "set", layout_aware = false, window = w,
+			internal = 2, client = 2, action = "set", layout_aware = false, window = window,
 		}))
 	end
 end
 
 -- ---------------------------------------------------------------------------
--- focus history (super + {parenright,equal} -> older/newer)
+-- Focus history
 -- ---------------------------------------------------------------------------
 
-function H.focus_history(step)
-	local wins = hl.get_windows() or {}
-	if #wins < 2 then return end
-	table.sort(wins, function(a, b)
+function M.focus_history(step)
+	local windows = hl.get_windows() or {}
+	if #windows < 2 then return end
+	table.sort(windows, function(a, b)
 		return (a.focus_history_id or 0) < (b.focus_history_id or 0)
 	end)
-	local cur = hl.get_active_window()
-	local idx
-	for i, w in ipairs(wins) do
-		if cur and w.address == cur.address then idx = i break end
+	local current = hl.get_active_window()
+	local index
+	for i, window in ipairs(windows) do
+		if current and window.address == current.address then
+			index = i
+			break
+		end
 	end
-	if not idx then return end
-	local t = wins[((idx - 1 + step) % #wins) + 1]
-	if t then hl.dispatch(hl.dsp.focus({ window = t })) end
+	if not index then return end
+	local target = windows[((index - 1 + step) % #windows) + 1]
+	if target then hl.dispatch(hl.dsp.focus({ window = target })) end
 end
 
-function H.focus_last()
-	local w = hl.get_last_window()
-	if w then hl.dispatch(hl.dsp.focus({ window = w })) end
+function M.focus_last()
+	local window = hl.get_last_window()
+	if window then hl.dispatch(hl.dsp.focus({ window = window })) end
 end
 
 -- ---------------------------------------------------------------------------
--- swap with bspwm-style fallback
+-- Directional swap with monitor fallback
 -- ---------------------------------------------------------------------------
--- Focus needs no helper: hl.dsp.focus({ direction = ... }) already falls back
--- to the neighbouring monitor (binds:window_direction_monitor_fallback, on by
--- default), which is `bspc node -f $A || bspc monitor -f $A`.
---
--- Swap: `bspc node -s $A --follow || bspc node -d $A:focused --follow`, i.e. swap
--- the selected subtree (or focused leaf) with an external neighbour, or else
--- send that entire node to the monitor in that direction. The neighbour search
--- uses the selection's outer box, never one of its own children.
--- A layout rejecting a message is reported as an ERROR (on-screen
--- overlay), so we ask the layout whether a neighbour exists instead of using
--- failure as control flow.
-
+-- Focus already falls back to the neighbouring monitor through the native
+-- dispatcher. Swap needs the selected node's OUTER box: its own children must
+-- not hide the monitor fallback. Query first; a rejected layout message would
+-- otherwise produce an on-screen error overlay.
 local bspwm = require("lua/extensions/bspwm")
 
-function H.swap_dir(d) -- d: l | r | u | d
-	if bspwm.has_neighbor(d) then
-		hl.dispatch(hl.dsp.layout("swap " .. d))
+function M.swap_dir(direction) -- l | r | u | d
+	if bspwm.has_neighbor(direction) then
+		hl.dispatch(hl.dsp.layout("swap " .. direction))
 		return
 	end
-	local mon = hl.get_monitor(d) -- relative to the focused monitor; nil if none
-	if mon and mon.active_workspace then H.move_to_workspace(mon.active_workspace) end
+	local monitor = hl.get_monitor(direction)
+	if monitor and monitor.active_workspace then M.move_to_workspace(monitor.active_workspace) end
 end
 
 -- ---------------------------------------------------------------------------
--- edge resize (bspc node -z): delta > 0 grows, delta < 0 shrinks
+-- Edge resize: positive delta grows, negative delta shrinks
 -- ---------------------------------------------------------------------------
 
-function H.resize_edge(edge, delta)
-	local w = hl.get_active_window()
-	if not w or w.mapped == false or (w.fullscreen or 0) ~= 0 then return end
+function M.resize_edge(edge, delta)
+	local window = hl.get_active_window()
+	if not window or window.mapped == false or (window.fullscreen or 0) ~= 0 then return end
 
-	if not w.floating then
-		local cmd = delta >= 0 and "grow" or "shrink"
-		hl.dispatch(hl.dsp.layout(cmd .. " " .. edge .. " " .. math.abs(delta)))
+	if not window.floating then
+		local command = delta >= 0 and "grow" or "shrink"
+		hl.dispatch(hl.dsp.layout(command .. " " .. edge .. " " .. math.abs(delta)))
 		return
 	end
 
-	-- Floating windows are not in the tiled layout; a layout message would
-	-- do nothing or resize an unrelated tiled window on the same workspace.
-	local pos, size = w.at, w.size
+	-- Floats aren't layout targets; a layout message could resize an unrelated
+	-- tile. Resize the original window, even if dispatch changes keyboard focus.
+	local position, size = window.at, window.size
 	local horizontal = edge == "l" or edge == "r"
 	local result = hl.dispatch(hl.dsp.window.resize({
 		x = math.max(1, size.x + (horizontal and delta or 0)),
 		y = math.max(1, size.y + (horizontal and 0 or delta)),
 		relative = false,
-		window = w,
+		window = window,
 	}))
 	if result and result.ok == false then return end
 
-	-- Hyprland v0.56.2 resizes floats around their CENTER. Restore the old
-	-- top-left for right/bottom resizes; shift it for left/top resizes so the
-	-- opposite edge stays fixed. Read back goal size (not animated geometry),
-	-- rather than assuming the requested size change was applied in full.
-	local resized = w.size
+	-- Hyprland v0.56.2 resizes floats around their centre. Read back goal size
+	-- (constraints may limit the requested change), then keep the opposite edge
+	-- fixed: shift the origin for left/top, restore it for right/bottom.
+	local resized = window.size
 	hl.dispatch(hl.dsp.window.move({
-		x = pos.x + (edge == "l" and size.x - resized.x or 0),
-		y = pos.y + (edge == "u" and size.y - resized.y or 0),
+		x = position.x + (edge == "l" and size.x - resized.x or 0),
+		y = position.y + (edge == "u" and size.y - resized.y or 0),
 		relative = false,
-		window = w,
+		window = window,
 	}))
 end
 
 -- ---------------------------------------------------------------------------
--- workspace send/swap helpers (bspc node -d / desktop -s)
+-- Workspace sends/swaps (bspc node -d / desktop -s)
 -- ---------------------------------------------------------------------------
 
-function H.move_to_workspace(sel)
-	local result = bspwm.move_to_workspace(sel)
+function M.move_to_workspace(selector)
+	local result = bspwm.move_to_workspace(selector)
 	if result ~= true then print(tostring(result)) end
 end
 
-function H.move_workspace_rel(rel)
-	local target = H.relative_workspace(rel)
-	if target then H.move_to_workspace(target) end
+function M.move_workspace_rel(step)
+	local target = M.relative_workspace(step)
+	if target then M.move_to_workspace(target) end
 end
 
-function H.swap_with_workspace(sel)
-	local cur = hl.get_active_workspace()
-	local tgt = hl.get_workspace(sel)
-	if not cur or not tgt or cur.id == tgt.id then return end
-	-- bspwm `desktop -s --follow` swaps the desktop OBJECTS (windows travel
-	-- with them) and then focus follows the focused desktop
-	-- (swap_desktops(): focus_node(m2, d1, d1->focus)): after the swap you
-	-- are looking at your own windows, on the target's slot/monitor. The
-	-- focused window belongs to the outgoing desktop, so re-focus it once
-	-- it has landed on the target workspace.
+function M.swap_with_workspace(selector)
+	local current = hl.get_active_workspace()
+	local target = hl.get_workspace(selector)
+	if not current or not target or current.id == target.id then return end
+	-- bspwm swaps desktop objects: their windows travel with them, then focus
+	-- follows the outgoing desktop. Re-focus its window in the destination slot.
 	local focused = hl.get_active_window()
-	local result = bspwm.swap_workspaces(cur, tgt)
+	local result = bspwm.swap_workspaces(current, target)
 	if result ~= true then
 		print(tostring(result))
 		return
 	end
-	local selector = tgt.id > 0 and tgt.id or "name:" .. tgt.name
-	if focused and focused.workspace and focused.workspace.id == tgt.id then
-		local result = hl.dispatch(hl.dsp.focus({ window = focused }))
-		if not result or result.ok == false then
-			hl.dispatch(hl.dsp.focus({ workspace = selector }))
-		end
-	else
-		hl.dispatch(hl.dsp.focus({ workspace = selector }))
+	local destination = target.id > 0 and target.id or "name:" .. target.name
+	if focused and focused.workspace and focused.workspace.id == target.id then
+		local focus_result = hl.dispatch(hl.dsp.focus({ window = focused }))
+		if focus_result and focus_result.ok ~= false then return end
 	end
+	hl.dispatch(hl.dsp.focus({ workspace = destination }))
 end
 
-function H.relative_workspace(rel)
-	local cur = hl.get_active_workspace()
-	if not cur or not cur.monitor or cur.special then return end
-	-- Workspace IDs are global, not monitor-relative. Include empty persistent
-	-- desktops, sort the actual slots on this monitor and wrap at either end.
+function M.relative_workspace(step)
+	local current = hl.get_active_workspace()
+	if not current or not current.monitor or current.special then return end
+	-- IDs are global, not monitor-relative. Include empty persistent desktops,
+	-- sort this monitor's actual slots and wrap at either end.
 	local workspaces = {}
-	for _, ws in ipairs(hl.get_workspaces() or {}) do
-		if not ws.special and ws.monitor and ws.monitor.name == cur.monitor.name then
-			workspaces[#workspaces + 1] = ws
+	for _, workspace in ipairs(hl.get_workspaces() or {}) do
+		if not workspace.special and workspace.monitor and workspace.monitor.name == current.monitor.name then
+			workspaces[#workspaces + 1] = workspace
 		end
 	end
 	table.sort(workspaces, function(a, b) return a.id < b.id end)
-	for i, ws in ipairs(workspaces) do
-		if ws.id == cur.id then
-			return workspaces[((i - 1 + rel) % #workspaces) + 1]
+	for i, workspace in ipairs(workspaces) do
+		if workspace.id == current.id then
+			return workspaces[((i - 1 + step) % #workspaces) + 1]
 		end
 	end
 end
 
-function H.swap_workspace_rel(rel)
-	local target = H.relative_workspace(rel)
-	if target then H.swap_with_workspace(target) end
+function M.swap_workspace_rel(step)
+	local target = M.relative_workspace(step)
+	if target then M.swap_with_workspace(target) end
 end
 
 -- ---------------------------------------------------------------------------
--- gap presets (bspc config -d focused window_gap)
+-- Gap presets
 -- ---------------------------------------------------------------------------
--- bspwm: Next/Prior = current gap +/- 5, BackSpace = default, shift+BackSpace = 0.
--- Hyprland gaps are global here (per-workspace gaps would need workspace-rule
--- churn); the current value is tracked in this module. A config reload
--- re-evaluates the modules, which also resets this state to the configured gaps.
-
+-- Gaps are global here; per-workspace gaps would require workspace-rule churn.
+-- Reloading re-evaluates the module and resets the tracked values to defaults.
 local gaps = { inner = vars.GAPS, outer = vars.GAPS_OUT }
 
 local function apply_gaps()
 	hl.config({ general = { gaps_in = gaps.inner, gaps_out = gaps.outer } })
 end
 
-function H.adjust_gaps(delta)
+function M.adjust_gaps(delta)
 	gaps.inner = math.max(0, gaps.inner + delta)
 	gaps.outer = math.max(0, gaps.outer + delta)
 	apply_gaps()
 end
 
-function H.reset_gaps()
+function M.reset_gaps()
 	gaps.inner, gaps.outer = vars.GAPS, vars.GAPS_OUT
 	apply_gaps()
 end
 
-function H.zero_gaps()
+function M.zero_gaps()
 	gaps.inner, gaps.outer = 0, 0
 	apply_gaps()
 end
 
 -- ---------------------------------------------------------------------------
--- monitor layout (replaces bspwmrc's `bspc monitor ^1/^2 -d ...` + xrandr dock test)
+-- Monitor layout
 -- ---------------------------------------------------------------------------
--- The config is loaded BEFORE the backend starts, so hl.get_monitors() is empty
--- on first load; callers re-run these from hl.on("monitor.added"/"monitor.removed").
--- monitor.removed fires while the monitor is still listed, hence `exclude`.
-
-local function connected(exclude)
+-- Initial config loads before the backend, so get_monitors() is empty. Callers
+-- retry on monitor.added/removed; removal fires while the monitor is still
+-- listed, hence the exclusion parameter.
+local function connected_monitors(exclude)
 	local names = {}
-	for _, m in ipairs(hl.get_monitors() or {}) do
-		if not (exclude and m.name == exclude.name) then names[#names + 1] = m.name end
+	for _, monitor in ipairs(hl.get_monitors() or {}) do
+		if not (exclude and monitor.name == exclude.name) then names[#names + 1] = monitor.name end
 	end
 	return names
 end
 
--- bspwmrc: `xrandr | grep -c " connected"` -gt 1 (always true on mainpc)
-function H.is_docked(exclude)
-	return vars.PC == "mainpc" or #connected(exclude) > 1
+function M.is_docked(exclude)
+	return vars.PC == "mainpc" or #connected_monitors(exclude) > 1
 end
 
--- tags 1-4 on the first monitor, 5-10 on the second (all on one when undocked)
-function H.apply_monitor_layout(exclude)
+-- Tags 1-4 on the first monitor, 5-10 on the second; all on one when undocked.
+function M.apply_monitor_layout(exclude)
 	local first, second
 	if vars.PC == "mainpc" then
 		first, second = vars.M1, vars.M2 -- pinned by output name
 	else
-		local names = connected(exclude)
+		local names = connected_monitors(exclude)
 		first, second = names[1], names[2]
 	end
-	if not first then return end -- no monitors known yet
+	if not first then return end
 	for i = 1, 10 do
 		hl.workspace_rule({
-			workspace  = tostring(i),
-			monitor    = (second and i > 4) and second or first,
+			workspace = tostring(i),
+			monitor = (second and i > 4) and second or first,
 			persistent = true,
 		})
 	end
 end
 
-return H
+return M

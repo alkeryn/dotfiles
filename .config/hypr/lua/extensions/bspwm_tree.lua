@@ -1,0 +1,264 @@
+-- Binary-tree operations, independent of the compositor and session state.
+-- Nodes retain their identity and metadata through insertion, removal and swaps.
+local geometry = require("lua/extensions/bspwm_geometry")
+local M = {}
+
+function M.leaf(id)
+	return { t = "leaf", id = id, n = 0 }
+end
+
+local function axis_for(direction)
+	if direction == "u" or direction == "d" or direction == "up" or direction == "down"
+		or direction == "north" or direction == "south" then
+		return "v"
+	end
+	return "h" -- l, r, west, east, nil
+end
+
+local function new_is_first(direction)
+	return direction == "l" or direction == "west"
+		or direction == "u" or direction == "up" or direction == "north"
+end
+
+-- A target is either a stable window ID or an internal node reference.
+function M.find_path(node, target, path)
+	if not node then return nil end
+	path = path or {}
+	table.insert(path, node)
+	if node == target or (node.t == "leaf" and node.id == target) then return path end
+	if node.t == "split" then
+		local found = M.find_path(node.a, target, path) or M.find_path(node.b, target, path)
+		if found then return found end
+	end
+	table.remove(path)
+	return nil
+end
+
+function M.collect_ids(node, ids)
+	if not node then return end
+	if node.t == "leaf" then
+		ids[node.id] = true
+	else
+		M.collect_ids(node.a, ids)
+		M.collect_ids(node.b, ids)
+	end
+end
+
+function M.leaves(node, result)
+	result = result or {}
+	if not node then return result end
+	if node.t == "leaf" then
+		table.insert(result, node)
+	else
+		M.leaves(node.a, result)
+		M.leaves(node.b, result)
+	end
+	return result
+end
+
+function M.first_leaf(node)
+	while node and node.t == "split" do node = node.a end
+	return node
+end
+
+function M.last_leaf(node)
+	local leaves = M.leaves(node)
+	return leaves[#leaves]
+end
+
+-- Remove dead leaves and promote siblings. Returns (new subtree, alive?).
+function M.prune(node, live)
+	if not node then return nil, false end
+	if node.t == "leaf" then
+		if live[node.id] then return node, true end
+		return nil, false
+	end
+	local first, first_alive = M.prune(node.a, live)
+	local second, second_alive = M.prune(node.b, live)
+	if first_alive and second_alive then
+		node.a, node.b = first, second
+		return node, true
+	end
+	if first_alive then return first, true end
+	if second_alive then return second, true end
+	return nil, false
+end
+
+function M.walk_splits(node, callback)
+	if not node or node.t ~= "split" then return end
+	callback(node)
+	M.walk_splits(node.a, callback)
+	M.walk_splits(node.b, callback)
+end
+
+-- Insert a window ID or intact subtree beside an anchor. Automatic callers
+-- must refresh boxes first: bspwm splits the longest side, new child second.
+function M.insert_adjacent(state, incoming, anchor_id, direction, ratio)
+	local new_node = type(incoming) == "table" and incoming or M.leaf(incoming)
+	local path = M.find_path(state.tree, anchor_id)
+	if not path then
+		-- The anchor vanished: attach beside the last leaf, or become root.
+		local other = M.last_leaf(state.tree)
+		if not other then
+			state.tree = new_node
+			return
+		end
+		path = M.find_path(state.tree, other.id)
+	end
+
+	local anchor = path[#path]
+	if not direction then
+		local box = anchor._box
+		direction = (box and box.w > box.h) and "r" or "d"
+	end
+	local split = { t = "split", axis = axis_for(direction), ratio = ratio or 0.5 }
+	-- Ratio is ALWAYS the first child's share, even for east/south insertion.
+	if new_is_first(direction) then
+		split.a, split.b = new_node, anchor
+	else
+		split.a, split.b = anchor, new_node
+	end
+	if #path == 1 then
+		state.tree = split
+	else
+		local parent = path[#path - 1]
+		if parent.a == anchor then parent.a = split else parent.b = split end
+	end
+end
+
+-- Detach a leaf OR subtree, promoting its sibling without rebuilding either.
+function M.detach(state, target)
+	local path = M.find_path(state.tree, target)
+	if not path then return nil end
+	local node = path[#path]
+	if #path == 1 then
+		state.tree = nil
+		return node
+	end
+	local parent = path[#path - 1]
+	local sibling = parent.a == node and parent.b or parent.a
+	if #path == 2 then
+		state.tree = sibling
+	else
+		local grandparent = path[#path - 2]
+		if grandparent.a == parent then grandparent.a = sibling else grandparent.b = sibling end
+	end
+	return node
+end
+
+-- Exchange disjoint nodes in-place (bspwm tree.c:swap_nodes). Capture both
+-- parent slots before writing, since the nodes may be siblings.
+function M.swap_nodes(state, source, target)
+	local source_path = M.find_path(state.tree, source)
+	local target_path = M.find_path(state.tree, target)
+	if not source_path or not target_path then return false end
+	local first, second = source_path[#source_path], target_path[#target_path]
+	if M.find_path(first, second) or M.find_path(second, first) then return false end
+	local first_parent, second_parent = source_path[#source_path - 1], target_path[#target_path - 1]
+	if not first_parent or not second_parent then return false end
+	local first_slot, second_slot = first_parent.a == first, second_parent.a == second
+	if first_slot then first_parent.a = second else first_parent.b = second end
+	if second_slot then second_parent.a = first else second_parent.b = first end
+	return true
+end
+
+-- Only splits OWNING the requested edge are resized: first-child east/south
+-- or second-child west/north. Other splits are skipped on the way to the root.
+function M.resize(state, target, direction, delta)
+	local path = M.find_path(state.tree, target)
+	if not path or #path < 2 then return false end
+	local axis = (direction == "l" or direction == "r") and "h" or "v"
+	for i = #path - 1, 1, -1 do
+		local parent, child = path[i], path[i + 1]
+		if parent.axis == axis and parent._box then
+			local is_first = parent.a == child
+			local owns_edge = (is_first and (direction == "r" or direction == "d"))
+				or (not is_first and (direction == "l" or direction == "u"))
+			if owns_edge then
+				local dimension = axis == "h" and parent._box.w or parent._box.h
+				local ratio_delta = math.abs(delta) / math.max(dimension, 1)
+				local sign = ((delta >= 0) == is_first) and 1 or -1
+				parent.ratio = math.min(0.9, math.max(0.1, parent.ratio + sign * ratio_delta))
+				return true
+			end
+		end
+	end
+	return false
+end
+
+function M.parent_or_root(state, target)
+	local path = M.find_path(state.tree, target)
+	if not path then return nil end
+	return #path >= 2 and path[#path - 1] or state.tree
+end
+
+function M.rotate(node, degrees)
+	if not node or node.t ~= "split" or degrees == 0 then return end
+	-- bspwm tree.c:rotate_tree_rec: our "v" is its TYPE_HORIZONTAL;
+	-- our "h" is its TYPE_VERTICAL.
+	if (degrees == 90 and node.axis == "v")
+		or (degrees == 270 and node.axis == "h") or degrees == 180 then
+		node.a, node.b = node.b, node.a
+		node.ratio = 1 - node.ratio
+	end
+	if degrees ~= 180 then node.axis = node.axis == "h" and "v" or "h" end
+	M.rotate(node.a, degrees)
+	M.rotate(node.b, degrees)
+end
+
+function M.flip(node, axis)
+	if not node or node.t ~= "split" then return end
+	if node.axis == axis then node.a, node.b = node.b, node.a end
+	M.flip(node.a, axis)
+	M.flip(node.b, axis)
+end
+
+function M.balance(node)
+	if not node or node.t ~= "split" then return end
+	local first_count, second_count = #M.leaves(node.a), #M.leaves(node.b)
+	node.ratio = first_count / (first_count + second_count)
+	M.balance(node.a)
+	M.balance(node.b)
+end
+
+function M.equalize(node, ratio)
+	if not node or node.t ~= "split" then return end
+	node.ratio = ratio
+	M.equalize(node.a, ratio)
+	M.equalize(node.b, ratio)
+end
+
+-- Make the focused window a child of the root split (bspc node -n @/).
+function M.transplant(state, target)
+	local removed = M.detach(state, target)
+	if not removed then return false end
+	local root = state.tree
+	if not root then
+		state.tree = removed
+		return true
+	end
+	state.tree = { t = "split", axis = root.axis, ratio = 0.5, a = root, b = removed }
+	return true
+end
+
+function M.place(node, box, boxes)
+	if not node then return end
+	if node.t == "leaf" then
+		boxes[node.id] = box
+		node._box = box
+		return
+	end
+	node._box = box
+	local first, second = geometry.split_box(box, node.axis, node.ratio)
+	M.place(node.a, first, boxes)
+	M.place(node.b, second, boxes)
+end
+
+function M.clear_presels(node)
+	if not node then return end
+	node.presel = nil
+	M.clear_presels(node.a)
+	M.clear_presels(node.b)
+end
+
+return M

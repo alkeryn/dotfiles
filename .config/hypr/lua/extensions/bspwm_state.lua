@@ -1,31 +1,43 @@
 -- Session-only layout checkpoints. Data-only, bounded parser: never load/eval
 -- a state file as Lua. Geometry/userdata are rebuilt by the compositor.
+local collect_ids = require("lua/extensions/bspwm_tree").collect_ids
 local M = {}
 local HEADER = "BSPWM_LAYOUT_V2"
 local LEGACY_HEADER = "BSPWM_LAYOUT_V1"
 local MAX_BYTES, MAX_NODES, MAX_DEPTH, MAX_WORKSPACES = 1048576, 8192, 128, 256
-local DIRECTIONS = { l=true, r=true, u=true, d=true, west=true, east=true,
-	north=true, south=true, up=true, down=true }
+local MAX_INTEGER = 9007199254740991
+local DIRECTIONS = {
+	l = true, r = true, u = true, d = true,
+	west = true, east = true, north = true, south = true, up = true, down = true,
+}
 
 local function integer(value, minimum)
 	assert(type(value) == "number" and value == value and value % 1 == 0
-		and value >= minimum and value <= 9007199254740991, "invalid integer")
+		and value >= minimum and value <= MAX_INTEGER, "invalid integer")
 	return value
 end
+
 local function ratio(value)
 	assert(type(value) == "number" and value > 0 and value < 1, "invalid ratio")
 	return value
 end
+
 local function presel_tokens(pre)
 	if not pre then return "- -" end
 	assert(DIRECTIONS[pre.dir], "invalid preselection direction")
 	return pre.dir .. " " .. string.format("%.17g", ratio(pre.ratio or 0.5))
 end
 
+local function focus_token(path, value)
+	return path == "-" and "-" or string.format("%.0f", integer(value, 1))
+end
+
+-- Workspace records are sorted; nodes are written in preorder. Selected nodes
+-- use paths rather than IDs so internal-node identity survives a round trip.
 function M.encode(states, pending)
 	local lines = { HEADER, "P " .. presel_tokens(pending) }
 	local ids = {}
-	for id in pairs(states) do ids[#ids + 1] = integer(id, -9007199254740991) end
+	for id in pairs(states) do ids[#ids + 1] = integer(id, -MAX_INTEGER) end
 	assert(#ids <= MAX_WORKSPACES, "too many workspaces")
 	table.sort(ids)
 	local total = 0
@@ -33,7 +45,10 @@ function M.encode(states, pending)
 		local st, paths, rows, seen_ids = states[id], {}, {}, {}
 		local function visit(node, path, depth)
 			assert(depth <= MAX_DEPTH, "tree too deep")
-			if not node then rows[#rows + 1] = "N"; return end
+			if not node then
+				rows[#rows + 1] = "N"
+				return
+			end
 			total = total + 1
 			assert(total <= MAX_NODES and not paths[node], "invalid/oversized tree")
 			paths[node] = path
@@ -55,9 +70,6 @@ function M.encode(states, pending)
 		visit(st.tree, ".", 0)
 		local selected = paths[st.selected] or "-"
 		local insertion = paths[st.insertion_anchor] or "-"
-		local function focus_token(path, value)
-			return path == "-" and "-" or string.format("%.0f", integer(value, 1))
-		end
 		assert(st.mode == "tiled" or st.mode == "monocle", "invalid mode")
 		lines[#lines + 1] = string.format("W %.0f %.0f %s %s %s %s %s", id,
 			integer(st.seq or 0, 0), st.mode, selected, focus_token(selected, st.selected_focus_id),
@@ -77,15 +89,19 @@ function M.decode(text)
 		local pos, total, workspaces = 0, 0, 0
 		local function next_token()
 			pos = pos + 1
-			local token = assert(tokens[pos], "truncated checkpoint")
-			return token
+			return (assert(tokens[pos], "truncated checkpoint"))
 		end
-		local function number(minimum) return integer(tonumber(next_token()), minimum) end
+		local function read_integer(minimum)
+			return integer(tonumber(next_token()), minimum)
+		end
 		local function read_presel()
 			local dir, value = next_token(), next_token()
-			if dir == "-" then assert(value == "-", "invalid empty preselection"); return nil end
+			if dir == "-" then
+				assert(value == "-", "invalid empty preselection")
+				return nil
+			end
 			assert(DIRECTIONS[dir], "invalid preselection direction")
-			return { dir=dir, ratio=ratio(tonumber(value)) }
+			return { dir = dir, ratio = ratio(tonumber(value)) }
 		end
 		local header = next_token()
 		assert(header == HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
@@ -93,7 +109,7 @@ function M.decode(text)
 		local result = { states = {}, pending = read_presel() }
 		while pos < #tokens do
 			assert(next_token() == "W", "invalid workspace record")
-			local id, seq, mode = number(-9007199254740991), number(0), next_token()
+			local id, seq, mode = read_integer(-MAX_INTEGER), read_integer(0), next_token()
 			assert(not result.states[id] and (mode == "tiled" or mode == "monocle"), "invalid workspace")
 			workspaces = workspaces + 1
 			assert(workspaces <= MAX_WORKSPACES, "too many workspaces")
@@ -106,39 +122,38 @@ function M.decode(text)
 				total = total + 1
 				assert(total <= MAX_NODES, "too many nodes")
 				if kind == "L" then
-					local leaf_id, age = number(1), number(0)
+					local leaf_id, age = read_integer(1), read_integer(0)
 					assert(not seen_ids[leaf_id], "duplicate leaf")
 					seen_ids[leaf_id] = true
-					return { t="leaf", id=leaf_id, n=age, presel=read_presel() }
+					return { t = "leaf", id = leaf_id, n = age, presel = read_presel() }
 				end
 				assert(kind == "S", "invalid node type")
 				local axis, split_ratio = next_token(), ratio(tonumber(next_token()))
 				assert(axis == "h" or axis == "v", "invalid axis")
-				local node = { t="split", axis=axis, ratio=split_ratio, presel=read_presel() }
+				local node = { t = "split", axis = axis, ratio = split_ratio, presel = read_presel() }
 				local pull_focus = header == HEADER and next_token() or "-"
 				node.a, node.b = read_node(depth + 1), read_node(depth + 1)
 				assert(node.a and node.b, "split missing child")
 				if pull_focus ~= "-" then
 					node.pull_focus_id, node.pull_ids = integer(tonumber(pull_focus), 1), {}
-					local function collect(child)
-						if child.t == "leaf" then node.pull_ids[child.id] = true
-						else collect(child.a); collect(child.b) end
-					end
-					collect(node)
+					collect_ids(node, node.pull_ids)
 					assert(node.pull_ids[node.pull_focus_id], "pull representative outside subtree")
 				end
 				return node
 			end
 			local tree = read_node(0)
 			local function resolve(path, focus)
-				if path == "-" then assert(focus == "-", "orphan focus"); return nil, nil end
+				if path == "-" then
+					assert(focus == "-", "orphan focus")
+					return nil, nil
+				end
 				assert(path:match("^%.[ab]*$") and #path <= MAX_DEPTH + 1, "invalid node path")
 				local node = tree
 				for child in path:sub(2):gmatch(".") do node = node and node[child] end
 				assert(node, "missing selected node")
 				return node, integer(tonumber(focus), 1)
 			end
-			local st = { tree=tree, seq=seq, mode=mode, boxes={}, highlighted={} }
+			local st = { tree = tree, seq = seq, mode = mode, boxes = {}, highlighted = {} }
 			st.selected, st.selected_focus_id = resolve(selected, focused)
 			st.insertion_anchor, st.insertion_window_id = resolve(insertion, inserted)
 			result.states[id] = st
@@ -168,14 +183,20 @@ function M.open(path)
 		local ok, text = pcall(M.encode, states, pending)
 		if not ok then return nil, text end
 		if text == self.last_payload then return true end
-		local tmp = self.path .. ".tmp"
-		local file, err = io.open(tmp, "w")
+		local temporary = self.path .. ".tmp"
+		local file, err = io.open(temporary, "w")
 		if not file then return nil, err end
 		local written, write_error = file:write(text)
 		local closed, close_error = file:close()
-		if not written or not closed then os.remove(tmp); return nil, write_error or close_error end
-		local renamed, rename_error = os.rename(tmp, self.path)
-		if not renamed then os.remove(tmp); return nil, rename_error end
+		if not written or not closed then
+			os.remove(temporary)
+			return nil, write_error or close_error
+		end
+		local renamed, rename_error = os.rename(temporary, self.path)
+		if not renamed then
+			os.remove(temporary)
+			return nil, rename_error
+		end
 		self.last_payload = text
 		return true
 	end
