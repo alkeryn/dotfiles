@@ -9,7 +9,7 @@
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
 --   * transplant (-n @/), global history-based send/pull (super+y)
 --   * selected-subtree desktop transfers (-d --follow)
---   * directional swap / move / grow / shrink between leaves
+--   * directional subtree swap, leaf move, subtree edge grow/shrink
 --   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
 --   * node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
@@ -225,31 +225,59 @@ local function remove_leaf(st, id)
 	return node
 end
 
+-- Exchange disjoint nodes in-place, as in bspwm tree.c:swap_nodes. Moving
+-- references (not IDs) preserves each subtree's splits, ages and preselections.
+local function swap_nodes(st, source, target)
+	local pa, pb = find_path(st.tree, source), find_path(st.tree, target)
+	if not pa or not pb then return false end
+	local a, b = pa[#pa], pb[#pb]
+	if find_path(a, b) or find_path(b, a) then return false end
+	local ap, bp = pa[#pa - 1], pb[#pb - 1]
+	if not ap or not bp then return false end
+	-- Capture both slots before writing: the two nodes may be siblings.
+	local a_first, b_first = ap.a == a, bp.a == b
+	if a_first then ap.a = b else ap.b = b end
+	if b_first then bp.a = a else bp.b = a end
+	return true
+end
+
 -- ---------------------------------------------------------------------------
 -- geometry helpers (uses boxes recorded by place())
 -- ---------------------------------------------------------------------------
 
+-- bspwm find_nearest_neighbor uses the selected NODE's rectangle, excludes
+-- descendants, then ranks leaves by boundary distance and focus history.
+-- These are disjoint tiled rectangles: direction requires an overlapping
+-- perpendicular range and a candidate beyond the selection's outer edge.
 local function neighbor_id(st, id, dir)
-	local b = st.boxes[id]
+	if st.mode ~= "tiled" then return nil end
+	local path = find_path(st.tree, id)
+	local node = path and path[#path]
+	local b = node and node._box
 	if not b then return nil end
-	local cx, cy = b.x + b.w / 2, b.y + b.h / 2
-	local best, bestD
-	for oid, ob in pairs(st.boxes) do
-		if oid ~= id then
-			local ox, oy = ob.x + ob.w / 2, ob.y + ob.h / 2
-			local ok
-			if dir == "l" then
-				ok = ox < cx and b.y < ob.y + ob.h and ob.y < b.y + b.h
-			elseif dir == "r" then
-				ok = ox > cx and b.y < ob.y + ob.h and ob.y < b.y + b.h
-			elseif dir == "u" then
-				ok = oy < cy and b.x < ob.x + ob.w and ob.x < b.x + b.w
-			elseif dir == "d" then
-				ok = oy > cy and b.x < ob.x + ob.w and ob.x < b.x + b.w
+	local excluded, windows = {}, {}
+	collect_ids(node, excluded)
+	for _, w in ipairs(hl.get_windows()) do
+		if w.mapped and not w.floating and not w.hidden then windows[w.stable_id] = w end
+	end
+	local best, best_distance, best_rank
+	for _, candidate in ipairs(leaves(st.tree)) do
+		local oid = candidate.id
+		local ob, w = st.boxes[oid], windows[oid]
+		if ob and w and not excluded[oid] then
+			local distance
+			if (dir == "l" or dir == "r") and b.y < ob.y + ob.h and ob.y < b.y + b.h then
+				if dir == "l" and ob.x + ob.w <= b.x then distance = b.x - (ob.x + ob.w)
+				elseif dir == "r" and ob.x >= b.x + b.w then distance = ob.x - (b.x + b.w) end
+			elseif (dir == "u" or dir == "d") and b.x < ob.x + ob.w and ob.x < b.x + b.w then
+				if dir == "u" and ob.y + ob.h <= b.y then distance = b.y - (ob.y + ob.h)
+				elseif dir == "d" and ob.y >= b.y + b.h then distance = ob.y - (b.y + b.h) end
 			end
-			if ok then
-				local d = (dir == "l" or dir == "r") and math.abs(ox - cx) or math.abs(oy - cy)
-				if not bestD or d < bestD then best, bestD = oid, d end
+			local rank = w.focus_history_id
+			if not rank or rank < 0 then rank = math.huge end
+			if distance and (not best_distance or distance < best_distance
+				or (distance == best_distance and rank < best_rank)) then
+				best, best_distance, best_rank = oid, distance, rank
 			end
 		end
 	end
@@ -763,26 +791,16 @@ local layout_impl = {
 			if rehydrating or transferring or st.mode ~= "tiled" then return true end
 			local source, target = tonumber(parts[2]), tonumber(parts[3])
 			if source ~= fid or not fw.active or source == target then return true end
-			local pa, pb = find_path(st.tree, source), target and find_path(st.tree, target)
-			if not pa or not pb then return true end
-			-- Swap NODES, not just IDs: age and preselection belong to the
-			-- window, just as in bspwm tree.c:swap_nodes(). No remove/reinsert.
-			local a, b = pa[#pa], pb[#pb]
-			local ap, bp = pa[#pa - 1], pb[#pb - 1]
-			local a_first, b_first = ap.a == a, bp.a == b
-			clear_selection(st)
-			if a_first then ap.a = b else ap.b = b end
-			if b_first then bp.a = a else bp.b = a end
+			if target and swap_nodes(st, source, target) then clear_selection(st) end
 			return true
 
 		elseif cmd == "swap" then
-			local nid = neighbor_id(st, fid, parts[2] or "r")
-			if not nid then return true end -- nothing in that direction: ok
-			local pa = find_path(st.tree, fid)
-			local pb = find_path(st.tree, nid)
-			if not pa or not pb then return true end
-			local la, lb = pa[#pa], pb[#pb]
-			la.id, lb.id = lb.id, la.id
+			if rehydrating or transferring or not fw.active or fw.floating or fw.hidden then return true end
+			local nid = neighbor_id(st, node, parts[2] or "r")
+			if not nid then return true end -- no external neighbour in that direction
+			swap_nodes(st, node, nid)
+			-- Keep keyboard focus and the selection on the same node. Its
+			-- representative moves with it, so no focus/tag dispatch is needed.
 			return true
 
 		elseif cmd == "move" then
@@ -1328,15 +1346,19 @@ function M.close()
 	if w and w.mapped then hl.dispatch(hl.dsp.window.close({ window = w })) end
 end
 
--- true when the focused window has a tiled neighbour in direction `dir`
--- (l|r|u|d); lets callers pick a fallback without making the layout reject a
--- message (a rejected layout message is shown as an ERROR overlay).
+-- Use the same selected node/search as `swap`, so an internal neighbour does
+-- not suppress the monitor fallback when the whole selection is at an edge.
 function M.has_neighbor(dir)
+	if rehydrating or transferring then return false end
 	local w = hl.get_active_window()
-	if not w or not w.workspace then return false end
+	if not w or not w.mapped or w.floating or w.hidden or not w.workspace then return false end
 	local st = S[w.workspace.id]
-	if not st or st.mode == "monocle" then return false end
-	return neighbor_id(st, w.stable_id, dir) ~= nil
+	if not st then return false end
+	local node = st.selected
+	if not node or st.selected_focus_id ~= w.stable_id or not find_path(st.tree, node) then
+		node = w.stable_id
+	end
+	return neighbor_id(st, node, dir) ~= nil
 end
 
 return M

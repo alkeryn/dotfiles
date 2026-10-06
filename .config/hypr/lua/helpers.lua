@@ -69,8 +69,10 @@ end
 -- default), which is `bspc node -f $A || bspc monitor -f $A`.
 --
 -- Swap: `bspc node -s $A --follow || bspc node -d $A:focused --follow`, i.e. swap
--- with the tree neighbour, or else send the window to the monitor in that
--- direction. A layout rejecting a message is reported as an ERROR (on-screen
+-- the selected subtree (or focused leaf) with an external neighbour, or else
+-- send that entire node to the monitor in that direction. The neighbour search
+-- uses the selection's outer box, never one of its own children.
+-- A layout rejecting a message is reported as an ERROR (on-screen
 -- overlay), so we ask the layout whether a neighbour exists instead of using
 -- failure as control flow.
 

@@ -364,13 +364,20 @@ function tests.selected_desktop_move_uses_destination_last_focus_not_arbitrary_l
 end
 
 function tests.selected_desktop_move_monitor_fallback_transfers_entire_selection()
-	local f = fixture()
-	f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
-	local node = f.states[1].selected
-	hl.get_monitor = function() return f.workspaces[2].monitor end
-	f.helpers().swap_dir("r")
-	assert(#f.moves == 2 and f.states[2].tree == node and f.states[2].selected == node)
-	f.consistent()
+	for _, dir in ipairs({ "l", "r", "u", "d" }) do
+		local f = fixture()
+		f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
+		local node = f.states[1].selected
+		hl.get_monitor = function(requested)
+			assert(requested == dir)
+			return f.workspaces[2].monitor
+		end
+		-- Even on the representative's left, its sibling belongs to the
+		-- selection and must not suppress the whole-subtree monitor transfer.
+		f.helpers().swap_dir(dir)
+		assert(#f.moves == 2 and f.states[2].tree == node and f.states[2].selected == node)
+		f.consistent()
+	end
 end
 
 function tests.selected_desktop_move_single_window_and_float_keep_native_follow()

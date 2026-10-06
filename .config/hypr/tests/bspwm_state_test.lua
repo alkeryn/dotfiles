@@ -169,6 +169,27 @@ function tests.rotated_resized_swapped_tree_survives_repeated_reload()
 	end
 end
 
+function tests.swapped_selected_subtree_and_metadata_survive_repeated_reload()
+	local f = fixture()
+	for id = 1, 3 do f.open(id) end
+	f.message("focus parent"); f.message("grow u 40")
+	f.message("preselect r"); f.message("pratio 0.3")
+	f.message("swap l")
+	local expected, saved = f.geometry(), read_file(f.path)
+	for _ = 1, 3 do
+		f.reload(); f.expect_geometry(expected)
+		assert(read_file(f.path) == saved)
+		local st = f.states[1]
+		assert(st.selected == st.tree.a and st.tree.b.id == 1 and st.selected_focus_id == 3)
+		assert(st.selected.presel.dir == "r" and st.selected.presel.ratio == 0.3)
+		assert(st.selected.a.n == 2 and st.selected.b.n == 3)
+		for id = 2, 3 do assert(f.windows[id].tags.bspwm_selected) end
+		f.message("swap r"); f.message("swap l")
+		f.expect_geometry(expected)
+		assert(read_file(f.path) == saved, "inverse swaps altered the selected subtree")
+	end
+end
+
 function tests.reload_event_without_replacing_lua_state_keeps_tree()
 	-- Hyprland retains the old Lua state when the new config fails syntax
 	-- validation, but still emits config.reloaded and runs the alias flip.

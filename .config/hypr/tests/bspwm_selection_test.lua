@@ -3,6 +3,8 @@
 local layout_path = arg[1] or "lua/extensions/bspwm.lua"
 local tests = {}
 package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
+-- Bindings need constants, not the host's ~/bin/wpc machine detection.
+package.loaded["lua/vars"] = { FLOAT_STEP = 20, terminal = "alacritty", GAPS = 4, GAPS_OUT = 8 }
 local selection_tag = "bspwm_selected"
 
 local function fixture(count)
@@ -37,6 +39,10 @@ local function fixture(count)
 			return bind
 		end,
 		get_active_window = function() return f.active end,
+		get_monitor = function(dir)
+			f.monitor_fallback = dir
+			return nil
+		end,
 		get_windows = function()
 			local result = {}
 			for _, w in pairs(f.windows) do if w.mapped then result[#result + 1] = w end end
@@ -85,6 +91,7 @@ local function fixture(count)
 		end
 	end
 	f.api = dofile(layout_path)
+	f.api.set_feedback_sink(function(states) f.states = states end)
 
 	function f.load_bindings()
 		package.loaded["lua/extensions/bspwm"] = f.api
@@ -163,6 +170,15 @@ local function fixture(count)
 	end
 	for id = 1, count or 4 do f.open(id) end
 	return f
+end
+
+local function leaf_by_id(node, id)
+	if node.t == "leaf" then return node.id == id and node or nil end
+	return leaf_by_id(node.a, id) or leaf_by_id(node.b, id)
+end
+
+local function split(axis, a, b, ratio)
+	return { t = "split", axis = axis, a = a, b = b, ratio = ratio or 0.5 }
 end
 
 function tests.parent_climbs_two_three_four_windows_and_stops()
@@ -339,6 +355,205 @@ function tests.flip_applies_to_selected_three_window_subtree()
 	assert(f.ctx.targets[2].box.y == 1080, "flip affected only the representative's parent")
 	assert(f.ctx.targets[3].box.y == 0 and f.ctx.targets[4].box.y == 0)
 	f.expect_selection(2, 3, 4)
+end
+
+for _, case in ipairs({
+	{ key = "h", rotation = 0 }, { key = "k", rotation = 90 },
+	{ key = "l", rotation = 180 }, { key = "j", rotation = 270 },
+}) do
+	tests["directional_swap_selected_subtree_" .. case.key] = function()
+		local f = fixture(3)
+		f.message("focus parent"); f.message("focus parent")
+		if case.rotation ~= 0 then f.message("rotate " .. case.rotation) end
+		f.focus(1); f.message("preselect l"); f.message("pratio 0.2")
+		f.focus(3); f.message("focus parent")
+		f.message("preselect u"); f.message("pratio 0.3")
+		local st = f.states[1]
+		local root, selected = st.tree, st.selected
+		selected.ratio = 0.37; f.recalculate()
+		local a, b = selected.a, selected.b
+		local target = root.a == selected and root.b or root.a
+		local target_box, selection_box = target._box, selected._box
+		local selected_first = root.a == selected
+		local tag_calls = f.tag_calls
+		f.load_bindings(); f.press("SUPER + SHIFT + " .. case.key)
+		assert((selected_first and root.b or root.a) == selected, "swapped a leaf instead of the whole subtree")
+		assert((selected_first and root.a or root.b) == target, "target did not take the selection's old slot")
+		assert(selected.a == a and selected.b == b and selected.ratio == 0.37)
+		assert(selected.presel.dir == "u" and selected.presel.ratio == 0.3 and target.presel.ratio == 0.2)
+		assert(selected._box.x == target_box.x and selected._box.y == target_box.y
+			and selected._box.w == target_box.w and selected._box.h == target_box.h)
+		f.expect_box(1, selection_box.x, selection_box.y, selection_box.w, selection_box.h)
+		assert(f.active.stable_id == 3 and st.selected == selected and st.selected_focus_id == 3)
+		assert(f.tag_calls == tag_calls and not f.monitor_fallback)
+		f.expect_selection(2, 3)
+	end
+end
+
+function tests.directional_swap_non_siblings_and_repeated_inverse()
+	local f = fixture(4)
+	f.focus(1); f.focus(4); f.message("focus parent")
+	local st = f.states[1]
+	local root, selected, target, other = st.tree, st.selected, st.tree.a, st.tree.b.a
+	local parent = root.b
+	local ratio = selected.ratio
+	local before = f.snapshot()
+	f.load_bindings()
+	for _ = 1, 5 do
+		f.press("SUPER + SHIFT + h")
+		assert(root.a == selected and parent.b == target and parent.a == other)
+		f.expect_box(2, before[2].x, before[2].y, before[2].w, before[2].h)
+		f.expect_selection(3, 4)
+		assert(selected.ratio == ratio and f.active.stable_id == 4)
+		f.press("SUPER + SHIFT + l")
+		assert(root.a == target and parent.b == selected and parent.a == other)
+		for id, b in pairs(before) do f.expect_box(id, b.x, b.y, b.w, b.h) end
+		f.expect_selection(3, 4)
+	end
+end
+
+function tests.directional_swap_uses_full_selection_box_and_focus_history()
+	local f = fixture(4)
+	local st, nodes = f.states[1], {}
+	for id = 1, 4 do nodes[id] = leaf_by_id(st.tree, id) end
+	st.tree = split("h", split("v", nodes[1], nodes[2]), split("v", nodes[3], nodes[4]))
+	f.recalculate()
+	-- The representative is bottom-right, but the selected right column also
+	-- overlaps top-left. Equidistant neighbours use history, not its leaf box.
+	f.focus(1); f.focus(4); f.message("focus parent")
+	local selected, left = st.selected, st.tree.a
+	f.load_bindings(); f.press("SUPER + SHIFT + h")
+	assert(left.a == selected and left.b == nodes[2] and st.tree.b == nodes[1])
+	f.expect_selection(3, 4)
+end
+
+function tests.directional_swap_prefers_boundary_distance_to_centres_and_breaks_ties_by_history()
+	local f = fixture(5)
+	local st, nodes = f.states[1], {}
+	for id = 1, 5 do nodes[id] = leaf_by_id(st.tree, id) end
+	local lower = split("h", nodes[2], nodes[3])
+	local left = split("v", nodes[1], lower)
+	st.tree = split("h", left, split("v", nodes[4], nodes[5]), 0.75)
+	f.recalculate()
+	-- 1 and 3 touch the selection. 3 has a closer centre, but 1 was focused
+	-- later. 2 is even newer, but its boundary is farther away than either.
+	f.focus(1); f.focus(2); f.focus(5); f.message("focus parent")
+	local selected = st.selected
+	f.message("swap l")
+	assert(left.a == selected and st.tree.b == nodes[1] and lower.a == nodes[2] and lower.b == nodes[3])
+	f.expect_selection(4, 5)
+end
+
+function tests.directional_swap_skips_hidden_neighbours()
+	local f = fixture(4)
+	local st, nodes = f.states[1], {}
+	for id = 1, 4 do nodes[id] = leaf_by_id(st.tree, id) end
+	local left = split("v", nodes[1], nodes[2])
+	st.tree = split("h", left, split("v", nodes[3], nodes[4]))
+	f.recalculate(); f.focus(1); f.focus(4); f.message("focus parent")
+	f.windows[1].hidden = true
+	local selected = st.selected
+	f.message("swap l")
+	assert(left.a == nodes[1] and left.b == selected and st.tree.b == nodes[2])
+	f.expect_selection(3, 4)
+end
+
+function tests.directional_swap_unranked_ties_use_stable_tree_order()
+	local f = fixture(4)
+	local st, nodes = f.states[1], {}
+	for id = 1, 4 do nodes[id] = leaf_by_id(st.tree, id) end
+	local left = split("v", nodes[1], nodes[2])
+	st.tree = split("h", left, split("v", nodes[3], nodes[4]))
+	f.recalculate(); f.message("focus parent")
+	for _, w in pairs(f.windows) do w.focus_history_id = -1 end
+	local selected = st.selected
+	f.message("swap l")
+	assert(left.a == selected and st.tree.b == nodes[1])
+end
+
+function tests.directional_swap_root_excludes_all_descendants_and_reaches_monitor_fallback()
+	local f = fixture(4)
+	f.message("focus parent"); f.message("focus parent"); f.message("focus parent")
+	local selected, before, calls = f.states[1].selected, f.snapshot(), f.tag_calls
+	f.load_bindings()
+	for key, dir in pairs({ h = "l", j = "d", k = "u", l = "r" }) do
+		assert(not f.api.has_neighbor(dir), "a descendant was treated as an external neighbour")
+		f.message("swap " .. dir)
+		f.monitor_fallback = nil
+		f.press("SUPER + SHIFT + " .. key)
+		assert(f.monitor_fallback == dir and f.states[1].selected == selected)
+		for id, b in pairs(before) do f.expect_box(id, b.x, b.y, b.w, b.h) end
+		f.expect_selection(1, 2, 3, 4)
+	end
+	assert(f.tag_calls == calls)
+end
+
+function tests.directional_swap_leaf_identity_age_and_presels_travel_with_window()
+	for _, explicit_selection in ipairs({ false, true }) do
+		local f = fixture(2)
+		f.focus(1); f.message("preselect u"); f.message("pratio 0.2")
+		f.focus(2); f.message("preselect r"); f.message("pratio 0.3")
+		if explicit_selection then f.message("focus parent"); f.message("focus second") end
+		local st = f.states[1]
+		local root, a, b = st.tree, st.tree.a, st.tree.b
+		local age_a, age_b = a.n, b.n
+		f.load_bindings(); f.press("SUPER + SHIFT + h")
+		assert(root.a == b and root.b == a and a.id == 1 and b.id == 2)
+		assert(a.n == age_a and b.n == age_b and a.presel.ratio == 0.2 and b.presel.ratio == 0.3)
+		assert(f.active.stable_id == 2)
+		if explicit_selection then assert(st.selected == b and st.selected_focus_id == 2) end
+		f.expect_selection(2); f.expect_no_tags()
+	end
+end
+
+function tests.directional_swap_preserves_selection_as_new_window_insertion_anchor()
+	local f = fixture(3)
+	f.message("focus parent"); f.message("preselect r"); f.message("pratio 0.3")
+	local st = f.states[1]
+	local selected, target = st.selected, st.tree.a
+	f.message("swap l")
+	assert(st.tree.a == selected)
+	f.open(4)
+	assert(st.tree.a.a == selected and st.tree.a.b.id == 4 and st.tree.b == target)
+	assert(st.tree.a.ratio == 0.3 and not selected.presel)
+	f.expect_selection(4); f.expect_no_tags()
+end
+
+function tests.directional_swap_no_external_target_is_noop()
+	local f = fixture(4)
+	f.message("focus parent") -- bottom-right pair; no tile to its right/below
+	local st, before = f.states[1], f.snapshot()
+	local selected = st.selected
+	for _, dir in ipairs({ "r", "d" }) do
+		assert(not f.api.has_neighbor(dir))
+		f.message("swap " .. dir)
+		assert(st.selected == selected)
+		for id, b in pairs(before) do f.expect_box(id, b.x, b.y, b.w, b.h) end
+		f.expect_selection(3, 4)
+	end
+end
+
+function tests.directional_swap_does_not_mutate_tiles_without_active_tile_or_in_monocle()
+	for _, mode in ipairs({ "float", "no_focus", "monocle" }) do
+		local f = fixture(3)
+		f.message("focus parent")
+		if mode == "float" then
+			f.windows[99] = { stable_id = 99, mapped = true, floating = true, tags = { personal = true }, workspace = { id = 1 } }
+			f.focus(99)
+		elseif mode == "no_focus" then f.focus(nil)
+		else
+			hl.workspace_rule = function() return { set_enabled = function() end } end
+			f.message("monocle")
+		end
+		local before, root = f.snapshot(), f.states[1].tree
+		local a, b = root.a, root.b
+		for _, dir in ipairs({ "l", "r", "u", "d" }) do
+			assert(not f.api.has_neighbor(dir))
+			f.message("swap " .. dir)
+			assert(root.a == a and root.b == b)
+			for id, box in pairs(before) do f.expect_box(id, box.x, box.y, box.w, box.h) end
+		end
+	end
 end
 
 function tests.resize_selected_subtree_uses_its_outer_edge()
