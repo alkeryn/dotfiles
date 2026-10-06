@@ -1,19 +1,23 @@
 -- vars.lua -- machine detection + shared constants
 -- ============================================================================
 -- Module: returns the shared state table used by helpers/rules/bindings.
--- PC is auto-detected from /etc/hostname, like ~/bin/wpc did with $PC.
+-- PC comes from ~/bin/wpc, just like bspwmrc.
 -- ============================================================================
 
 local M = {}
 
-M.PC = "mainpc"
 do
-	local f = io.open("/etc/hostname", "r")
-	if f then
-		local host = f:read("*l") or ""
-		f:close()
-		if host:find("laptop") or host:find("nomad") then M.PC = "laptop" end
-	end
+	-- Source wpc in Bash: executing it alone cannot export variables back to Lua.
+	local pipe = assert(io.popen([=[bash --noprofile --norc -c '
+		source "$HOME/bin/wpc" >/dev/null && printf "%s\n" "$PC"
+	']=], "r"), "vars.lua: could not start Bash to source wpc")
+	local pc = pipe:read("*l")
+	-- Hyprland uses SA_NOCLDWAIT, so pclose can return ECHILD even on success.
+	-- The shell prints PC only if sourcing wpc succeeded; validate that output.
+	pipe:close()
+	assert(pc == "mainpc" or pc == "laptop",
+		"vars.lua: wpc failed or did not set PC to mainpc/laptop")
+	M.PC = pc
 end
 
 M.GAPS       = 4   -- previous attempt: gaps_in 4, gaps_out 8 (bspwm window_gap 8)
