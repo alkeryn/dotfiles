@@ -133,6 +133,11 @@ hl.config({
 		numlock_by_default = true,          -- numlockx on
 		follow_mouse = 2,                   -- previous attempt tuning (was 0 here)
 		float_switch_override_focus = 0,
+		-- what to focus when the focused window closes:
+		--   1 = window under the cursor (the wrong-monitor trap),
+		--   2 = most recently focused window of the workspace (bspwm-like).
+		-- Empty-workspace closes are handled by lua/close_refocus.lua.
+		focus_on_close = 2,
 		sensitivity = 0,
 		touchpad = { natural_scroll = false },
 	},
@@ -218,12 +223,6 @@ hl.on("hyprland.start", function()
 		hl.exec_cmd("ckb-next -b")
 		-- hl.exec_cmd("conky -q")                               -- XWayland
 		hl.exec_cmd("signal-desktop")
-		-- last-window-close refocus bug workaround (socket2 watcher).
-		-- Still relevant in v0.56.2: when a workspace empties, focus falls
-		-- back to cursor position (InputManager::refocus), which can land on
-		-- the wrong monitor. Drop this script if the bug proves fixed.
-
-		-- hl.exec_cmd("$HOME/.config/hypr/scripts/close_refocus_fix")
 	else
 		hl.exec_cmd("signal-desktop")
 	end
@@ -250,5 +249,6 @@ end)
 -- rules + bindings (each in its own module)
 -- ---------------------------------------------------------------------------
 
-require("lua/rules")    -- window/workspace rules + monitor->tag assignment
-require("lua/bindings") -- keybindings
+require("lua/rules")           -- window/workspace rules + monitor->tag assignment
+require("lua/bindings")        -- keybindings
+require("lua/close_refocus")   -- keep the right monitor focused when a workspace empties
