@@ -17,11 +17,13 @@
   and monitors; see `bspwm_focus.md` for source references and parity checks.
 - `presel_feedback.lua`: preview geometry and atomic V3 JSON publication to the
   existing renderer, including retirement of legacy protocol files.
-- `close_refocus.lua`: empty-workspace focus correction and bounded rechecks.
 
 `../helpers.lua` provides the public window/focus/workspace/gap/monitor helpers
 used by bindings and rules. All `require` paths are relative to the main config
 root, not this directory.
+
+Empty-workspace refocus prevention is provided by the native
+[`hypr_extras` plugin](../../plugins/hypr_extras/README.md), not a Lua extension.
 
 ## Behavior-sensitive details
 

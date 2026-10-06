@@ -18,6 +18,10 @@
 --   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
+-- Native extras; build, testing, and rollback instructions:
+-- plugins/hypr_extras/README.md
+hl.plugin.load(os.getenv("HOME") .. "/.config/hypr/plugins/hypr_extras/build/hypr_extras.so")
+
 local bspwm = require("lua/extensions/bspwm") -- registers the "lua:bspwm" layout
 require("lua/extensions/presel_feedback").setup(bspwm)
 hl.layer_rule({
@@ -135,7 +139,7 @@ hl.config({
 		-- what to focus when the focused window closes:
 		--   1 = window under the cursor (the wrong-monitor trap),
 		--   2 = most recently focused window of the workspace (bspwm-like).
-		-- Empty-workspace closes are handled by lua/extensions/close_refocus.lua.
+		-- Empty-workspace refocus prevention requires the hypr_extras plugin.
 		focus_on_close = 2,
 		sensitivity = 0,
 		touchpad = { natural_scroll = false },
@@ -204,4 +208,3 @@ require("lua/autostart") -- startup commands
 
 require("lua/rules")           -- window/workspace rules + monitor->tag assignment
 require("lua/bindings")        -- keybindings
-require("lua/extensions/close_refocus")   -- keep the right monitor focused when a workspace empties
