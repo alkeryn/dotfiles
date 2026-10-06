@@ -70,7 +70,8 @@ hl.config({
 	render = {
 		cm_enabled = true,
 		cm_auto_hdr = 1,      -- auto HDR when a fullscreen app requests it
-		direct_scanout = 1,   -- previous attempt: direct_scanout = true
+		-- Workaround for stale frames after closing fullscreen mpv: keep compositing.
+		direct_scanout = 0,
 		-- cm_fs_passthrough: existed on the old build, gone in v0.56.2 --
 		-- cm_auto_hdr + surface-driven metadata cover it.
 	},
