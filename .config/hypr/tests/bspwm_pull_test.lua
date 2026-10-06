@@ -1,4 +1,5 @@
--- lua tests/bspwm_pull_test.lua -- pull and desktop swap; native move/recalculation ordering is mocked.
+-- lua tests/bspwm_pull_test.lua -- pull, desktop swap and pointer drag;
+-- native move/recalculation ordering and pointer timers are mocked.
 local codec = require("lua/extensions/bspwm_state")
 local tests = {}
 -- Bindings need constants, not the host's ~/bin/wpc machine detection.
@@ -18,7 +19,7 @@ local function fixture()
 	end
 	function f.workspace(id, monitor)
 		if f.workspaces[id] then return f.workspaces[id] end
-		local mon = monitor or { name = "monitor-" .. id, position = { x = (id - 1) * 2000, y = 0 }, width = 1600, height = 900, scale = 1 }
+		local mon = monitor or { id = id, name = "monitor-" .. id, position = { x = (id - 1) * 2000, y = 0 }, width = 1600, height = 900, scale = 1 }
 		local ws = { id = id, name = tostring(id), monitor = mon, tiled_layout = "lua:bspwm", visible = true }
 		function ws:get_windows()
 			local result = {}
@@ -29,6 +30,7 @@ local function fixture()
 			return result
 		end
 		f.workspaces[id] = ws
+		mon.active_workspace = mon.active_workspace or ws
 		f.contexts[id] = { area = { x = mon.position.x, y = mon.position.y, w = 1600, h = 900 }, targets = {} }
 		return ws
 	end
@@ -46,6 +48,7 @@ local function fixture()
 		for _, w in pairs(f.windows) do w.active = w == window end
 		local old_ws = f.active_ws
 		f.active, f.active_ws = window, window.workspace
+		window.workspace.last_window = window
 		if old_ws ~= f.active_ws then
 			f.emit("workspace.active", f.active_ws)
 			if not old_ws or old_ws.monitor ~= f.active_ws.monitor then f.emit("monitor.focused", window.monitor) end
@@ -120,7 +123,7 @@ local function fixture()
 			bind = function(keys, dispatcher) f.binds[keys] = dispatcher end,
 			dispatch = function(dispatcher) return dispatcher() end,
 			dsp = setmetatable({
-				layout = function(message) return function() return f.message(message) end end,
+				layout = function(message) return function() return { ok = f.message(message) == true } end end,
 				focus = function(opts) return function()
 					if opts.workspace then
 						f.active_ws, f.active = assert(hl.get_workspace(opts.workspace)), nil
@@ -181,6 +184,7 @@ local function fixture()
 		function target:place(box)
 			if f.throw_placement then error("synthetic placement exception") end
 			self.box = box
+			window.at, window.size = { x = box.x, y = box.y }, { x = box.w, y = box.h }
 		end
 		f.windows[id] = window
 		if not window.floating then table.insert(f.contexts[ws.id].targets, target) end
@@ -683,6 +687,200 @@ function tests.workspace_swap_bindings_reach_monitor_local_swap()
 	f.binds["SUPER + ALT + dollar"]()
 	assert(f.active_ws.id == 5)
 	f.consistent()
+end
+
+-- Drive the actual input module and real binding callbacks through the same
+-- native-layout fixture. No desktop, IPC polling process or physical mouse.
+local function pointer_fixture()
+	local f = fixture()
+	f.layers, f.timers, f.native_drags = {}, {}, 0
+	hl.get_cursor_pos = function() return f.pos end
+	hl.get_monitor_at_cursor = function() return f.pointer_monitor end
+	hl.get_layers = function() return f.layers end
+	hl.timer = function(callback, opts)
+		assert(opts.type == "repeat" and opts.timeout == 17)
+		local timer = { enabled = true, callback = callback }
+		function timer:set_enabled(enabled) self.enabled = enabled end
+		f.timers[#f.timers + 1] = timer
+		return timer
+	end
+	hl.dsp.window.drag = function() return function() f.native_drags = f.native_drags + 1 end end
+	f.helpers()
+	package.loaded["lua/bindings"] = nil
+	require("lua/bindings")
+	function f.point(x, y, mon)
+		f.pos = { x = x, y = y }
+		f.pointer_monitor = mon or f.workspaces[1].monitor
+	end
+	function f.tick()
+		for _, timer in ipairs(f.timers) do if timer.enabled then timer.callback() end end
+	end
+	function f.start() f.binds["SUPER + mouse:272"]() end
+	function f.release() f.binds["mouse:272"]() end
+	return f
+end
+
+function tests.pointer_swaps_repeatedly_while_held_without_floating_or_reinsertion()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.open(3)
+	f.presel(1, "l", 0.3); f.focus(3)
+	local node, root = f.leaf(1), f.states[1].tree
+	local original, second, third = f.box(1), f.box(2), f.box(3)
+	local function center(b) f.point(b.x + b.w / 2, b.y + b.h / 2); f.tick() end
+	center(original); f.start()
+	assert(f.active.stable_id == 1, "must grab hovered window, not keyboard focus (3)")
+	center(second)
+	assert(f.box(1).x == second.x and f.box(1).y == second.y)
+	assert(f.box(2).x == original.x and f.box(2).y == original.y)
+	assert(f.leaf(1) == node and node.presel.dir == "l" and root == f.states[1].tree)
+	local after = codec.encode(f.states)
+	f.tick(); assert(codec.encode(f.states) == after, "stationary cursor must not swap back")
+	center(third)
+	assert(f.box(1).y == third.y and f.active.stable_id == 1)
+	assert(f.leaf(1) == node and f.native_drags == 0 and #f.moves == 0)
+	for _, w in pairs(f.windows) do assert(not w.floating) end
+	f.release(); after = codec.encode(f.states)
+	center(original)
+	assert(codec.encode(f.states) == after and not f.timers[1].enabled, "release ends swapping")
+	f.consistent()
+end
+
+function tests.pointer_swaps_siblings_and_back_and_survives_checkpoint_reload()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.presel(1, "d", 0.23); f.presel(2, "l", 0.72)
+	f.point(200, 200); f.start()
+	local before = codec.encode(f.states)
+	f.point(1000, 200); f.tick()
+	assert(f.states[1].tree.a.id == 2 and f.states[1].tree.b.id == 1)
+	f.point(200, 200); f.tick()
+	assert(codec.encode(f.states) == before)
+	f.point(1000, 200); f.tick(); f.release()
+	local after = codec.encode(f.states)
+	f.load(after)
+	assert(codec.encode(f.states) == after)
+	f.consistent()
+end
+
+function tests.pointer_empty_space_layers_and_floats_do_not_swap_underlying_tiles()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	local float = f.open(3, 1, true)
+	float.at, float.size = { x = 900, y = 100 }, { x = 200, y = 200 }
+	f.point(200, 200); f.start()
+	local before = codec.encode(f.states)
+	f.point(1000, 200); f.tick()
+	assert(codec.encode(f.states) == before, "floating occlusion")
+	f.point(1700, 200); f.tick()
+	assert(codec.encode(f.states) == before, "empty desktop/gap")
+	f.layers = { { mapped = true, layer = 3, namespace = "launcher", x = 1100, y = 100, w = 200, h = 200 } }
+	f.point(1200, 200); f.tick()
+	assert(codec.encode(f.states) == before, "layer occlusion")
+	f.layers[1].namespace = "bspwm-presel-feedback"
+	f.point(1201, 200); f.tick()
+	assert(codec.encode(f.states) ~= before, "feedback must be click-through")
+	f.release()
+end
+
+function tests.pointer_native_float_drag_releases_and_ctrl_override_remains_native()
+	local f = pointer_fixture()
+	local float = f.open(1, 1, true)
+	float.at, float.size = { x = 0, y = 0 }, { x = 500, y = 500 }
+	f.point(200, 200); f.start()
+	assert(f.native_drags == 1 and #f.timers == 0)
+	f.release(); f.start() -- native releasePending reinvokes the press callback
+	assert(f.native_drags == 2 and #f.timers == 0)
+	f.start(); f.start(); f.release() -- reverse release callback order is safe too
+	assert(f.native_drags == 4)
+	f.binds["SUPER + CTRL + mouse:272"]()
+	assert(f.native_drags == 5)
+end
+
+function tests.pointer_reuses_timer_and_cancels_on_close_submap_and_reload()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	for _, event in ipairs({ "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }) do
+		f.point(200, 200); f.start()
+		assert(#f.timers == 1 and f.timers[1].enabled)
+		f.emit(event)
+		assert(not f.timers[1].enabled)
+	end
+	f.start(); f.emit("window.close", f.windows[2]); assert(f.timers[1].enabled)
+	f.emit("window.close", f.windows[1]); assert(not f.timers[1].enabled)
+end
+
+function tests.pointer_focus_loss_or_missing_workspace_cancels_safely()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(200, 200); f.start()
+	f.active = nil -- e.g. a session lock taking focus
+	f.tick(); assert(not f.timers[1].enabled)
+	f.start(); f.windows[1].workspace = nil
+	f.tick(); assert(not f.timers[1].enabled)
+	assert(not f.api.drag_valid(nil))
+	assert(not f.api.drag_valid({ mapped = true }))
+end
+
+function tests.pointer_invalid_sources_and_targets_never_enter_native_drag()
+	for _, prop in ipairs({ "floating", "hidden", "fullscreen", "group", "visible", "mapped" }) do
+		local f = pointer_fixture()
+		f.open(1); f.open(2)
+		f.point(200, 200); f.start()
+		local before = codec.encode(f.states)
+		f.windows[2][prop] = ({ fullscreen = 2, group = {}, visible = false, mapped = false })[prop]
+		if prop == "floating" or prop == "hidden" then f.windows[2][prop] = true end
+		f.point(1000, 200); f.tick()
+		assert(codec.encode(f.states) == before and f.native_drags == 0, prop)
+		f.windows[1].mapped = false
+		f.tick(); assert(not f.timers[1].enabled)
+	end
+	local f = pointer_fixture()
+	f.open(1); f.message("monocle")
+	f.point(200, 200); f.start()
+	assert(#f.timers == 0 and f.native_drags == 0)
+end
+
+function tests.pointer_cross_monitor_transfers_tiled_node_then_continues_swapping()
+	local f = pointer_fixture()
+	f.open(1, 1); f.open(2, 2); f.open(3, 2)
+	f.presel(1, "u", 0.3); f.presel(2, "l", 0.25)
+	local node, target_node = f.leaf(1), f.leaf(2)
+	f.point(200, 200); f.start()
+	f.point(2100, 200, f.workspaces[2].monitor); f.tick()
+	assert(f.windows[1].workspace.id == 2 and f.active.stable_id == 1)
+	assert(f.leaf(1) == node and node.presel.dir == "u" and not target_node.presel)
+	assert(not f.states[1].tree and not next(f.states[1].boxes))
+	assert(#f.moves == 1 and not f.windows[1].floating and f.native_drags == 0)
+	local target = f.box(3)
+	f.point(target.x + target.w / 2, target.y + target.h / 2, f.workspaces[2].monitor); f.tick()
+	assert(f.box(1).x == target.x and f.box(1).y == target.y)
+	f.release(); f.consistent()
+end
+
+function tests.pointer_transfers_to_empty_named_workspace()
+	local f = pointer_fixture()
+	f.open(1)
+	local dest = f.workspace(-1300)
+	dest.name = "named"
+	f.point(200, 200); f.start()
+	f.point(-2600000, 200, dest.monitor); f.tick()
+	assert(f.windows[1].workspace == dest and f.active.stable_id == 1)
+	assert(f.moves[1].workspace == "name:named")
+	f.consistent(); f.release()
+end
+
+function tests.pointer_failed_native_transfer_stops_and_releases_layout_guard()
+	for _, fail in ipairs({ "fail_id", "throw_id", "ignore_move", "throw_placement" }) do
+		local f = pointer_fixture()
+		f.open(1, 1); f.open(2, 2)
+		f.point(200, 200); f.start()
+		f[fail] = fail == "ignore_move" or fail == "throw_placement" or 1
+		f.point(2100, 200, f.workspaces[2].monitor); f.tick()
+		assert(not f.timers[1].enabled)
+		f[fail] = nil
+		assert(f.api.drag_valid(f.windows[1]), "transfer guard must be released")
+		f.recalculate(1); f.recalculate(2); f.consistent()
+	end
 end
 
 local names, failures = {}, 0

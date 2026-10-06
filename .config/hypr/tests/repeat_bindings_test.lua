@@ -19,7 +19,8 @@ _G.hl = {
 require("lua/bindings")
 
 local mouse_binds = {
-	["SUPER + mouse:272"] = true,
+	["SUPER + mouse:272"] = false, -- custom held-button tiled swap, not native MBIND
+	["mouse:272"] = false, -- non-consuming release observer
 	["SUPER + CTRL + mouse:272"] = true,
 	["SUPER + mouse:273"] = true,
 	["SUPER + mouse_down"] = false,
@@ -38,7 +39,10 @@ for keys, opts in pairs(binds) do
 		if opts.repeating ~= true then missing_repeat[#missing_repeat + 1] = keys end
 	end
 end
-assert(mouse_count == 5, "lost a mouse binding")
+assert(mouse_count == 6, "lost a mouse binding")
+local release = binds["mouse:272"]
+assert(release.release and release.ignore_mods and release.non_consuming and release.transparent
+	and release.locked and release.dont_inhibit and release.submap_universal, "drag release must always stop without consuming clicks")
 assert(keyboard_count > 100, "did not load all keyboard bindings")
 table.sort(missing_repeat)
 assert(#missing_repeat == 0, "keyboard bindings missing repeat:\n" .. table.concat(missing_repeat, "\n"))

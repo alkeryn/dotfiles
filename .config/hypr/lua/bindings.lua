@@ -231,10 +231,18 @@ for mods, list in pairs(SOUNDS) do
 end
 hl.bind("SUPER + KP_Insert",     hl.dsp.exec_cmd("pkill paplay"), { repeating = true })
 
--- mouse: move/resize. Previous attempt swapped windows by dragging
--- (bindm swapwindow) -- that mouse mode no longer exists in v0.56.2
--- (MBIND is move/resize only), so SUPER-drag now moves like stock.
-hl.bind("SUPER + mouse:272",     hl.dsp.window.drag(), { mouse = true })
+-- bspwm pointer move: tiles swap on hover while held; floats move normally.
+-- Do NOT use native window.drag for tiles: it floats/removes them until drop.
+local pointer_drag = require("lua/extensions/bspwm_drag").new(require("lua/extensions/bspwm"))
+hl.bind("SUPER + mouse:272", pointer_drag.begin)
+-- A release must end the grab even if Super went up first, another modifier
+-- was pressed, an inhibitor appeared, or the submap/lock state changed. This
+-- observer does not consume ordinary clicks or interfere with native drags.
+hl.bind("mouse:272", pointer_drag.stop, {
+	release = true, ignore_mods = true, non_consuming = true, transparent = true,
+	locked = true, dont_inhibit = true, submap_universal = true,
+})
+-- Explicit native move override and resize retain their previous behavior.
 hl.bind("SUPER + CTRL + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind("SUPER + mouse:273",     hl.dsp.window.resize(), { mouse = true })
 

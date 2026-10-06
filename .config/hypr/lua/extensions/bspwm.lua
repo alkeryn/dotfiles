@@ -9,6 +9,7 @@
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
 --   * transplant (-n @/), global history-based send/pull (super+y)
 --   * directional swap / move / grow / shrink between leaves
+--   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
 --   * node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
 --
@@ -21,6 +22,7 @@
 --   pratio <0.1..0.9>
 --   preselect cancel | preselect clear
 --   swap <l|r|u|d>          move <l|r|u|d>
+--   pointer_swap <source stable_id> <target stable_id> (decimal, same workspace)
 --   grow <l|r|u|d> <px>     shrink <l|r|u|d> <px>
 --   rotate <90|270>         flip <h|v>
 --   balance                 equalize
@@ -756,7 +758,23 @@ local layout_impl = {
 		-- Do not select/rotate arbitrary tiles while keyboard focus is on a float.
 		if (cmd == "focus" or cmd == "rotate") and not fw.active then return true end
 
-		if cmd == "swap" then
+		if cmd == "pointer_swap" then
+			if rehydrating or transferring or st.mode ~= "tiled" then return true end
+			local source, target = tonumber(parts[2]), tonumber(parts[3])
+			if source ~= fid or not fw.active or source == target then return true end
+			local pa, pb = find_path(st.tree, source), target and find_path(st.tree, target)
+			if not pa or not pb then return true end
+			-- Swap NODES, not just IDs: age and preselection belong to the
+			-- window, just as in bspwm tree.c:swap_nodes(). No remove/reinsert.
+			local a, b = pa[#pa], pb[#pb]
+			local ap, bp = pa[#pa - 1], pb[#pb - 1]
+			local a_first, b_first = ap.a == a, bp.a == b
+			clear_selection(st)
+			if a_first then ap.a = b else ap.b = b end
+			if b_first then bp.a = a else bp.b = a end
+			return true
+
+		elseif cmd == "swap" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
 			if not nid then return true end -- nothing in that direction: ok
 			local pa = find_path(st.tree, fid)
@@ -1068,6 +1086,77 @@ function M.swap_workspaces(cur, tgt)
 	if not ok then return "workspace swap: " .. tostring(failure) end
 	if not replay_ok then return "workspace swap: " .. tostring(replay_error) end
 	return true
+end
+
+-- Pointer operations never enter Hyprland's native tiled drag controller:
+-- it temporarily floats/removes the source and destroys its original slot.
+function M.drag_valid(w)
+	local ws = w and w.workspace
+	local st = ws and S[ws.id]
+	return ws ~= nil and st ~= nil and not rehydrating and not transferring and w.mapped and not w.floating
+		and not w.hidden and w.visible ~= false and not w.group and (w.fullscreen or 0) == 0
+		and ws.visible ~= false and (ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b")
+		and st.mode == "tiled" and find_path(st.tree, w.stable_id) ~= nil
+end
+
+function M.drag_swap(w, other)
+	if not M.drag_valid(w) or not M.drag_valid(other) or w.workspace.id ~= other.workspace.id then return false end
+	if not w.active then hl.dispatch(hl.dsp.focus({ window = w })) end
+	if not w.active then return false end
+	local result = hl.dispatch(hl.dsp.layout("pointer_swap " .. w.stable_id .. " " .. other.stable_id))
+	return not result or result.ok ~= false
+end
+
+-- bspwm window.c:move_client transfers (rather than swaps) when crossing a
+-- monitor boundary, then subsequent motion swaps in the destination desktop.
+function M.drag_transfer(w, dest)
+	if not M.drag_valid(w) or not dest or dest.id == w.workspace.id or dest.visible == false
+		or (dest.tiled_layout ~= "lua:bspwm" and dest.tiled_layout ~= "lua:bspwm_b") then return false end
+	local source = w.workspace
+	local from, to = S[source.id], state_for(dest.id)
+	local path = find_path(from.tree, w.stable_id)
+	local node = path[#path]
+	local anchor = dest.last_window and dest.last_window.stable_id
+	local contexts = {}
+	local function move_to(ws)
+		local selector = ws.id > 0 and ws.id or "name:" .. ws.name
+		local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
+		return not (result and result.ok == false) and w.workspace and w.workspace.id == ws.id
+	end
+	transferring, transfer_contexts = true, contexts
+	local ok, moved = pcall(move_to, dest)
+	local success = ok and moved
+	if not success and w.workspace and w.workspace.id ~= source.id then pcall(move_to, source) end
+	local replay_ok, replay_error = pcall(function()
+		if success then
+			remove_leaf(from, node)
+			local anchor_path = anchor and find_path(to.tree, anchor)
+			local anchor_node = anchor_path and anchor_path[#anchor_path] or any_leaf(to.tree)
+			local context = contexts[dest.id]
+			if context then place(to.tree, context.area, {}) end
+			local pre = apply_pend(anchor_node)
+			insert_adjacent(to, node, anchor_node, pre and pre.dir, pre and pre.ratio)
+			to.seq = math.max(to.seq, node.n)
+		end
+		-- Reconcile even after a failed native move/rollback. Empty sources
+		-- have no callback, so must be pruned explicitly before checkpointing.
+		for _, ws in ipairs({ source, dest }) do
+			local st, live = S[ws.id], {}
+			for _, window in ipairs(ws:get_windows() or {}) do
+				if window.mapped and not window.floating then live[window.stable_id] = true end
+			end
+			st.tree = prune_tree(st.tree, live)
+			st.boxes = {}
+			clear_selection(st)
+		end
+		transfer_contexts = nil
+		replay_transfer_contexts(contexts)
+	end)
+	transfer_contexts, transferring = nil, false
+	publish_feedback()
+	if not replay_ok then print("bspwm pointer transfer: " .. tostring(replay_error)) end
+	if success and replay_ok then hl.dispatch(hl.dsp.focus({ window = w })) end
+	return success and replay_ok
 end
 
 function M.reload()
