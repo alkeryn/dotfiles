@@ -405,7 +405,7 @@ end
 -- the layout
 -- ---------------------------------------------------------------------------
 
-hl.layout.register("bspwm", {
+local layout_impl = {
 
 	recalculate = function(ctx)
 		local targets = {}
@@ -607,7 +607,17 @@ hl.layout.register("bspwm", {
 
 		return "bspwm layout: unknown command '" .. cmd .. "'"
 	end,
-})
+}
+
+-- Registered twice, under "lua:bspwm" and "lua:bspwm_b". Hyprland v0.56.2 keeps a
+-- workspace's existing layout instance across a config reload when the layout
+-- NAME is unchanged, but that instance still points at the pre-reload provider
+-- (marked inactive, Lua state closed), so every recalculation fails and Hyprland
+-- falls back to a plain grid -- windows open side by side. hyprland.lua flips
+-- general.layout between the two names on config.reloaded, which forces fresh
+-- instances bound to the new provider.
+hl.layout.register("bspwm", layout_impl)
+hl.layout.register("bspwm_b", layout_impl)
 
 -- ---------------------------------------------------------------------------
 -- module API (require("bspwm"))

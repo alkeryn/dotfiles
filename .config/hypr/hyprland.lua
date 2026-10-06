@@ -146,6 +146,23 @@ hl.config({
 -- not misc:, in v0.56.2
 hl.config({ cursor = { inactive_timeout = PC == "laptop" and 3 or 0 } })
 
+-- Config reload workaround (Hyprland v0.56.2): a reload closes the Lua state and
+-- re-registers the layout, but workspaces keep their old layout instance when the
+-- layout name is unchanged -- that instance is bound to the dead provider and
+-- falls back to a plain grid (windows side by side). See bspwm.lua: the layout
+-- is registered under two names; flip to the one the workspaces are NOT using so
+-- they all get a fresh instance. (The bspwm tree state is rebuilt from the
+-- current windows, as the Lua state holding it is gone after a reload anyway.)
+hl.on("config.reloaded", function()
+	local ws  = hl.get_active_workspace()
+	local cur = ws and ws.tiled_layout or nil
+	if cur == "lua:bspwm" then
+		hl.config({ general = { layout = "lua:bspwm_b" } })
+	elseif cur == "lua:bspwm_b" then
+		hl.config({ general = { layout = "lua:bspwm" } })
+	end -- anything else (first start: no workspace yet): keep the configured layout
+end)
+
 -- animations (previous attempt: everything off except the workspace fade)
 hl.curve("easeOutQuint",   { type = "bezier", points = { {0.23, 1},    {0.32, 1}    } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { {0.65, 0.05}, {0.36, 1}    } })
