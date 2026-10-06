@@ -23,6 +23,8 @@ bin/Software
 
 !.config/bspwm
 
+!.config/hypr
+
 # !.config/ckb-next
 # !.config/ckb-next/*
 # !.config/ckb-next/ckb-next.conf
