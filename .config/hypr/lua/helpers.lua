@@ -1,4 +1,4 @@
--- helpers.lua -- shared helper functions (focus, swap, gaps, monitors)
+-- helpers.lua -- shared helper functions (focus, swap, resize, gaps, monitors)
 -- ============================================================================
 -- Module: returns the helpers table. Requires lua/vars.
 -- ============================================================================
@@ -56,6 +56,45 @@ function H.swap_dir(d) -- d: l | r | u | d
 	end
 	local mon = hl.get_monitor(d) -- relative to the focused monitor; nil if none
 	if mon then hl.dispatch(hl.dsp.window.move({ monitor = mon, follow = true })) end
+end
+
+-- ---------------------------------------------------------------------------
+-- edge resize (bspc node -z): delta > 0 grows, delta < 0 shrinks
+-- ---------------------------------------------------------------------------
+
+function H.resize_edge(edge, delta)
+	local w = hl.get_active_window()
+	if not w or w.mapped == false or (w.fullscreen or 0) ~= 0 then return end
+
+	if not w.floating then
+		local cmd = delta >= 0 and "grow" or "shrink"
+		hl.dispatch(hl.dsp.layout(cmd .. " " .. edge .. " " .. math.abs(delta)))
+		return
+	end
+
+	-- Floating windows are not in the tiled layout; a layout message would
+	-- do nothing or resize an unrelated tiled window on the same workspace.
+	local pos, size = w.at, w.size
+	local horizontal = edge == "l" or edge == "r"
+	local result = hl.dispatch(hl.dsp.window.resize({
+		x = math.max(1, size.x + (horizontal and delta or 0)),
+		y = math.max(1, size.y + (horizontal and 0 or delta)),
+		relative = false,
+		window = w,
+	}))
+	if result and result.ok == false then return end
+
+	-- Hyprland v0.56.2 resizes floats around their CENTER. Restore the old
+	-- top-left for right/bottom resizes; shift it for left/top resizes so the
+	-- opposite edge stays fixed. Read back goal size (not animated geometry),
+	-- rather than assuming the requested size change was applied in full.
+	local resized = w.size
+	hl.dispatch(hl.dsp.window.move({
+		x = pos.x + (edge == "l" and size.x - resized.x or 0),
+		y = pos.y + (edge == "u" and size.y - resized.y or 0),
+		relative = false,
+		window = w,
+	}))
 end
 
 -- ---------------------------------------------------------------------------

@@ -185,12 +185,12 @@ hl.bind("SUPER + CTRL + space",              hl.dsp.layout("preselect cancel"), 
 hl.bind("SUPER + CTRL + SHIFT + space",      hl.dsp.layout("preselect clear"))
 
 -- Move/resize (bspc node -z / -v)
--- previous attempt used resizeactiveedge (removed in v0.56.2); the bspwm
--- layout's grow/shrink adjusts the owning ancestor split instead
-local RESIZE_KEYS = { h = "l", j = "d", k = "u", l = "r" }
-for key, d in pairs(RESIZE_KEYS) do
-	hl.bind("SUPER + ALT + " .. key,            hl.dsp.layout("grow " .. d .. " 20"), { repeating = true })
-	hl.bind("SUPER + ALT + CTRL + " .. key,     hl.dsp.layout("shrink " .. d .. " 20"), { repeating = true })
+-- The key specifies the direction the edge MOVES: h grows the left edge
+-- outward, Ctrl+h shrinks the RIGHT edge inward. Match sxhkd on tiles AND floats.
+local resize_keys = { h = { "l", "r" }, j = { "d", "u" }, k = { "u", "d" }, l = { "r", "l" } }
+for key, edges in pairs(resize_keys) do
+	hl.bind("SUPER + ALT + " .. key,          function() helpers.resize_edge(edges[1], 20) end, { repeating = true })
+	hl.bind("SUPER + ALT + CTRL + " .. key,   function() helpers.resize_edge(edges[2], -20) end, { repeating = true })
 end
 
 -- move a floating window
