@@ -1,6 +1,6 @@
 """Script-only, click-through preselection display for Hyprland.
 
-Geometry comes from Lua. GTK/layer-shell only displays opaque rectangles;
+Geometry comes from Lua. GTK/layer-shell only displays translucent rectangles;
 there is no compiler, generated protocol code, plugin or custom executable.
 """
 import argparse
@@ -16,7 +16,8 @@ import sys
 MAX_STATE_BYTES = 131072
 MAX_RECTANGLES = 256
 NAMESPACE = "bspwm-presel-feedback"
-COLOR = (16 / 255, 0, 0)  # bspwm's opaque #100000, no outline
+COLOR = (16 / 255, 0, 0)  # bspwm's #100000, no outline
+OPACITY = 0.5  # original picom.conf: 50:class_g='Bspwm' && class_i='presel_feedback'
 
 
 @dataclass(frozen=True)
@@ -81,8 +82,10 @@ def placements(previews, monitor_boxes):
 
 def draw_feedback(context, width, height):
     import cairo
+    # Replace rather than blend with the previous frame: repeated redraws
+    # must retain the original picom rule's 50% opacity.
     context.set_operator(cairo.OPERATOR_SOURCE)
-    context.set_source_rgb(*COLOR)
+    context.set_source_rgba(*COLOR, OPACITY)
     context.rectangle(0, 0, width, height)
     context.fill()
 

@@ -110,14 +110,18 @@ monitor_x={mx}, monitor_y={my}, monitor_w={mw}, monitor_h={mh}}}}}))'''
         with self.assertRaises(ValueError):
             feedback.parse_state(state_for([preview_fixture(monitor)] * (feedback.MAX_RECTANGLES + 1)))
 
-    def test_color_is_opaque_and_uniform_without_outline(self):
+    def test_color_matches_original_picom_opacity_without_outline(self):
         import cairo
         width, height = 120, 80
         surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, width, height)
-        feedback.draw_feedback(cairo.Context(surface), width, height)
-        surface.flush()
-        pixels = memoryview(surface.get_data()).cast("I")
-        self.assertEqual(set(pixels), {0xFF100000})
+        context = cairo.Context(surface)
+        # Cairo stores premultiplied ARGB: 50% alpha is 128, red 16 becomes 8.
+        # Repainting must replace the pixels, not accumulate toward opacity.
+        for _ in range(3):
+            feedback.draw_feedback(context, width, height)
+            surface.flush()
+            pixels = memoryview(surface.get_data()).cast("I")
+            self.assertEqual(set(pixels), {0x80080000})
 
     def test_process_identity_requires_exact_state_and_known_program(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(os.environ, {"XDG_CACHE_HOME": directory}):

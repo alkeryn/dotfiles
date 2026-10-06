@@ -6,7 +6,8 @@
 
 ## Behavior
 
-- Opaque `#100000`, no outline, matching the original bspwm feedback color.
+- `#100000` at **50% opacity**, no outline: matches the original bspwm color
+  and the `presel_feedback` opacity rule in the old `picom.conf`.
 - Correct direction/ratio for leaf or subtree preselection.
 - Predicts the future work area, including monitor reservations and the removal
   of the single-window smart-gap rule when the second tile opens. Inner gaps are
@@ -76,6 +77,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p '*_test.py'
 Tests use synthetic output fixtures and injected geometry, not connected
 monitors or the output names in `lua/vars.lua`. They cover smart gaps, scaling,
 rotated outputs, subtree geometry, names/escaping, monitor reordering, ambiguity,
-opaque drawing, process-identity checks, and startup with a refusing legacy lock.
+50% opacity (including repeated redraws), process-identity checks, and startup
+with a refusing legacy lock.
 Live placement and input pass-through
 still need checking on the desktop.
