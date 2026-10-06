@@ -29,6 +29,7 @@ hl.on("hyprland.start", function()
 	hl.exec_cmd([[xrdb -merge "$HOME/.Xresources" && hyprctl eval 'require("lua/autostart").after_xresources()']])
 	hl.exec_cmd("sh -c 'pkill -x mpd; mpd; mpDris2'")
 	hl.exec_cmd("nm-applet")
+	hl.exec_cmd("waybar")
 	-- hl.exec_cmd("megasync")
 end)
 
