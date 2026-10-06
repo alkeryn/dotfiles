@@ -5,7 +5,7 @@
 --
 -- Implements a real per-workspace binary tree like bspwm:
 --   * automatic insertion: split the focused window's longest side (ratio 0.5)
---   * preselection: direction (-p) and ratio (-o), consumed on next insert
+--   * preselection: direction (-p), ratio (-o), click-through feedback rectangle
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
 --   * transplant (-n @/), pull last leaf (super+y emulation)
 --   * directional swap / move / grow / shrink between leaves
@@ -13,7 +13,6 @@
 --   * monocle mode (stack, focused on top)
 --
 -- NOT implemented (see discussion):
---   * preselection feedback rectangle (needs a C++ plugin to draw)
 --   * mouse border-drag resize (use the grow/shrink binds)
 --   * pseudo_tiled (use stock hl.dsp.window.pseudo)
 --
@@ -34,6 +33,11 @@ local S    = {}   -- per-workspace tree, geometry, preselection and selected nod
 local PEND = nil  -- pending preselect for a not-yet-identifiable (empty) ws
 local selection_focus = false -- guard our own representative-window focus events
 local selection_tag = "bspwm_selected"
+local feedback_sink
+
+local function publish_feedback()
+	if feedback_sink then feedback_sink(S) end
+end
 
 -- ---------------------------------------------------------------------------
 -- tree primitives
@@ -526,7 +530,7 @@ local layout_impl = {
 		end
 
 		local n = #targets
-		if n == 0 then return end
+		if n == 0 then publish_feedback(); return end
 
 		local wsid = ws_of(ctx)
 		if not wsid then return end
@@ -618,6 +622,7 @@ local layout_impl = {
 			end
 		end
 		highlight_selection(st, targets)
+		publish_feedback()
 	end,
 
 	layout_msg = function(ctx, msg)
@@ -776,6 +781,12 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+-- Optional native renderer kept separate from the layout's tree logic.
+function M.set_feedback_sink(sink)
+	feedback_sink = sink
+	publish_feedback()
+end
 
 function M.close_selected()
 	local active = hl.get_active_window()

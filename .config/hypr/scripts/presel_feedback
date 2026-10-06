@@ -1,0 +1,38 @@
+#!/bin/sh
+# Build once (or after source/protocol changes), then run the native helper.
+set -eu
+source_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}/hypr/presel_feedback
+mkdir -p "$cache_dir"
+exec 9>"$cache_dir/build.lock"
+flock 9
+protocol_dir=$(pkg-config --variable=pkgdatadir wayland-protocols)
+layer="$source_dir/protocols/wlr-layer-shell-unstable-v1.xml"
+viewport="$protocol_dir/stable/viewporter/viewporter.xml"
+xdg="$protocol_dir/stable/xdg-shell/xdg-shell.xml"
+binary="$cache_dir/presel_feedback"
+rebuild=false
+for file in "$source_dir/presel_feedback.c" "$0" "$layer" "$viewport" "$xdg"; do
+    if [ ! -x "$binary" ] || [ "$file" -nt "$binary" ]; then rebuild=true; fi
+done
+if "$rebuild"; then
+    build_dir=$(mktemp -d "$cache_dir/build.XXXXXX")
+    trap 'rm -rf -- "$build_dir"' EXIT HUP INT TERM
+    wayland-scanner client-header "$layer" "$build_dir/wlr-layer-shell-client-protocol.h"
+    wayland-scanner private-code "$layer" "$build_dir/wlr-layer-shell-protocol.c"
+    wayland-scanner client-header "$viewport" "$build_dir/viewporter-client-protocol.h"
+    wayland-scanner private-code "$viewport" "$build_dir/viewporter-protocol.c"
+    wayland-scanner private-code "$xdg" "$build_dir/xdg-shell-protocol.c"
+    # Intentional word splitting of pkg-config's compiler/linker flags.
+    # shellcheck disable=SC2046
+    ${CC:-cc} -std=c11 -O2 -Wall -Wextra -Werror ${CFLAGS:-} \
+        $(pkg-config --cflags wayland-client) -I"$build_dir" \
+        "$source_dir/presel_feedback.c" "$build_dir/"*-protocol.c \
+        $(pkg-config --libs wayland-client) ${LDFLAGS:-} -o "$build_dir/presel_feedback"
+    mv -f "$build_dir/presel_feedback" "$binary"
+    rm -rf -- "$build_dir"
+    trap - EXIT HUP INT TERM
+fi
+flock -u 9
+exec 9>&-
+exec "$binary" "$@"

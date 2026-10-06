@@ -13,9 +13,18 @@
 --   hyprpaper hypridle hyprlock waybar dunst grim slurp wl-clipboard cliphist
 --   rofi (wayland build) alacritty brightnessctl playerctl pactl ckb-next
 --   conky (XWayland) megasync signal-desktop mpd mpDris2
+--   libwayland-client (native feedback; build: cc, pkg-config, wayland-scanner,
+--   wayland-protocols -- no Python/GTK/Cairo dependency)
 -- ============================================================================
 
-require("bspwm") -- registers the "lua:bspwm" layout
+local bspwm = require("bspwm") -- registers the "lua:bspwm" layout
+require("lua/presel_feedback").setup(bspwm)
+hl.layer_rule({
+	name = "bspwm-preselection-feedback",
+	match = { namespace = "^bspwm-presel-feedback$" },
+	no_anim = true,
+	blur = false,
+})
 
 local vars = require("lua/vars")
 
