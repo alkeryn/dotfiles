@@ -182,7 +182,10 @@ hl.on("hyprland.start", function()
 		hl.exec_cmd("ckb-next -b")
 		hl.exec_cmd("conky -q")                               -- XWayland
 		hl.exec_cmd("signal-desktop")
-		-- last-window-close refocus bug workaround (socket2 watcher)
+		-- last-window-close refocus bug workaround (socket2 watcher).
+		-- Still relevant in v0.56.2: when a workspace empties, focus falls
+		-- back to cursor position (InputManager::refocus), which can land on
+		-- the wrong monitor. Drop this script if the bug proves fixed.
 		hl.exec_cmd("$HOME/.config/hypr/scripts/close_refocus_fix")
 	else
 		hl.exec_cmd("signal-desktop")
