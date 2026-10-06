@@ -94,7 +94,8 @@ hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill(), { repeating = true 
 -- alternate between the tiled and monocle layout (bspc desktop -l next)
 hl.bind("SUPER + v",                   hl.dsp.layout("mode"))
 
--- automatic <-> last manual / pull last leaf (super+y)
+-- send to last preselection, otherwise pull last focused leaf (global history)
+-- Across desktops/monitors; focus the inserted node after the move completes.
 hl.bind("SUPER + y",                   hl.dsp.layout("pull"))
 
 -- Rotate (bspc node -R {90,270})

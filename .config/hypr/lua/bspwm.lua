@@ -7,7 +7,7 @@
 --   * automatic insertion: split the focused window's longest side (ratio 0.5)
 --   * preselection: direction (-p), ratio (-o), click-through feedback rectangle
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
---   * transplant (-n @/), pull last leaf (super+y emulation)
+--   * transplant (-n @/), global history-based send/pull (super+y)
 --   * directional swap / move / grow / shrink between leaves
 --   * node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
@@ -43,11 +43,13 @@ local last_store_error
 local selection_focus = false -- guard our own representative-window focus events
 local selection_tag = "bspwm_selected"
 local feedback_sink
+local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
+local transferring = false -- also suppress checkpoints/feedback through final replay
 local monocle_display = require("lua/bspwm_monocle")
 local monocle = monocle_display.new()
 
 local function checkpoint()
-	if not state_store or rehydrating then return end
+	if not state_store or rehydrating or transferring then return end
 	local ok, err = state_store:save(S, PEND)
 	if not ok and err ~= last_store_error then print("bspwm checkpoint: " .. tostring(err)) end
 	last_store_error = ok and nil or err
@@ -61,6 +63,7 @@ local function on_event(name, callback)
 end
 
 local function publish_feedback()
+	if transferring then return end
 	checkpoint()
 	if feedback_sink then feedback_sink(S) end
 end
@@ -162,12 +165,12 @@ end
 -- insertion / removal
 -- ---------------------------------------------------------------------------
 
--- insert new_id as sibling of anchor_id (window id OR subtree), on side `dir`.
+-- insert new_id (window id OR intact subtree) beside anchor_id, on side `dir`.
 -- Without preselection, match bspwm's default longest_side / second_child.
 -- Automatic callers must refresh the tree's boxes before inserting.
 local function insert_adjacent(st, new_id, anchor_id, dir, ratio)
 	local r    = ratio or 0.5
-	local new  = leaf(new_id)
+	local new  = type(new_id) == "table" and new_id or leaf(new_id)
 	local path = find_path(st.tree, anchor_id)
 
 	if not path then
@@ -339,34 +342,8 @@ local function transplant(st, id)
 	return true
 end
 
--- super+y: if focused is newest, move it next to the last manual window;
--- otherwise pull the newest other leaf next to focused.
-local function pull(st, focused_id)
-	local all = leaves(st.tree)
-	local newest, oldest, newest_other, oldest_other
-	for _, l in ipairs(all) do
-		if not newest or l.n > newest.n then newest = l end
-		if not oldest or l.n < oldest.n then oldest = l end
-		if l.id ~= focused_id then
-			if not newest_other or l.n > newest_other.n then newest_other = l end
-			if not oldest_other or l.n < oldest_other.n then oldest_other = l end
-		end
-	end
-	if not newest_other then return false end
-	if newest.id == focused_id then
-		-- focused is automatic: send it next to the last manual window
-		remove_leaf(st, focused_id)
-		insert_adjacent(st, focused_id, oldest_other.id, "r", nil)
-	else
-		local n = newest_other.n
-		remove_leaf(st, newest_other.id)
-		insert_adjacent(st, newest_other.id, focused_id, "r", nil)
-		-- preserve insertion age
-		local path = find_path(st.tree, newest_other.id)
-		if path then path[#path].n = n end
-	end
-	return true
-end
+-- Needs the provider's recalculation function; implemented below layout_impl.
+local pull
 
 local function focus_subtree_node(st, id, which)
 	local path = find_path(st.tree, st.selected or id)
@@ -600,6 +577,12 @@ local layout_impl = {
 
 		local wsid = ws_of(ctx)
 		if not wsid then return end
+		if transfer_contexts then
+			-- Native window.move removes/adds targets synchronously, one at a
+			-- time. Do not prune a subtree halfway through moving its leaves.
+			transfer_contexts[wsid] = ctx
+			return
+		end
 		local st = state_for(wsid)
 		monocle.sync(targets[1].window.workspace, st.mode == "monocle")
 		local area = { x = ctx.area.x, y = ctx.area.y, w = ctx.area.w, h = ctx.area.h }
@@ -823,8 +806,8 @@ local layout_impl = {
 			return true
 
 		elseif cmd == "pull" then
-			pull(st, fid)
-			return true
+			if rehydrating or transferring or not fw.active then return true end
+			return pull(st, node, fw, ctx.area)
 
 		elseif cmd == "mode" then
 			st.mode = (st.mode == "monocle") and "tiled" or "monocle"
@@ -850,6 +833,145 @@ local layout_impl = {
 		return "bspwm layout: unknown command '" .. cmd .. "'"
 	end,
 }
+
+-- Original sxhkd: focused.automatic && node -n last.!automatic || node last.leaf -n focused
+-- "automatic" means NO preselection, not newest; "last" is global focus history.
+pull = function(st, node, focused, area)
+	local candidates, windows = {}, {}
+	for _, w in ipairs(hl.get_windows()) do
+		local ws = w.workspace
+		local state = ws and S[ws.id]
+		local layout = ws and ws.tiled_layout
+		local path = state and find_path(state.tree, w.stable_id)
+		if w.mapped and not w.floating and not w.hidden and not w.group and path
+			and (layout == "lua:bspwm" or layout == "lua:bspwm_b") then
+			windows[w.stable_id] = w
+			local rank = w.focus_history_id
+			if rank and rank >= 0 then
+				candidates[#candidates + 1] = { window = w, st = state, path = path, rank = rank }
+			end
+		end
+	end
+	if not windows[focused.stable_id] then return true end
+	table.sort(candidates, function(a, b)
+		if a.rank == b.rank then return a.window.stable_id < b.window.stable_id end
+		return a.rank < b.rank
+	end)
+	local function disjoint(other)
+		return not find_path(node, other) and not find_path(other, node)
+	end
+	local from = { st = st, node = node, window = focused }
+	local to
+	if not node.presel then
+		for _, candidate in ipairs(candidates) do
+			-- Internal-node preselections survive loss of selection. Associate
+			-- them with their representative leaves' native focus history.
+			for i = #candidate.path, 1, -1 do
+				local anchor = candidate.path[i]
+				if anchor.presel and disjoint(anchor) then
+					to = { st = candidate.st, node = anchor, window = candidate.window }
+					break
+				end
+			end
+			if to then break end
+		end
+	end
+	if not to then
+		to = from
+		from = nil
+		for _, candidate in ipairs(candidates) do
+			local last = candidate.path[#candidate.path]
+			if disjoint(last) then
+				from = { st = candidate.st, node = last, window = candidate.window }
+				break
+			end
+		end
+	end
+	if not from then return true end
+
+	local moving = {}
+	for _, child in ipairs(leaves(from.node)) do
+		if not windows[child.id] then return true end -- stale/hidden/grouped subtree
+		moving[#moving + 1] = windows[child.id]
+	end
+	local source_ws, dest_ws = from.window.workspace, to.window.workspace
+	local cross_workspace = source_ws.id ~= dest_ws.id
+	local contexts, failure = {}, nil
+	if cross_workspace then
+		transferring, transfer_contexts = true, contexts
+		-- Workspace objects stringify to their ID in this API, but negative
+		-- named/special IDs are parsed as relative selectors. Use their name.
+		local selector = dest_ws.id > 0 and dest_ws.id or "name:" .. dest_ws.name
+		local ok, err = pcall(function()
+			for _, w in ipairs(moving) do
+				local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
+				if (result and result.ok == false) or not w.workspace or w.workspace.id ~= dest_ws.id then
+					failure = "pull: could not move window " .. w.stable_id
+					break
+				end
+			end
+		end)
+		if not ok then failure = "pull: " .. tostring(err) end
+	end
+
+	if not failure then
+		-- Commit only after native moves succeeded. Reuse the node so split
+		-- ratios, ages and its own preselections travel with it.
+		remove_leaf(from.st, from.node)
+		local dest_area = contexts[dest_ws.id] and contexts[dest_ws.id].area or area
+		place(to.st.tree, dest_area, {})
+		local pre = to.node.presel
+		to.node.presel = nil
+		insert_adjacent(to.st, from.node, to.node, pre and pre.dir, pre and pre.ratio)
+		for _, child in ipairs(leaves(from.node)) do to.st.seq = math.max(to.st.seq, child.n) end
+	end
+	clear_selection(from.st)
+	clear_selection(to.st)
+	-- Prune before replay/checkpointing: an empty source produces no native
+	-- callback, and a partially failed move must not leave duplicate leaves.
+	local live = {}
+	for _, w in ipairs(hl.get_windows()) do
+		if w.mapped and not w.floating and w.workspace and w.workspace.id == source_ws.id then live[w.stable_id] = true end
+	end
+	from.st.tree = prune_tree(from.st.tree, live)
+	if not from.st.tree then from.st.boxes = {} end
+	transfer_contexts = nil
+
+	-- Replay the latest native snapshots now that ALL windows have moved.
+	-- Filter by current workspace: an earlier source snapshot can still hold
+	-- the last departing target (Hyprland skips callbacks for empty layouts).
+	for wsid, context in pairs(contexts) do
+		local targets = {}
+		for _, target in ipairs(context.targets) do
+			local w = target.window
+			if w and w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
+				targets[#targets + 1] = target
+			end
+		end
+		layout_impl.recalculate({ area = context.area, targets = targets })
+	end
+	transferring = false
+	if not failure then
+		-- Move silently above, then focus ONCE after committing/replaying the
+		-- insertion. Focus the incoming node, not the old destination anchor.
+		local ok, result = pcall(function()
+			return hl.dispatch(hl.dsp.focus({ window = from.window }))
+		end)
+		local active = hl.get_active_window()
+		if not ok or (result and result.ok == false) or not active or active.stable_id ~= from.window.stable_id then
+			failure = "pull: could not focus inserted node" .. (not ok and ": " .. tostring(result) or "")
+		elseif from.node.t == "split" then
+			-- Workspace/monitor focus events clear selection. Restore the moved
+			-- subtree AFTER those events, retaining its original representative.
+			to.st.selected, to.st.selected_focus_id = from.node, active.stable_id
+			local targets = {}
+			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
+			highlight_selection(to.st, targets)
+		end
+	end
+	publish_feedback()
+	return failure or true
+end
 
 -- Messages can change state without moving windows (e.g. preselection).
 local handle_message = layout_impl.layout_msg
