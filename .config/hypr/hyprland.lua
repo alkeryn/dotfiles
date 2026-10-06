@@ -159,8 +159,8 @@ hl.config({ cursor = { inactive_timeout = PC == "laptop" and 3 or 0 } })
 -- layout name is unchanged -- that instance is bound to the dead provider and
 -- falls back to a plain grid (windows side by side). See bspwm.lua: the layout
 -- is registered under two names; flip to the one the workspaces are NOT using so
--- they all get a fresh instance. (The bspwm tree state is rebuilt from the
--- current windows, as the Lua state holding it is gone after a reload anyway.)
+-- they all get a fresh instance. bspwm.lua restores the session checkpoint
+-- before registration, preserving the tree/ratios while targets are reattached.
 hl.on("config.reloaded", function()
 	local ws  = hl.get_active_workspace()
 	local cur = ws and ws.tiled_layout or nil

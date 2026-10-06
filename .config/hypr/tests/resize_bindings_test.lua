@@ -2,6 +2,7 @@
 -- Loads the actual bindings, helpers and layout. The floating dispatcher mock
 -- models v0.56.2's center-based resize and exposes updated goal geometry.
 local tests = {}
+package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture()
 	local f = { binds = {}, messages = {}, resize_calls = 0, move_calls = 0 }

@@ -1,6 +1,8 @@
 -- Run from ~/.config/hypr: lua tests/bspwm_layout_test.lua
 -- Exercises the real provider using the installed HL.LayoutContext API shape.
 local tests = {}
+-- Never read/write the running desktop's session checkpoint from unit tests.
+package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture(width, height, x, y)
 	local providers = {}

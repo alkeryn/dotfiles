@@ -1,6 +1,7 @@
 -- Run from ~/.config/hypr: lua tests/presel_feedback_test.lua
 local feedback = require("lua/presel_feedback")
 local tests = {}
+package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
 
 -- These are synthetic outputs, never connector names from lua/vars or the host.
 local function monitor_fixture(index, properties)

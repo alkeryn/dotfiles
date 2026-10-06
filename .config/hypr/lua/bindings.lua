@@ -67,9 +67,9 @@ hl.bind("XF86MonBrightnessUp",    hl.dsp.exec_cmd("light -A 10"), { locked = tru
 -- wifi toggle
 hl.bind("SUPER + F12",            hl.dsp.exec_cmd("~/bin/wifitoggle"))
 
--- reload config (sxhkd super+Escape dance; there is no dsp.reload_config --
--- "reload" is a hyprctl command; the lua config also hot-reloads on file save)
-hl.bind("SUPER + Escape",         hl.dsp.exec_cmd("hyprctl reload"))
+-- Reload without discarding the tree. Mutations are also checkpointed for
+-- automatic file reloads; the shortcut flushes once more before hyprctl reload.
+hl.bind("SUPER + Escape",         require("bspwm").reload)
 
 -- keyboard layouts (setxkbmap {fr, us altgr-intl, ru, us colemak})
 local layouts = {

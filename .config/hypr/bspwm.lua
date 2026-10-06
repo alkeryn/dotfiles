@@ -29,13 +29,37 @@
 --   focus <parent|brother|first|second>
 -- ============================================================================
 
-local S    = {}   -- per-workspace tree, geometry, preselection and selected node
-local PEND = nil  -- pending preselect for a not-yet-identifiable (empty) ws
+-- Load BEFORE registering either provider: registration itself can reattach
+-- existing windows and call recalculate with an incomplete target list.
+local state_store, store_error = require("lua/bspwm_state").open_session()
+local restored, restore_error
+if state_store then restored, restore_error = state_store:load() end
+if store_error or restore_error then print("bspwm checkpoint: " .. tostring(store_error or restore_error)) end
+local S = restored and restored.states or {}
+local PEND = restored and restored.pending or nil
+local rehydrating = state_store ~= nil
+local config_seen = false
+local last_store_error
 local selection_focus = false -- guard our own representative-window focus events
 local selection_tag = "bspwm_selected"
 local feedback_sink
 
+local function checkpoint()
+	if not state_store or rehydrating then return end
+	local ok, err = state_store:save(S, PEND)
+	if not ok and err ~= last_store_error then print("bspwm checkpoint: " .. tostring(err)) end
+	last_store_error = ok and nil or err
+end
+
+local function on_event(name, callback)
+	hl.on(name, function(...)
+		callback(...)
+		checkpoint()
+	end)
+end
+
 local function publish_feedback()
+	checkpoint()
 	if feedback_sink then feedback_sink(S) end
 end
 
@@ -436,6 +460,7 @@ local function tag_window(w, enabled)
 end
 
 local function highlight_selection(st, targets)
+	if rehydrating then return end
 	local ids, desired = {}, {}
 	-- Ordinary leaf selection uses Hyprland's normal active border.
 	if st.selected and st.selected.t == "split" then collect_ids(st.selected, ids) end
@@ -460,7 +485,7 @@ local function clear_selection(st)
 end
 
 local function clear_selections()
-	if selection_focus then return end
+	if selection_focus or rehydrating then return end
 	for _, st in pairs(S) do clear_selection(st) end
 end
 
@@ -473,8 +498,8 @@ hl.window_rule({
 	border_color = "rgb(bb0000) rgb(bb0000)",
 })
 
-hl.on("window.active", function(w, reason)
-	if selection_focus then return end
+on_event("window.active", function(w, reason)
+	if selection_focus or rehydrating then return end
 	local st = w and w.workspace and S[w.workspace.id]
 	-- Re-notification of the same keyboard-focused representative is not a
 	-- new tree selection. An explicit click (FOCUS_REASON_CLICK = 5) is.
@@ -487,12 +512,12 @@ hl.on("window.active", function(w, reason)
 	clear_selections()
 	if anchor then st.insertion_anchor, st.insertion_window_id = anchor, w.stable_id end
 end)
-hl.on("workspace.active", clear_selections)
-hl.on("workspace.special_active", clear_selections)
-hl.on("monitor.focused", clear_selections)
+on_event("workspace.active", clear_selections)
+on_event("workspace.special_active", clear_selections)
+on_event("monitor.focused", clear_selections)
 
 local function window_leaves_selection(w)
-	if not w then return end
+	if not w or rehydrating then return end
 	for _, st in pairs(S) do
 		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id
 			or st.insertion_window_id == w.stable_id then
@@ -500,19 +525,53 @@ local function window_leaves_selection(w)
 		end
 	end
 end
-hl.on("window.close", window_leaves_selection)
+on_event("window.close", window_leaves_selection)
 -- A client can unmap/remap the same window object, retaining its old tags.
-hl.on("window.open", function(w) tag_window(w, false) end)
-hl.on("window.move_to_workspace", window_leaves_selection)
-hl.on("window.fullscreen", window_leaves_selection)
-hl.on("workspace.removed", function(ws)
+on_event("window.open", function(w) tag_window(w, false) end)
+on_event("window.move_to_workspace", window_leaves_selection)
+on_event("window.fullscreen", window_leaves_selection)
+on_event("workspace.removed", function(ws)
 	local st = ws and S[ws.id]
 	if st then clear_selection(st); S[ws.id] = nil end
 end)
-hl.on("config.reloaded", function()
-	clear_selections()
-	-- Tags survive a Lua-state reload; the old selected-node references do not.
-	for _, w in ipairs(hl.get_windows()) do tag_window(w, false) end
+on_event("config.reloaded", function()
+	if state_store then
+		-- The alias flip in hyprland.lua can reattach windows again. Wait for
+		-- the scheduled property refresh before leaving the restore phase.
+		rehydrating, config_seen = true, true
+	else
+		clear_selections()
+		for _, w in ipairs(hl.get_windows()) do tag_window(w, false) end
+	end
+end)
+on_event("config.props_refreshed", function()
+	if not rehydrating or not config_seen then return end
+	local windows, live, targets = hl.get_windows(), {}, {}
+	for _, w in ipairs(windows) do
+		if w.mapped and not w.floating and w.workspace then
+			local id = w.workspace.id
+			live[id], targets[id] = live[id] or {}, targets[id] or {}
+			live[id][w.stable_id] = true
+			targets[id][#targets[id] + 1] = { window = w }
+		end
+	end
+	rehydrating, config_seen = false, false
+	-- Remove old tags, then restore the saved selection with fresh userdata.
+	for _, w in ipairs(windows) do tag_window(w, false) end
+	local active = hl.get_active_window()
+	for id, st in pairs(S) do
+		st.highlighted = {}
+		st.tree = prune_tree(st.tree, live[id] or {})
+		if st.selected and (not find_path(st.tree, st.selected) or not active
+			or active.stable_id ~= st.selected_focus_id
+			or not find_path(st.selected, st.selected_focus_id)) then clear_selection(st) end
+		if st.insertion_anchor and (not find_path(st.tree, st.insertion_anchor)
+			or not (live[id] and live[id][st.insertion_window_id])) then
+			st.insertion_anchor, st.insertion_window_id = nil, nil
+		end
+		highlight_selection(st, targets[id] or {})
+	end
+	publish_feedback()
 end)
 
 -- ---------------------------------------------------------------------------
@@ -542,6 +601,15 @@ local layout_impl = {
 		for _, t in ipairs(targets) do
 			live[t.window.stable_id] = t
 		end
+		if rehydrating then
+			-- newTarget() recalculates after EACH reattached window. Missing
+			-- ctx targets are not closed windows: preserve all live saved leaves.
+			for _, w in ipairs(hl.get_windows()) do
+				if w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
+					live[w.stable_id] = live[w.stable_id] or { window = w }
+				end
+			end
+		end
 
 		-- focused id
 		local focused_id
@@ -553,7 +621,7 @@ local layout_impl = {
 		st.tree = prune_tree(st.tree, live)
 		if st.selected and (not find_path(st.tree, st.selected)
 			or not live[st.selected_focus_id]
-			or (focused_id and focused_id ~= st.selected_focus_id and find_path(st.tree, focused_id))) then
+			or (not rehydrating and focused_id and focused_id ~= st.selected_focus_id and find_path(st.tree, focused_id))) then
 			clear_selection(st)
 		end
 
@@ -766,6 +834,14 @@ local layout_impl = {
 	end,
 }
 
+-- Messages can change state without moving windows (e.g. preselection).
+local handle_message = layout_impl.layout_msg
+layout_impl.layout_msg = function(ctx, msg)
+	local result = handle_message(ctx, msg)
+	checkpoint()
+	return result
+end
+
 -- Registered twice, under "lua:bspwm" and "lua:bspwm_b". Hyprland v0.56.2 keeps a
 -- workspace's existing layout instance across a config reload when the layout
 -- NAME is unchanged, but that instance still points at the pre-reload provider
@@ -781,6 +857,11 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+function M.reload()
+	checkpoint()
+	hl.exec_cmd("hyprctl reload")
+end
 
 -- Optional renderer kept separate from the layout's tree logic.
 function M.set_feedback_sink(sink)
@@ -807,6 +888,7 @@ function M.close_selected()
 	for _, w in ipairs(windows) do
 		if w.mapped then hl.dispatch(hl.dsp.window.close({ window = w })) end
 	end
+	checkpoint()
 	return true
 end
 

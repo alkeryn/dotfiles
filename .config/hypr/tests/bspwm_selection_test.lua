@@ -2,6 +2,7 @@
 -- Real tree/navigation; mocked Hyprland focus events and reversible tag rules.
 local layout_path = arg[1] or "bspwm.lua"
 local tests = {}
+package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
 local selection_tag = "bspwm_selected"
 
 local function fixture(count)
