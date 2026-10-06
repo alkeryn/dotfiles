@@ -4,7 +4,7 @@
 -- Select with:    general.layout = "lua:bspwm"   (or workspace_rule layout=)
 --
 -- Implements a real per-workspace binary tree like bspwm:
---   * automatic insertion as sibling of the focused window (split_ratio)
+--   * automatic insertion: split the focused window's longest side (ratio 0.5)
 --   * preselection: direction (-p) and ratio (-o), consumed on next insert
 --   * subtree rotate (-R 90/270), flip (-F h/v), balance (-B), equalize (-E)
 --   * transplant (-n @/), pull last leaf (super+y emulation)
@@ -134,9 +134,10 @@ end
 -- insertion / removal
 -- ---------------------------------------------------------------------------
 
--- insert new_id as sibling of anchor_id, on side `dir`, with split ratio
+-- insert new_id as sibling of anchor_id, on side `dir`, with split ratio.
+-- Without preselection, match bspwm's default longest_side / second_child.
+-- Automatic callers must refresh the tree's boxes before inserting.
 local function insert_adjacent(st, new_id, anchor_id, dir, ratio)
-	local ax   = axis_for(dir)
 	local r    = ratio or 0.5
 	local new  = leaf(new_id)
 	local path = find_path(st.tree, anchor_id)
@@ -150,7 +151,11 @@ local function insert_adjacent(st, new_id, anchor_id, dir, ratio)
 	end
 
 	local anchor = path[#path]
-	local split  = { t = "split", axis = ax, ratio = r }
+	if not dir then
+		local box = anchor._box
+		dir = (box and box.w > box.h) and "r" or "d"
+	end
+	local split = { t = "split", axis = axis_for(dir), ratio = r }
 	-- ratio = fraction of the FIRST child. bspwm semantics: -o X gives the
 	-- preselected side fraction X.
 	if new_is_first(dir) then
@@ -421,6 +426,7 @@ local layout_impl = {
 		local wsid = ws_of(ctx)
 		if not wsid then return end
 		local st = state_for(wsid)
+		local area = { x = ctx.area.x, y = ctx.area.y, w = ctx.area.w, h = ctx.area.h }
 
 		-- live table: stable_id -> target
 		local live = {}
@@ -441,6 +447,19 @@ local layout_impl = {
 		local present = {}
 		collect_ids(st.tree, present)
 		local anchor = focused_id
+		if not anchor or not present[anchor] then
+			-- Mapping may have focused the NEW window already, or this may
+			-- be an inactive workspace. Split its last focused surviving leaf
+			-- rather than an arbitrary leaf at the end of the tree.
+			local best_rank
+			for _, t in ipairs(targets) do
+				local id = t.window.stable_id
+				local rank = t.window.focus_history_id
+				if present[id] and rank and rank >= 0 and (not best_rank or rank < best_rank) then
+					anchor, best_rank = id, rank
+				end
+			end
+		end
 		for _, t in ipairs(targets) do
 			local id = t.window.stable_id
 			if not present[id] then
@@ -450,6 +469,10 @@ local layout_impl = {
 					st.tree = leaf(id)
 					st.tree.n = st.seq
 				else
+					-- Recompute after pruning and before EACH insertion: a reload
+					-- can supply a batch, and old boxes may predate a monitor resize.
+					-- Use tiled geometry even while displaying monocle mode.
+					place(st.tree, area, {})
 					local ok = anchor and find_path(st.tree, anchor)
 					insert_adjacent(st, id, ok and anchor or (any_leaf(st.tree).id),
 						pre and pre.dir or nil, pre and pre.ratio or nil)
@@ -462,7 +485,6 @@ local layout_impl = {
 
 		-- place
 		st.boxes = {}
-		local area = { x = ctx.area.x, y = ctx.area.y, w = ctx.area.w, h = ctx.area.h }
 		if st.mode == "monocle" then
 			for _, t in ipairs(targets) do
 				t:place(area)
