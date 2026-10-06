@@ -132,7 +132,7 @@ end
 -- insertion / removal
 -- ---------------------------------------------------------------------------
 
--- insert new_id as sibling of anchor_id, on side `dir`, with split ratio.
+-- insert new_id as sibling of anchor_id (window id OR subtree), on side `dir`.
 -- Without preselection, match bspwm's default longest_side / second_child.
 -- Automatic callers must refresh the tree's boxes before inserting.
 local function insert_adjacent(st, new_id, anchor_id, dir, ratio)
@@ -154,13 +154,12 @@ local function insert_adjacent(st, new_id, anchor_id, dir, ratio)
 		dir = (box and box.w > box.h) and "r" or "d"
 	end
 	local split = { t = "split", axis = axis_for(dir), ratio = r }
-	-- ratio = fraction of the FIRST child. bspwm semantics: -o X gives the
-	-- preselected side fraction X.
+	-- bspwm tree.c:insert_node: ratio is ALWAYS the first child's share,
+	-- including east/south preselection where the new window is second.
 	if new_is_first(dir) then
 		split.a, split.b = new, anchor
 	else
 		split.a, split.b = anchor, new
-		if ratio then r = 1 - r; split.ratio = r end
 	end
 
 	if #path == 1 then
@@ -261,12 +260,18 @@ local function subtree_of(st, id)
 	return (#path >= 2) and path[#path - 1] or st.tree
 end
 
-local function rotate(node, mode)
-	if not node or node.t ~= "split" then return end
-	node.axis = (node.axis == "h") and "v" or "h"
-	if mode == 90 then node.a, node.b = node.b, node.a end
-	rotate(node.a, mode)
-	rotate(node.b, mode)
+local function rotate(node, degrees)
+	if not node or node.t ~= "split" or degrees == 0 then return end
+	-- Direct counterpart of bspwm tree.c:rotate_tree_rec. Our "v" means
+	-- top/bottom (TYPE_HORIZONTAL there); "h" is TYPE_VERTICAL there.
+	if (degrees == 90 and node.axis == "v")
+		or (degrees == 270 and node.axis == "h") or degrees == 180 then
+		node.a, node.b = node.b, node.a
+		node.ratio = 1 - node.ratio
+	end
+	if degrees ~= 180 then node.axis = (node.axis == "h") and "v" or "h" end
+	rotate(node.a, degrees)
+	rotate(node.b, degrees)
 end
 
 local function flip(node, axis)
@@ -390,17 +395,28 @@ end
 local function state_for(wsid)
 	local st = S[wsid]
 	if not st then
-		st = { seq = 0, mode = "tiled", pend = nil, boxes = {}, highlighted = {} }
+		st = { seq = 0, mode = "tiled", boxes = {}, highlighted = {} }
 		S[wsid] = st
 	end
 	return st
 end
 
-local function apply_pend(st)
-	local pre = st.pend or PEND
-	if pre == PEND and pre then PEND = nil end
-	st.pend = nil
+local function apply_pend(anchor)
+	if anchor and anchor.presel then
+		local pre = anchor.presel
+		anchor.presel = nil
+		return pre
+	end
+	local pre = PEND
+	PEND = nil
 	return pre
+end
+
+local function clear_presels(node)
+	if not node then return end
+	node.presel = nil
+	clear_presels(node.a)
+	clear_presels(node.b)
 end
 
 -- ---------------------------------------------------------------------------
@@ -435,6 +451,7 @@ end
 
 local function clear_selection(st)
 	st.selected, st.selected_focus_id = nil, nil
+	st.insertion_anchor, st.insertion_window_id = nil, nil
 	highlight_selection(st, {})
 end
 
@@ -452,7 +469,20 @@ hl.window_rule({
 	border_color = "rgb(bb0000) rgb(bb0000)",
 })
 
-hl.on("window.active", clear_selections)
+hl.on("window.active", function(w, reason)
+	if selection_focus then return end
+	local st = w and w.workspace and S[w.workspace.id]
+	-- Re-notification of the same keyboard-focused representative is not a
+	-- new tree selection. An explicit click (FOCUS_REASON_CLICK = 5) is.
+	if st and st.selected_focus_id == w.stable_id and reason ~= 5 then return end
+	local anchor
+	if st and not w.floating and not find_path(st.tree, w.stable_id) then
+		-- A newly mapped window can receive focus BEFORE its first layout pass.
+		anchor = st.selected or (st.insertion_window_id == w.stable_id and st.insertion_anchor)
+	end
+	clear_selections()
+	if anchor then st.insertion_anchor, st.insertion_window_id = anchor, w.stable_id end
+end)
 hl.on("workspace.active", clear_selections)
 hl.on("workspace.special_active", clear_selections)
 hl.on("monitor.focused", clear_selections)
@@ -460,7 +490,8 @@ hl.on("monitor.focused", clear_selections)
 local function window_leaves_selection(w)
 	if not w then return end
 	for _, st in pairs(S) do
-		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id then
+		if st.highlighted[w.stable_id] or st.selected_focus_id == w.stable_id
+			or st.insertion_window_id == w.stable_id then
 			clear_selection(st)
 		end
 	end
@@ -518,15 +549,15 @@ local layout_impl = {
 		st.tree = prune_tree(st.tree, live)
 		if st.selected and (not find_path(st.tree, st.selected)
 			or not live[st.selected_focus_id]
-			or (focused_id and focused_id ~= st.selected_focus_id)) then
+			or (focused_id and focused_id ~= st.selected_focus_id and find_path(st.tree, focused_id))) then
 			clear_selection(st)
 		end
 
 		-- insert new windows
 		local present = {}
 		collect_ids(st.tree, present)
-		local anchor = focused_id
-		if not anchor or not present[anchor] then
+		local anchor = st.selected or focused_id
+		if not anchor or not find_path(st.tree, anchor) then
 			-- Mapping may have focused the NEW window already, or this may
 			-- be an inactive workspace. Split its last focused surviving leaf
 			-- rather than an arbitrary leaf at the end of the tree.
@@ -542,9 +573,15 @@ local layout_impl = {
 		for _, t in ipairs(targets) do
 			local id = t.window.stable_id
 			if not present[id] then
+				if st.insertion_window_id == id and find_path(st.tree, st.insertion_anchor) then
+					anchor = st.insertion_anchor
+				end
+				local anchor_path = anchor and find_path(st.tree, anchor)
+				local anchor_node = anchor_path and anchor_path[#anchor_path] or any_leaf(st.tree)
+				-- Snapshot the subtree BEFORE clearing its highlight/selection.
 				clear_selection(st)
 				st.seq = st.seq + 1
-				local pre = apply_pend(st)
+				local pre = apply_pend(anchor_node)
 				if not st.tree then
 					st.tree = leaf(id)
 					st.tree.n = st.seq
@@ -553,8 +590,7 @@ local layout_impl = {
 					-- can supply a batch, and old boxes may predate a monitor resize.
 					-- Use tiled geometry even while displaying monocle mode.
 					place(st.tree, area, {})
-					local ok = anchor and find_path(st.tree, anchor)
-					insert_adjacent(st, id, ok and anchor or (any_leaf(st.tree).id),
+					insert_adjacent(st, id, anchor_node,
 						pre and pre.dir or nil, pre and pre.ratio or nil)
 					local path = find_path(st.tree, id)
 					if path then path[#path].n = st.seq end
@@ -613,39 +649,39 @@ local layout_impl = {
 			return false
 		end
 
-		-- preselection (works even on an empty workspace)
-		if cmd == "preselect" then
-			local arg = parts[2] or ""
-			if arg == "cancel" or arg == "clear" then
-				if st then st.pend = nil end
-				PEND = nil
-			else
-				local p = { dir = arg, ratio = nil }
-				if st and (st.tree or #ctx.targets > 0) then st.pend = p else PEND = p end
-			end
-			return true
-		elseif cmd == "pratio" then
-			local r = tonumber(parts[2])
-			if not r or r <= 0 or r >= 1 then
-				return "pratio: expected 0.1..0.9"
-			end
-			local p = (st and (st.tree or #ctx.targets > 0)) and (st.pend or { dir = nil }) or (PEND or { dir = nil })
-			p.ratio = r
-			if st and (st.tree or #ctx.targets > 0) then st.pend = p else PEND = p end
-			return true
-
-		elseif not st or not st.tree then
-			return true -- nothing to act on; silently ignore
-		end
-
 		local fw = focused()
 		local fid = fw and fw.stable_id or nil
-		if not fid then return true end -- nothing focused; silently ignore
-		-- Do not select arbitrary tiles while keyboard focus is on a float.
-		if cmd == "focus" and not fw.active then return true end
-		if st.selected and (st.selected_focus_id ~= fid or not find_path(st.tree, st.selected)) then
+		if st and st.selected and (st.selected_focus_id ~= fid or not find_path(st.tree, st.selected)) then
 			clear_selection(st)
 		end
+		local path = st and fid and find_path(st.tree, fid)
+		local node = st and (st.selected or (path and path[#path]))
+
+		-- Like bspwm, preselection belongs to the selected NODE, not to a
+		-- workspace-wide next-window slot. Changing direction preserves ratio.
+		if cmd == "preselect" or cmd == "pratio" then
+			local arg = parts[2] or ""
+			if cmd == "preselect" and (arg == "cancel" or arg == "clear") then
+				if arg == "clear" and st then clear_presels(st.tree)
+				elseif node then node.presel = nil end
+				PEND = nil
+				return true
+			end
+			local pre = (node and node.presel) or (not node and PEND) or { dir = "r", ratio = 0.5 }
+			if cmd == "pratio" then
+				local r = tonumber(arg)
+				if not r or r <= 0 or r >= 1 then return "pratio: expected 0.1..0.9" end
+				pre.ratio = r
+			else
+				pre.dir = arg
+			end
+			if node then node.presel = pre else PEND = pre end
+			return true
+		end
+
+		if not node then return true end -- empty workspace
+		-- Do not select/rotate arbitrary tiles while keyboard focus is on a float.
+		if (cmd == "focus" or cmd == "rotate") and not fw.active then return true end
 
 		if cmd == "swap" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
@@ -674,8 +710,9 @@ local layout_impl = {
 			return true -- no owning split (e.g. screen edge) is a no-op, not an error
 
 		elseif cmd == "rotate" then
-			local sub = st.selected or subtree_of(st, fid)
-			rotate(sub, tonumber(parts[2]) or 90)
+			local degrees = tonumber(parts[2]) or 90
+			if degrees ~= 90 and degrees ~= 180 and degrees ~= 270 then return "rotate: expected 90, 180 or 270" end
+			rotate(node, degrees)
 			return true
 
 		elseif cmd == "flip" then
@@ -739,6 +776,35 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+function M.close_selected()
+	local active = hl.get_active_window()
+	local st = active and active.workspace and S[active.workspace.id]
+	if not st or not st.selected or st.selected.t ~= "split" or active.floating
+		or st.selected_focus_id ~= active.stable_id or not find_path(st.tree, st.selected) then return false end
+
+	-- bspwm close_node walks all leaves. Snapshot live handles first: clients
+	-- may close immediately and change focus/the tree while requests are sent.
+	local ids, windows = {}, {}
+	collect_ids(st.selected, ids)
+	for _, w in ipairs(hl.get_windows()) do
+		if ids[w.stable_id] and w.mapped and not w.floating
+			and w.workspace and w.workspace.id == active.workspace.id then windows[#windows + 1] = w end
+	end
+	if #windows < 2 then return false end
+	clear_selection(st)
+	for _, w in ipairs(windows) do
+		if w.mapped then hl.dispatch(hl.dsp.window.close({ window = w })) end
+	end
+	return true
+end
+
+-- Normal close shortcut: selected subtree, otherwise the focused window.
+function M.close()
+	if M.close_selected() then return end
+	local w = hl.get_active_window()
+	if w and w.mapped then hl.dispatch(hl.dsp.window.close({ window = w })) end
+end
 
 -- true when the focused window has a tiled neighbour in direction `dir`
 -- (l|r|u|d); lets callers pick a fallback without making the layout reject a

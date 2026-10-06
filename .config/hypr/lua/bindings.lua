@@ -85,8 +85,10 @@ for _, l in ipairs(layouts) do
 end
 
 -- quit bspwm / close and kill
+-- Super+x closes the selected subtree, or just the focused window otherwise.
+-- Plain Ctrl+x is left to applications; Super+Ctrl+x below still pins.
 hl.bind("SUPER + CTRL + ALT + Escape", hl.dsp.exit())
-hl.bind("SUPER + x",                   hl.dsp.window.close(), { repeating = true })
+hl.bind("SUPER + x",                   require("bspwm").close, { repeating = true })
 hl.bind("SUPER + SHIFT + x",           hl.dsp.window.kill(), { repeating = true })
 
 -- alternate between the tiled and monocle layout (bspc desktop -l next)
