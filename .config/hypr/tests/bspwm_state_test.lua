@@ -1,5 +1,5 @@
 -- lua tests/bspwm_state_test.lua -- no host session or monitor dependencies.
-local codec = require("lua/bspwm_state")
+local codec = require("lua/extensions/bspwm_state")
 local tests = {}
 local paths = {}
 local function temporary_path()
@@ -52,7 +52,7 @@ local function fixture()
 			function spec:set_enabled(enabled) self.enabled = enabled end
 			return spec
 		end
-		package.loaded["lua/bspwm_state"] = { open_session=function() return codec.open(f.path) end }
+		package.loaded["lua/extensions/bspwm_state"] = { open_session=function() return codec.open(f.path) end }
 		local function ignored_dispatcher() return function() end end
 		_G.hl = {
 			layout = { register=function(name, provider)
@@ -86,7 +86,7 @@ local function fixture()
 			}, {__index=function() return ignored_dispatcher end}) },
 			{__index=function() return ignored_dispatcher end}),
 		}
-		f.api = dofile("lua/bspwm.lua")
+		f.api = dofile("lua/extensions/bspwm.lua")
 		f.api.set_feedback_sink(function(states) f.states = states end)
 	end
 	function f.finish_reload()
@@ -254,7 +254,7 @@ end
 function tests.reload_shortcut_checkpoints_then_invokes_real_reload()
 	local f = fixture()
 	f.open(1); f.open(2)
-	package.loaded["lua/bspwm"] = f.api
+	package.loaded["lua/extensions/bspwm"] = f.api
 	package.loaded["lua/bindings"], package.loaded["lua/helpers"] = nil, nil
 	require("lua/bindings")
 	local saved = read_file(f.path)

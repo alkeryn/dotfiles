@@ -1,8 +1,8 @@
 -- lua tests/bspwm_monocle_test.lua -- real provider, mocked rule/placement API.
 -- Models Space's outer padding and WindowTarget's inner gaps + border insets.
 -- Does not test compositor rendering; visual transparency still needs a desktop.
-package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
-local display = require("lua/bspwm_monocle")
+package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
+local display = require("lua/extensions/bspwm_monocle")
 local tests = {}
 
 local function fixture()
@@ -73,7 +73,7 @@ local function fixture()
 		} }, -- Deliberately NO fullscreen/hide/opacity dispatchers.
 	}
 	f.base_rule = hl.workspace_rule({ workspace = "1", monitor = "fixture-monitor", persistent = true })
-	dofile("lua/bspwm.lua")
+	dofile("lua/extensions/bspwm.lua")
 	function f.recalculate()
 		local _, outer = f.gaps(ws)
 		local bounds = display.monitor_box({ monitor = mon })

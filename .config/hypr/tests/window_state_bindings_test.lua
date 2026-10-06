@@ -5,7 +5,7 @@ local tests = {}
 local function fixture()
 	local f = { binds = {}, calls = {}, fullscreen_changes = 0 }
 	local function ignored_dispatcher() return function() end end
-	package.loaded["lua/bspwm"] = { close = function() end, reload = function() end }
+	package.loaded["lua/extensions/bspwm"] = { close = function() end, reload = function() end }
 	local window_dsp = setmetatable({}, { __index = function() return ignored_dispatcher end })
 
 	local function dispatcher(kind, opts, apply)

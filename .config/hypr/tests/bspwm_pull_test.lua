@@ -1,5 +1,5 @@
 -- lua tests/bspwm_pull_test.lua -- native move/recalculation ordering is mocked.
-local codec = require("lua/bspwm_state")
+local codec = require("lua/extensions/bspwm_state")
 local tests = {}
 
 local function find(node, id)
@@ -54,7 +54,7 @@ local function fixture()
 	end
 	function f.load(saved)
 		f.events = {}
-		package.loaded["lua/bspwm_state"] = { open_session = function()
+		package.loaded["lua/extensions/bspwm_state"] = { open_session = function()
 			if not saved then return nil end
 			return {
 				load = function() return assert(codec.decode(saved)) end,
@@ -134,7 +134,7 @@ local function fixture()
 				end end }, { __index = function() return noop end }),
 			}, { __index = function() return noop end }),
 		}
-		f.api = dofile("lua/bspwm.lua")
+		f.api = dofile("lua/extensions/bspwm.lua")
 		f.api.set_feedback_sink(function(states) f.states = states end)
 		if saved then f.emit("config.reloaded"); f.emit("config.props_refreshed", true) end
 	end
@@ -435,7 +435,7 @@ end
 function tests.super_y_binding_reaches_global_pull()
 	local f = fixture()
 	f.open(1, 1); f.open(2, 2); f.focus(1)
-	package.loaded["lua/bspwm"] = f.api
+	package.loaded["lua/extensions/bspwm"] = f.api
 	package.loaded["lua/bindings"], package.loaded["lua/helpers"] = nil, nil
 	require("lua/bindings")
 	assert(f.binds["SUPER + y"])

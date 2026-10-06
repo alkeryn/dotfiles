@@ -74,7 +74,7 @@ end
 -- overlay), so we ask the layout whether a neighbour exists instead of using
 -- failure as control flow.
 
-local bspwm = require("lua/bspwm")
+local bspwm = require("lua/extensions/bspwm")
 
 function H.swap_dir(d) -- d: l | r | u | d
 	if bspwm.has_neighbor(d) then

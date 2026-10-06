@@ -5,7 +5,7 @@
 --   require("lua/rules")    -- window/workspace rules + monitor assignment
 --   require("lua/bindings") -- keybindings
 --   require("lua/helpers")  -- focus/swap/gap/monitor helpers (used by the two above)
---   require("lua/bspwm")    -- the bspwm-style tree layout
+--   require("lua/extensions/bspwm")    -- the bspwm-style tree layout
 --
 -- Migration from ~/.config/bspwm/bspwmrc + sxhkd.
 --
@@ -16,8 +16,8 @@
 --   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
-local bspwm = require("lua/bspwm") -- registers the "lua:bspwm" layout
-require("lua/presel_feedback").setup(bspwm)
+local bspwm = require("lua/extensions/bspwm") -- registers the "lua:bspwm" layout
+require("lua/extensions/presel_feedback").setup(bspwm)
 hl.layer_rule({
 	name = "bspwm-preselection-feedback",
 	match = { namespace = "^bspwm-presel-feedback$" },
@@ -136,7 +136,7 @@ hl.config({
 		-- what to focus when the focused window closes:
 		--   1 = window under the cursor (the wrong-monitor trap),
 		--   2 = most recently focused window of the workspace (bspwm-like).
-		-- Empty-workspace closes are handled by lua/close_refocus.lua.
+		-- Empty-workspace closes are handled by lua/extensions/close_refocus.lua.
 		focus_on_close = 2,
 		sensitivity = 0,
 		touchpad = { natural_scroll = false },
@@ -162,9 +162,9 @@ hl.config({ cursor = { inactive_timeout = PC == "laptop" and 3 or 0 } })
 -- Config reload workaround (Hyprland v0.56.2): a reload closes the Lua state and
 -- re-registers the layout, but workspaces keep their old layout instance when the
 -- layout name is unchanged -- that instance is bound to the dead provider and
--- falls back to a plain grid (windows side by side). See lua/bspwm.lua: the layout
+-- falls back to a plain grid (windows side by side). See lua/extensions/bspwm.lua: the layout
 -- is registered under two names; flip to the one the workspaces are NOT using so
--- they all get a fresh instance. lua/bspwm.lua restores the session checkpoint
+-- they all get a fresh instance. lua/extensions/bspwm.lua restores the session checkpoint
 -- before registration, preserving the tree/ratios while targets are reattached.
 hl.on("config.reloaded", function()
 	local ws  = hl.get_active_workspace()
@@ -251,4 +251,4 @@ end)
 
 require("lua/rules")           -- window/workspace rules + monitor->tag assignment
 require("lua/bindings")        -- keybindings
-require("lua/close_refocus")   -- keep the right monitor focused when a workspace empties
+require("lua/extensions/close_refocus")   -- keep the right monitor focused when a workspace empties

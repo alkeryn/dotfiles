@@ -1,8 +1,8 @@
--- Run from ~/.config/hypr: lua tests/bspwm_selection_test.lua [lua/bspwm.lua]
+-- Run from ~/.config/hypr: lua tests/bspwm_selection_test.lua [lua/extensions/bspwm.lua]
 -- Real tree/navigation; mocked Hyprland focus events and reversible tag rules.
-local layout_path = arg[1] or "lua/bspwm.lua"
+local layout_path = arg[1] or "lua/extensions/bspwm.lua"
 local tests = {}
-package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
+package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
 local selection_tag = "bspwm_selected"
 
 local function fixture(count)
@@ -87,7 +87,7 @@ local function fixture(count)
 	f.api = dofile(layout_path)
 
 	function f.load_bindings()
-		package.loaded["lua/bspwm"] = f.api
+		package.loaded["lua/extensions/bspwm"] = f.api
 		package.loaded["lua/helpers"], package.loaded["lua/bindings"] = nil, nil
 		require("lua/bindings")
 	end

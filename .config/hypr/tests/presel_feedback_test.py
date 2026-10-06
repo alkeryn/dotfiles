@@ -54,7 +54,7 @@ class FeedbackTests(unittest.TestCase):
         preview = preview_fixture(monitor)
         x, y, w, h = preview.box
         mx, my, mw, mh = preview.monitor
-        source = f'''local feedback = require("lua/presel_feedback")
+        source = f'''local feedback = require("lua/extensions/presel_feedback")
 io.write(feedback.encode({{{{output=arg[1], x={mx+x}, y={my+y}, w={w}, h={h},
 monitor_x={mx}, monitor_y={my}, monitor_w={mw}, monitor_h={mh}}}}}))'''
         result = subprocess.run(["lua", "-", preview.output], input=source, text=True,

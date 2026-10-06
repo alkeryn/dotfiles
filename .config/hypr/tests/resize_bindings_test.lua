@@ -2,7 +2,7 @@
 -- Loads the actual bindings, helpers and layout. The floating dispatcher mock
 -- models v0.56.2's center-based resize and exposes updated goal geometry.
 local tests = {}
-package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
+package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture()
 	local f = { binds = {}, messages = {}, resize_calls = 0, move_calls = 0 }
@@ -64,7 +64,7 @@ local function fixture()
 			end,
 		}, { __index = function() return ignored_dispatcher end }),
 	}
-	for _, name in ipairs({ "lua/bspwm", "lua/helpers", "lua/bindings" }) do package.loaded[name] = nil end
+	for _, name in ipairs({ "lua/extensions/bspwm", "lua/helpers", "lua/bindings" }) do package.loaded[name] = nil end
 	require("lua/bindings")
 
 	function f.press(key, shrink)

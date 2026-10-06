@@ -1,6 +1,6 @@
 # Script-only preselection feedback
 
-`lua/presel_feedback.lua` does all geometry prediction. The small display helper,
+`lua/extensions/presel_feedback.lua` does all geometry prediction. The small display helper,
 `scripts/presel_feedback.py`, runs through Python and GTK3/layer-shell. There is
 **no compiler, build step, generated protocol code, custom binary or plugin**.
 

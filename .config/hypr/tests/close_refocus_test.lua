@@ -34,8 +34,8 @@ local function fixture(windows, active, workspaces, active_ws)
 		end,
 		dsp = { focus = focus_dsp },
 	}
-	package.loaded["lua/close_refocus"] = nil
-	require("lua/close_refocus")
+	package.loaded["lua/extensions/close_refocus"] = nil
+	require("lua/extensions/close_refocus")
 	assert(f.on_close and f.on_active, "module must register window.close and window.active")
 	return f
 end

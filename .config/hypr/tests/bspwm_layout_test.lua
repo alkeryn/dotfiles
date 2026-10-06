@@ -2,7 +2,7 @@
 -- Exercises the real provider using the installed HL.LayoutContext API shape.
 local tests = {}
 -- Never read/write the running desktop's session checkpoint from unit tests.
-package.loaded["lua/bspwm_state"] = { open_session = function() return nil end }
+package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture(width, height, x, y)
 	local providers = {}
@@ -15,7 +15,7 @@ local function fixture(width, height, x, y)
 		dispatch = function() end,
 		dsp = { window = { alter_zorder = function() end } },
 	}
-	dofile("lua/bspwm.lua")
+	dofile("lua/extensions/bspwm.lua")
 	local provider = assert(providers.bspwm)
 	local ctx = { area = { x = x or 0, y = y or 0, w = width, h = height }, targets = {} }
 	local f = { ctx = ctx }

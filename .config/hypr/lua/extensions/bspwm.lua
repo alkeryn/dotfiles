@@ -1,6 +1,6 @@
--- lua/bspwm.lua -- bspwm-style binary-tree layout for Hyprland (v0.56.2+)
+-- lua/extensions/bspwm.lua -- bspwm-style binary-tree layout for Hyprland (v0.56.2+)
 -- ============================================================================
--- Register with:  require("lua/bspwm")    -- from hyprland.lua
+-- Register with:  require("lua/extensions/bspwm")    -- from hyprland.lua
 -- Select with:    general.layout = "lua:bspwm"   (or workspace_rule layout=)
 --
 -- Implements a real per-workspace binary tree like bspwm:
@@ -31,7 +31,7 @@
 
 -- Load BEFORE registering either provider: registration itself can reattach
 -- existing windows and call recalculate with an incomplete target list.
-local state_store, store_error = require("lua/bspwm_state").open_session()
+local state_store, store_error = require("lua/extensions/bspwm_state").open_session()
 local restored, restore_error
 if state_store then restored, restore_error = state_store:load() end
 if store_error or restore_error then print("bspwm checkpoint: " .. tostring(store_error or restore_error)) end
@@ -45,7 +45,7 @@ local selection_tag = "bspwm_selected"
 local feedback_sink
 local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
 local transferring = false -- also suppress checkpoints/feedback through final replay
-local monocle_display = require("lua/bspwm_monocle")
+local monocle_display = require("lua/extensions/bspwm_monocle")
 local monocle = monocle_display.new()
 
 local function checkpoint()
@@ -992,7 +992,7 @@ hl.layout.register("bspwm", layout_impl)
 hl.layout.register("bspwm_b", layout_impl)
 
 -- ---------------------------------------------------------------------------
--- module API (require("lua/bspwm"))
+-- module API (require("lua/extensions/bspwm"))
 -- ---------------------------------------------------------------------------
 
 local M = {}
