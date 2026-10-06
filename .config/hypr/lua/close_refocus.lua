@@ -29,7 +29,7 @@
 
 -- TEMPORARY instrumentation: trace decisions to /tmp/close_refocus.log and
 -- stdout (hyprctl rollinglogger). Remove once the behavior is confirmed.
-local TRACE = true
+local TRACE = false
 local function trace(...)
 	if not TRACE then return end
 	local n = select("#", ...)
