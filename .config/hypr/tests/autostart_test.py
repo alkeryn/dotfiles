@@ -97,6 +97,7 @@ exit 94
                 self.assertFalse(any("signal-desktop" in cmd for cmd in commands))
                 self.assertEqual("ckb-next -b" in commands, pc == "mainpc")
                 self.assertIn("hypridle", commands)
+                self.assertEqual(commands.count("hyprpaper"), 1)
                 self.assertIn("nm-applet", commands)
 
     def test_success_launches_signal_in_its_own_exec_even_after_pending_reload(self):

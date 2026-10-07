@@ -198,11 +198,9 @@ require("lua/autostart") -- startup commands
 
 -- hyprctl setcursor is superseded by XCURSOR_THEME/XCURSOR_SIZE env above
 
--- wallpaper: ~/.wall lock -> hyprpaper config (~/.config/hypr/hyprpaper.conf):
---   splash = false
---   ipc = on
---   preload = /path/to/wall.jpg
---   wallpaper = ,/path/to/wall.jpg
+-- wallpaper: ~/bin/setwall IMAGE MODE (also used by ranger actions 11-17).
+-- Generates ~/.config/hypr/hyprpaper.conf on Wayland; hyprpaper starts via autostart.
+-- On X11 it uses feh. ~/.fehbg is also saved on Wayland for the next X11 session.
 
 -- lock: ~/bin/lock + ~/bin/blurlock -> hyprlock, driven by hypridle:
 --   ~/.config/hypr/hypridle.conf:
