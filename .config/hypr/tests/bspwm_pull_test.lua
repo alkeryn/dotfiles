@@ -423,17 +423,164 @@ function tests.selected_desktop_move_monitor_fallback_transfers_entire_selection
 	end
 end
 
-function tests.selected_desktop_move_single_window_and_float_keep_native_follow()
-	for _, floating in ipairs({ false, true }) do
+function tests.desktop_move_floats_groups_and_other_layouts_keep_native_follow()
+	for _, kind in ipairs({ "floating", "group", "layout" }) do
 		local f = fixture()
 		f.workspace(2); f.open(1, 1); f.open(2, 1); f.message("focus parent")
-		if floating then f.open(3, 1, true) else f.focus(1) end
+		if kind == "floating" then f.open(3, 1, true) else f.focus(1) end
+		if kind == "group" then f.active.group = {} end
+		if kind == "layout" then f.workspaces[2].tiled_layout = "dwindle" end
 		local active = f.active
 		assert(f.api.move_to_workspace(2) == true)
 		assert(#f.moves == 1 and f.moves[1].window == active and f.moves[1].follow)
 		assert(active.workspace.id == 2 and f.active == active and f.windows[2].workspace.id == 1)
 		f.consistent()
 	end
+end
+
+local function layout_signature(f, wsid)
+	return codec.encode({ [wsid] = { tree = f.states[wsid].tree, seq = 0, mode = "tiled" } })
+end
+
+function tests.desktop_move_relative_round_trips_restore_every_leaf_and_split()
+	for moving_id = 1, 5 do
+		local f = fixture()
+		local mon = f.workspace(1).monitor
+		f.workspace(2, mon)
+		for id = 1, 5 do f.open(id, 1) end
+		for id = 6, 8 do f.open(id, 2) end
+		f.focus(1); f.message("grow r 120")
+		f.focus(moving_id)
+		local node = f.leaf(moving_id)
+		local original = layout_signature(f, 1)
+		local boxes = {}
+		for id = 1, 5 do boxes[id] = f.box(id) end
+		f.load_bindings()
+		local destination
+		for _ = 1, 4 do
+			f.binds["SUPER + SHIFT + dollar"]()
+			assert(f.active_ws.id == 2 and f.leaf(moving_id) == node)
+			local current = layout_signature(f, 2)
+			assert(not destination or current == destination, "destination insertion drifted")
+			destination = current
+			f.binds["SUPER + SHIFT + dead_circumflex"]()
+			assert(f.active_ws.id == 1 and f.leaf(moving_id) == node)
+			assert(layout_signature(f, 1) == original, "return changed original split for leaf " .. moving_id)
+			for id = 1, 5 do
+				local b = boxes[id]
+				expect_box(f.box(id), b.x, b.y, b.w, b.h)
+			end
+			assert(not f.states[1].selected and not f.states[2].selected)
+			f.consistent()
+		end
+	end
+end
+
+function tests.desktop_move_subtree_round_trips_restore_outer_and_inner_splits()
+	local f = fixture()
+	for id = 1, 4 do f.open(id) end
+	f.focus(1); f.message("grow r 100")
+	f.focus(4); f.message("focus parent"); f.message("grow l 80")
+	local node, original = f.states[1].selected, layout_signature(f, 1)
+	f.workspace(2)
+	for _ = 1, 4 do
+		assert(f.api.move_to_workspace(2) == true)
+		assert(f.api.move_to_workspace(1) == true)
+		assert(f.states[1].selected == node and layout_signature(f, 1) == original)
+		f.consistent()
+	end
+end
+
+function tests.desktop_move_single_tile_snapshots_anchor_and_places_before_follow()
+	local f = fixture()
+	f.open(4, 2); f.open(5, 2); f.open(6, 2); f.focus(4)
+	local anchor = f.leaf(4)
+	f.open(1); f.open(2); f.focus(1)
+	local node = f.leaf(1)
+	f.after_move = function() f.workspaces[2].last_window = f.windows[6] end
+	f.before_focus = function()
+		assert(f.states[2].tree.a.a == anchor and f.states[2].tree.a.b == node)
+		assert(f.box(1).x >= 2000)
+	end
+	assert(f.api.move_to_workspace(2) == true)
+	assert(#f.moves == 1 and not f.moves[1].follow and #f.focus_calls == 1)
+	assert(not f.states[2].selected and not f.windows[1].tags.bspwm_selected)
+	f.consistent()
+end
+
+function tests.desktop_move_return_preselection_overrides_saved_slot()
+	local f = fixture()
+	f.open(1); f.open(2); f.focus(1)
+	assert(f.api.move_to_workspace(2) == true)
+	f.presel(2, "d", 0.3); f.focus(1)
+	assert(f.api.move_to_workspace(1) == true)
+	local root = f.states[1].tree
+	assert(root.axis == "v" and root.ratio == 0.3 and root.a.id == 2 and root.b.id == 1)
+	assert(not f.leaf(2).presel)
+	-- The override becomes the new return slot, not the superseded one.
+	local expected = layout_signature(f, 1)
+	assert(f.api.move_to_workspace(2) == true)
+	assert(f.api.move_to_workspace(1) == true)
+	assert(layout_signature(f, 1) == expected)
+	f.consistent()
+end
+
+function tests.desktop_move_stale_slot_falls_back_after_layout_changes()
+	for _, change in ipairs({ "close", "insert", "rotate", "resize", "float" }) do
+		local f = fixture()
+		for id = 1, 4 do f.open(id) end
+		f.focus(1)
+		assert(f.api.move_to_workspace(2) == true)
+		f.focus(2)
+		if change == "close" then
+			f.windows[3].mapped = false; f.emit("window.close", f.windows[3]); f.recalculate(1)
+		elseif change == "insert" then f.open(5)
+		elseif change == "rotate" then f.message("focus parent"); f.message("rotate 90")
+		elseif change == "resize" then f.message("grow d 80")
+		else
+			f.windows[3].floating = true; f.emit("window.update_rules", f.windows[3]); f.recalculate(1)
+		end
+		local anchor = f.leaf(2)
+		f.focus(2); f.focus(1)
+		assert(f.api.move_to_workspace(1) == true)
+		local path = require("lua/extensions/bspwm_tree").find_path(f.states[1].tree, 1)
+		assert(path[#path - 1].a == anchor, "stale slot overrode current anchor after " .. change)
+		f.consistent()
+	end
+end
+
+function tests.desktop_move_failed_return_preserves_slot_for_retry()
+	for _, kind in ipairs({ "fail_id", "throw_id", "ignore_move", "after_move" }) do
+		local f = fixture()
+		f.open(1); f.open(2); f.focus(1)
+		local node, original = f.leaf(1), layout_signature(f, 1)
+		assert(f.api.move_to_workspace(2) == true)
+		if kind == "after_move" then
+			f.after_move = function(_, dest)
+				if dest.id == 1 then error("failure after ownership changed") end
+			end
+		else f[kind] = kind == "ignore_move" or 1 end
+		assert(type(f.api.move_to_workspace(1)) == "string")
+		assert(f.windows[1].workspace.id == 2 and f.leaf(1) == node)
+		f[kind] = nil; f.focus(1)
+		assert(f.api.move_to_workspace(1) == true)
+		assert(layout_signature(f, 1) == original and f.leaf(1) == node)
+		f.consistent()
+	end
+end
+
+function tests.desktop_move_pending_preselection_overrides_saved_slot()
+	local f = fixture()
+	f.open(1); f.open(2); f.focus(1)
+	assert(f.api.move_to_workspace(2) == true)
+	-- Set a workspace-wide pending preselection while focused on an empty one.
+	f.active_ws, f.active = f.workspace(3), nil
+	f.windows[1].active = false
+	f.message("preselect u"); f.message("pratio 0.4"); f.focus(1)
+	assert(f.api.move_to_workspace(1) == true)
+	local root = f.states[1].tree
+	assert(root.axis == "v" and root.ratio == 0.4 and root.a.id == 1 and root.b.id == 2)
+	f.consistent()
 end
 
 function tests.selected_desktop_move_rejects_unsafe_subtrees_and_other_layouts_without_partial_fallback()

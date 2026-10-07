@@ -88,6 +88,11 @@ end
 -- Pure tree operations are separate from native focus/layout callbacks.
 local tree = require("lua/extensions/bspwm_tree")
 local directional_focus = require("lua/extensions/bspwm_focus")
+local workspace_slot = require("lua/extensions/bspwm_workspace_slots")
+-- Keys survive intact transfers but not closed/rebuilt nodes. Values contain
+-- only plain slot data, so even LuaJIT's weak tables cannot retain dead trees.
+-- Deliberately transient: config reload starts a new set of return positions.
+local workspace_slots = setmetatable({}, { __mode = "k" })
 local leaf, find_path, collect_ids = tree.leaf, tree.find_path, tree.collect_ids
 local leaves, last_leaf = tree.leaves, tree.last_leaf
 local prune_tree, walk_splits = tree.prune, tree.walk_splits
@@ -428,7 +433,10 @@ on_event("window.update_rules", function(w)
 end)
 on_event("window.fullscreen", window_leaves_selection)
 on_event("workspace.removed", function(ws)
-	if ws then monocle.remove(ws) end
+	if ws then
+		monocle.remove(ws)
+		for _, slots in pairs(workspace_slots) do slots[ws.id] = nil end
+	end
 	local st = ws and states[ws.id]
 	if st then
 		clear_selection(st)
@@ -1006,8 +1014,8 @@ function M.set_floating(window, floating)
 	return result
 end
 
--- bspwm messages.c passes the selected NODE to tree.c:transfer_node for
--- `node -d --follow`. Native window.move only knows the representative leaf.
+-- Transfer intact nodes, including unselected tiles. Native remove/reinsert
+-- loses both leaf metadata and the original split when moving back and forth.
 function M.move_to_workspace(selector)
 	if rehydrating or transferring then return "workspace move: layout is busy" end
 	local active = hl.get_active_window()
@@ -1019,11 +1027,17 @@ function M.move_to_workspace(selector)
 	if dest and dest.id == source.id then return true end
 	if not node or node.t ~= "split" or active.floating or from.selected_focus_id ~= active.stable_id
 		or not find_path(from.tree, node) then
-		-- Unselected tiles, floats and native groups keep their normal behavior.
-		local result = hl.dispatch(hl.dsp.window.move({
-			window = active, workspace = dest and workspace_selector(dest) or selector, follow = true,
-		}))
-		return result and result.ok == false and "workspace move: could not move focused window" or true
+		local path = from and find_path(from.tree, active.stable_id)
+		if path and not active.floating and not active.hidden and not active.group
+			and compatible_workspace(source) and (not dest or compatible_workspace(dest)) then
+			node = path[#path]
+		else
+			-- Floats, native groups and other layouts still use native follow.
+			local result = hl.dispatch(hl.dsp.window.move({
+				window = active, workspace = dest and workspace_selector(dest) or selector, follow = true,
+			}))
+			return result and result.ok == false and "workspace move: could not move focused window" or true
+		end
 	end
 	if not compatible_workspace(source) or (dest and not compatible_workspace(dest)) then
 		return "workspace move: selected subtree requires the bspwm layout"
@@ -1050,6 +1064,7 @@ function M.move_to_workspace(selector)
 		anchor = to.selected or (path and path[#path]) or last_leaf(to.tree)
 	end
 	if dest then set_destination(dest) end
+	local source_slot = workspace_slot.capture(from, node)
 	local contexts = {}
 	transferring, transfer_contexts = true, contexts
 	local ok, failure = pcall(function()
@@ -1083,8 +1098,16 @@ function M.move_to_workspace(selector)
 			detach_node(from, node)
 			local context = contexts[dest.id]
 			if context then place(to.tree, context.area, {}) end
-			local pre = take_preselection(anchor)
-			insert_adjacent(to, node, anchor, pre and pre.dir, pre and pre.ratio)
+			local slots = workspace_slots[node] or {}
+			-- Explicit insertion intent wins. Otherwise restore the original
+			-- side/axis/ratio only if the remaining destination tree still fits.
+			if (anchor and anchor.presel) or pending_presel
+				or not workspace_slot.restore(to, node, slots[dest.id]) then
+				local pre = take_preselection(anchor)
+				insert_adjacent(to, node, anchor, pre and pre.dir, pre and pre.ratio)
+			end
+			slots[dest.id], slots[source.id] = nil, source_slot
+			workspace_slots[node] = slots
 			for _, child in ipairs(leaves(node)) do to.seq = math.max(to.seq, child.n) end
 		end
 		for _, ws in ipairs(dest and { source, dest } or { source }) do
@@ -1106,8 +1129,8 @@ function M.move_to_workspace(selector)
 		local focused, result = pcall(function() return hl.dispatch(hl.dsp.focus({ window = active })) end)
 		local current = hl.get_active_window()
 		if not focused or (result and result.ok == false) or not current or current.stable_id ~= active.stable_id then
-			failure = "could not focus moved subtree"
-		else
+			failure = "could not focus moved node"
+		elseif node.t == "split" then
 			-- Workspace/monitor focus notifications clear selection. Restore it
 			-- afterwards so another send/rotate/close still acts on the subtree.
 			to.selected, to.selected_focus_id = node, active.stable_id
