@@ -229,7 +229,7 @@ local SOUNDS = {
 for mods, list in pairs(SOUNDS) do
 	for _, s in ipairs(list) do
 		hl.bind("SUPER + " .. mods .. s[1],
-			hl.dsp.exec_cmd("paplay ~/Cloud/Mega/zPC/Sounds/" .. s[2] .. ".wav &"), { repeating = true })
+			hl.dsp.exec_cmd("paplay ~/Sync/zPC/Sounds/" .. s[2] .. ".wav &"), { repeating = true })
 	end
 end
 hl.bind("SUPER + KP_Insert",     hl.dsp.exec_cmd("pkill paplay"), { repeating = true })
