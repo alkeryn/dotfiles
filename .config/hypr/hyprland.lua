@@ -215,3 +215,4 @@ require("lua/autostart") -- startup commands
 
 require("lua/rules")           -- window/workspace rules + monitor->tag assignment
 require("lua/bindings")        -- keybindings
+require("lua/extensions/floating_focus") -- raise floats on keyboard focus, not just clicks
