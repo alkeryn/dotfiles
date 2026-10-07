@@ -324,7 +324,7 @@ function tests.remembered_pull_source_round_trips_without_visual_selection()
 	local tree = { t="split", axis="h", ratio=0.37, pull_focus_id=2, pull_ids={ [1]=true, [2]=true },
 		a={ t="leaf", id=1, n=1 }, b={ t="leaf", id=2, n=2 } }
 	local text = codec.encode({ [1]={ tree=tree, seq=2, mode="tiled" } })
-	assert(text:match("^BSPWM_LAYOUT_V2"))
+	assert(text:match("^BSPWM_LAYOUT_V3"))
 	local decoded = assert(codec.decode(text))
 	local st = decoded.states[1]
 	assert(not st.selected and st.tree.pull_focus_id == 2)
@@ -339,7 +339,38 @@ function tests.legacy_v1_checkpoint_remains_readable()
 	assert(st.selected == st.tree and st.selected_focus_id == 2 and st.tree.ratio == 0.37)
 	assert(not st.tree.pull_focus_id)
 	local upgraded = codec.encode(decoded.states)
-	assert(upgraded:match("^BSPWM_LAYOUT_V2") and codec.decode(upgraded))
+	assert(upgraded:match("^BSPWM_LAYOUT_V3") and codec.decode(upgraded))
+end
+
+function tests.legacy_v2_keeps_pull_sources_without_floating_geometry()
+	local text = "BSPWM_LAYOUT_V2\nP - -\nW 1 2 tiled . 2 - -\nS h 0.37 - - 2\nL 1 1 - -\nL 2 2 - -\n"
+	local decoded = assert(codec.decode(text))
+	local st = decoded.states[1]
+	assert(st.selected == st.tree and st.tree.pull_focus_id == 2 and st.tree.pull_ids[1])
+	assert(not st.tree.a.floating_geometry and not st.tree.b.floating_geometry)
+	assert(codec.decode(codec.encode(decoded.states)))
+end
+
+function tests.floating_geometry_round_trip_is_data_only_and_optional()
+	local node = { t="leaf", id=1, n=1, floating_geometry={ x=-900, y=120, w=700, h=400,
+		monitor={ x=-1200, y=0, w=1200, h=800 }, window="must not persist" } }
+	local states = { [1]={ tree=node, seq=1, mode="tiled" } }
+	local text = codec.encode(states)
+	local decoded = assert(codec.decode(text))
+	local box = decoded.states[1].tree.floating_geometry
+	assert(box.x == -900 and box.y == 120 and box.w == 700 and box.h == 400)
+	assert(box.monitor.x == -1200 and box.monitor.w == 1200 and not box.window)
+	assert(codec.encode(decoded.states) == text)
+	node.floating_geometry.monitor = nil
+	assert(not assert(codec.decode(codec.encode(states))).states[1].tree.floating_geometry.monitor)
+end
+
+function tests.malformed_floating_geometry_is_rejected()
+	local prefix = "BSPWM_LAYOUT_V3\nP - -\nW 1 1 tiled - - - -\nL 1 1 - - "
+	for _, record in ipairs({ "R 1 2 0 40 -", "R 1 2 -1 40 -", "R nan 2 3 4 -",
+		"R 1e100 2 3 4 -", "R 1.5 2 3 4 -", "R 1 2 3 4 R 0 0 0 800", "R 1 2 3", "X" }) do
+		assert(not codec.decode(prefix .. record), "accepted invalid geometry " .. record)
+	end
 end
 
 function tests.invalid_pull_source_representative_is_rejected()

@@ -51,6 +51,7 @@ local prune_pull_sources
 local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
 local transferring = false -- also suppress checkpoints/feedback through final replay
 local closing = {} -- window.close precedes mapped=false and target removal
+local float_geometry = require("lua/extensions/bspwm_float_geometry")
 local monocle_display = require("lua/extensions/bspwm_monocle")
 local monocle = monocle_display.new()
 
@@ -682,12 +683,9 @@ local layout_impl = {
 		elseif cmd == "move" then
 			local nid = neighbor_id(st, fid, parts[2] or "r")
 			if not nid then return true end
-			local pa  = find_path(st.tree, fid)
-			local n   = pa and pa[#pa].n or 0
-			detach_node(st, fid)
-			insert_adjacent(st, fid, nid, (parts[2] == "l" or parts[2] == "u") and parts[2] or "r", nil)
-			local path = find_path(st.tree, fid)
-			if path then path[#path].n = n end
+			local moved = detach_node(st, fid)
+			-- Keep per-window metadata, including the last floating rectangle.
+			insert_adjacent(st, moved, nid, (parts[2] == "l" or parts[2] == "u") and parts[2] or "r", nil)
 			return true
 
 		elseif cmd == "grow" or cmd == "shrink" then
@@ -939,6 +937,35 @@ hl.layout.register("bspwm_b", layout_impl)
 -- ---------------------------------------------------------------------------
 
 local M = {}
+
+-- Explicit state shortcuts can bracket the synchronous native transition.
+-- Unlike rule events, the return from float() is after native placement, so
+-- restoring here needs neither a timer nor a plugin hook, and cannot interfere
+-- with Hyprland's temporary floating state during native pointer drags.
+function M.set_floating(window, floating)
+	local was_floating = window.floating
+	local captured = was_floating and not floating and float_geometry.capture(window) or nil
+	local function node_for_window()
+		if rehydrating or transferring then return nil end
+		local ws = window.workspace
+		local st = ws and compatible_workspace(ws) and states[ws.id]
+		local path = st and find_path(st.tree, window.stable_id)
+		return path and path[#path]
+	end
+	local node = node_for_window()
+	local saved = node and node.floating_geometry
+	local result = hl.dispatch(hl.dsp.window.float({ action = floating and "on" or "off", window = window }))
+	if (result and result.ok == false) or not window.mapped or window.floating ~= floating then return result end
+	if captured then
+		-- An initially floating client has no tree leaf until the tile dispatch
+		-- inserts it. Attach to that leaf only after the transition succeeds.
+		node = node_for_window()
+		if node then node.floating_geometry = captured; checkpoint() end
+	elseif not was_floating and floating then
+		float_geometry.restore(window, saved)
+	end
+	return result
+end
 
 -- bspwm messages.c passes the selected NODE to tree.c:transfer_node for
 -- `node -d --follow`. Native window.move only knows the representative leaf.

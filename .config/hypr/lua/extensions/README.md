@@ -10,8 +10,10 @@
 - `bspwm_geometry.lua`: shared logical monitor bounds and split rounding for
   tree placement, monocle and preselection previews.
 - `bspwm_state.lua`: bounded data-only checkpoint codec and atomic session
-  storage. V1 checkpoints remain readable; writes retain the V2 format.
+  storage. V1/V2 checkpoints remain readable; V3 also saves floating rectangles.
 - `bspwm_monocle.lua`: reversible workspace/window rules and guarded raising.
+- `bspwm_float_geometry.lua`: goal-geometry capture and post-dispatch restoration
+  for explicit state shortcuts; no native plugin hooks or polling.
 - `bspwm_drag.lua`: held-button pointer sampling and native floating fallback.
 - `bspwm_focus.lua`: bspwm low-tightness directional focus across tiles/floats
   and monitors; see `bspwm_focus.md` for source references and parity checks.
@@ -33,6 +35,9 @@ Empty-workspace refocus prevention is provided by the native
   bspwm. Placement expands the nonvacant sibling without changing topology or
   ratios. Tiling again revives that exact leaf, not a new insertion. See
   [`bspwm_floating.md`](bspwm_floating.md) for callback-ordering details.
+- State shortcuts also save the last floating rectangle before tiling and restore
+  it after native float placement, including across reloads. Repeating the float
+  shortcut while already floating never undoes a manual move.
 - A selected node can be an entire subtree. Detaching, swapping and transferring
   it must retain its identity, ages, ratios and preselection metadata.
 - Native moves and rule changes can reenter layout callbacks synchronously.

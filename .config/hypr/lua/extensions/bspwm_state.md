@@ -10,6 +10,7 @@ Stored per workspace:
 
 - Binary-tree topology, split directions and exact ratios.
 - Window stable IDs and insertion ages/sequence.
+- Last floating rectangle saved by the state shortcuts, with its monitor bounds.
 - Tiled/monocle mode and per-node preselection.
 - Selected node and pending insertion anchor, identified by tree paths.
 - Remembered `Super+y` source groups and their representative window IDs,
@@ -19,8 +20,8 @@ Vacant floating leaves remain in the saved topology. Vacancy itself is derived
 from live windows/targets on reload rather than serialized, so tiling again
 restores the saved slot even after reloading while every window is floating.
 
-Geometry and Hyprland userdata are not serialized. The new config's monitor
-workareas and gaps still apply; this preserves the tree, not overrides to other
+Tiled placement geometry and Hyprland userdata are not serialized. The new
+config's monitor workareas and gaps still apply; this preserves the tree, not overrides to other
 configuration options. Selections are retained only if their focused window and
 subtree still exist.
 
@@ -50,8 +51,10 @@ data tokens, **never executes Lua from a state file**, and rejects corruption,
 invalid nodes, duplicate leaves, excessive depth or oversized input. Errors are
 logged with `bspwm checkpoint:`; persistence failure does not disable tiling.
 
-V2 adds an optional pull-source representative to split-node records. V1 files
+V3 adds an optional floating rectangle and monitor bounds to leaf records. V2
+introduced an optional pull-source representative on splits. V1 and V2 files
 are still accepted and upgraded on the next save without rebuilding their trees.
+Floating coordinates are bounded integers and rectangle dimensions must be positive.
 The decoder verifies each remembered representative belongs to its subtree and
 reconstructs its member IDs. If membership changed while the config was reloading,
 the layout drops that stale association during reconciliation.

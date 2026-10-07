@@ -1,6 +1,7 @@
 -- Shared window, focus, workspace, gap and monitor helpers.
 -- Module paths resolve against the main config directory, not lua/.
 local vars = require("lua/vars")
+local bspwm = require("lua/extensions/bspwm")
 local M = {}
 
 -- ---------------------------------------------------------------------------
@@ -21,7 +22,7 @@ function M.set_window_state(state)
 		}))
 	end
 	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = window }))
-	hl.dispatch(hl.dsp.window.float({ action = state == "floating" and "on" or "off", window = window }))
+	bspwm.set_floating(window, state == "floating")
 	if fullscreen then
 		-- fullscreen_state: 2 = full fullscreen, 1 = maximized.
 		hl.dispatch(hl.dsp.window.fullscreen_state({
@@ -61,7 +62,6 @@ end
 -- ---------------------------------------------------------------------------
 -- Directional focus/swap with monitor fallback
 -- ---------------------------------------------------------------------------
-local bspwm = require("lua/extensions/bspwm")
 
 function M.focus_dir(direction) -- l | r | u | d
 	bspwm.focus_dir(direction)

@@ -7,7 +7,8 @@ local tests = {}
 package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
 
 local function fixture(count)
-	local f = { windows = {}, targets = {}, events = {}, contexts = {} }
+	package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return nil end }
+	local f = { windows = {}, targets = {}, events = {}, contexts = {}, geometry_calls = {} }
 	local provider
 	function f.context(id)
 		if not f.contexts[id] then
@@ -48,17 +49,58 @@ local function fixture(count)
 		dispatch = function(callback) return callback() end,
 		dsp = { window = { alter_zorder = noop, tag = function() return function()
 			if f.reenter_tags then f.recalculate() end
+		end end,
+		fullscreen_state = function(opts) return function()
+			local w = opts.window
+			if opts.internal ~= 0 and (w.fullscreen or 0) == 0 then w.before_fullscreen = { at=w.at, size=w.size } end
+			w.fullscreen, w.fullscreen_client = opts.internal, opts.client
+			if opts.internal == 0 and w.before_fullscreen then
+				w.at, w.size = w.before_fullscreen.at, w.before_fullscreen.size
+				w.before_fullscreen = nil
+			elseif opts.internal ~= 0 then
+				w.at, w.size = { x=0, y=0 }, { x=1200, y=800 }
+			end
+		end end,
+		pseudo = function(opts) return function() opts.window.pseudo = opts.action == "on" end end,
+		float = function(opts) return function()
+			local w, floating = opts.window, opts.action == "on"
+			if f.reject_float then return { ok=false } end
+			if floating ~= w.floating and not f.ignore_float then
+				if floating then f.float(w.stable_id) else f.tile(w.stable_id) end
+			end
+			if f.after_float_dispatch then f.after_float_dispatch(w) end
+			return { ok=true }
+		end end,
+		resize = function(opts) return function()
+			local w = opts.window
+			assert(w.floating and not opts.relative)
+			table.insert(f.geometry_calls, "resize:" .. w.stable_id)
+			if f.reject_resize then return { ok=false } end
+			w.at = { x=w.at.x - (opts.x-w.size.x)/2, y=w.at.y - (opts.y-w.size.y)/2 }
+			w.size = { x=opts.x, y=opts.y }
+			return { ok=true }
+		end end,
+		move = function(opts) return function()
+			local w = opts.window
+			assert(w.floating and not opts.relative)
+			table.insert(f.geometry_calls, "move:" .. w.stable_id)
+			w.at = { x=opts.x, y=opts.y }
+			return { ok=true }
 		end end }, focus = function(opts) return function() f.focus(opts.window.stable_id) end end },
 	}
 	f.api = dofile(arg[1] or "lua/extensions/bspwm.lua")
 	f.api.set_feedback_sink(function(states) f.states = states end)
 	function f.open(id, wsid)
-		local w = { stable_id = id, workspace = { id = wsid or 1 }, mapped = true,
-			floating = false, focus_history_id = 100, active = false }
+		local w = { stable_id = id, workspace = { id = wsid or 1, tiled_layout = "lua:bspwm" }, mapped = true,
+			floating = false, focus_history_id = 100, active = false,
+			monitor = { position = { x=0, y=0 }, width=1200, height=800, scale=1 } }
 		f.windows[id] = w
 		f.emit("window.open_early", w)
 		local target = { window = w, placements = 0 }
-		function target:place(box) self.box = box; self.placements = self.placements + 1 end
+		function target:place(box)
+			self.box = box; self.placements = self.placements + 1
+			w.at, w.size = { x=box.x, y=box.y }, { x=box.w, y=box.h }
+		end
 		f.targets[id] = target
 		table.insert(f.context(w.workspace.id).targets, target)
 		f.recalculate(w.workspace.id); f.emit("window.open", w); f.focus(id)
@@ -78,12 +120,20 @@ local function fixture(count)
 		if f.after_remove then f.after_remove(w) end
 		w.floating = true
 		f.emit("window.update_rules", w)
+		-- DefaultFloatingAlgorithm::movedTarget runs AFTER update_rules and
+		-- recentres on the current tile, even if a float was previously moved.
+		local size = w.last_float_size or { x=640, y=400 }
+		local width, height = size.x, size.y
+		if math.abs(width-w.size.x) < 5 and math.abs(height-w.size.y) < 5 then width, height = width+10, height+10 end
+		w.at = { x=w.at.x+(w.size.x-width)/2, y=w.at.y+(w.size.y-height)/2 }
+		w.size = { x=width, y=height }
 		f.recalculate(w.workspace.id)
 		assert(f.targets[id].placements == placements, "layout placed a floating target")
 	end
 	function f.tile(id)
 		local w = f.windows[id]
 		assert(w.floating)
+		w.last_float_size = { x=w.size.x, y=w.size.y }
 		w.floating = false
 		f.emit("window.update_rules", w) -- before movedTarget/newTarget
 		table.insert(f.context(w.workspace.id).targets, f.targets[id])
@@ -105,6 +155,24 @@ local function fixture(count)
 		return path and path[#path]
 	end
 	function f.snapshot() return codec.encode(f.states) end
+	function f.set_state(state)
+		package.loaded["lua/extensions/bspwm"] = f.api
+		package.loaded["lua/helpers"] = nil
+		package.loaded["lua/vars"] = { GAPS=4, GAPS_OUT=8 }
+		require("lua/helpers").set_window_state(state)
+	end
+	function f.reload()
+		local saved = f.snapshot()
+		f.events = {}
+		package.loaded["lua/extensions/bspwm_state"] = { open_session = function() return {
+			load = function() return assert(codec.decode(saved)) end,
+			save = function(_, states) f.saved = codec.encode(states); return true end,
+		} end }
+		f.api = dofile(arg[1] or "lua/extensions/bspwm.lua")
+		f.api.set_feedback_sink(function(states) f.states = states end)
+		f.emit("config.reloaded"); f.emit("config.props_refreshed", true)
+		for id in pairs(f.contexts) do f.recalculate(id) end
+	end
 	for id = 1, count or 4 do f.open(id) end
 	return f
 end
@@ -219,6 +287,146 @@ function tests.monocle_float_round_trip_keeps_the_underlying_tree()
 	f.message("monocle"); f.float(2); f.focus(1); f.tile(2); f.message("tiled")
 	assert(f.snapshot() == original)
 	expect_box(f.targets[2].box, 600, 0, 600, 400)
+end
+
+local function set_rectangle(w, x, y, width, height)
+	w.at, w.size = { x=x, y=y }, { x=width, y=height }
+end
+
+local function expect_rectangle(w, x, y, width, height)
+	expect_box({ x=w.at.x, y=w.at.y, w=w.size.x, h=w.size.y }, x, y, width, height)
+end
+
+function tests.state_shortcuts_restore_latest_float_position_without_reinsertion()
+	local f = fixture(3)
+	f.focus(2)
+	local root, node, age = f.states[1].tree, f.leaf(2), f.leaf(2).n
+	f.set_state("floating")
+	assert(#f.geometry_calls == 0, "first float must keep native placement")
+	for i = 1, 4 do
+		set_rectangle(f.windows[2], 70+i, 90+i, 630+i, 420+i)
+		f.set_state("tiled")
+		assert(node.floating_geometry.x == 70+i)
+		f.set_state("tiled") -- repeat must not overwrite with tiled geometry
+		f.set_state("floating")
+		expect_rectangle(f.windows[2], 70+i, 90+i, 630+i, 420+i)
+		assert(f.states[1].tree == root and f.leaf(2) == node and node.n == age and f.states[1].seq == 3)
+	end
+end
+
+function tests.leaf_move_preserves_saved_floating_rectangle()
+	local f = fixture(3)
+	f.focus(1); f.set_state("floating")
+	set_rectangle(f.windows[1], 80, 90, 650, 430)
+	f.set_state("tiled")
+	local node, saved = f.leaf(1), f.leaf(1).floating_geometry
+	f.message("move r")
+	assert(f.leaf(1) == node and node.floating_geometry == saved)
+	f.set_state("floating")
+	expect_rectangle(f.windows[1], 80, 90, 650, 430)
+end
+
+function tests.repeated_float_shortcut_does_not_undo_a_manual_move()
+	local f = fixture(1)
+	f.set_state("floating")
+	set_rectangle(f.windows[1], 80, 90, 500, 300)
+	f.set_state("tiled"); f.set_state("floating")
+	set_rectangle(f.windows[1], 250, 320, 550, 310)
+	local calls = #f.geometry_calls
+	for _ = 1, 4 do f.set_state("floating") end
+	expect_rectangle(f.windows[1], 250, 320, 550, 310)
+	assert(#f.geometry_calls == calls)
+end
+
+function tests.native_equal_size_growth_is_undone_before_restoring_position()
+	local f = fixture(1)
+	f.set_state("floating")
+	set_rectangle(f.windows[1], -20, 40, 1200, 800)
+	f.set_state("tiled"); f.set_state("floating")
+	expect_rectangle(f.windows[1], -20, 40, 1200, 800)
+	assert(table.concat(f.geometry_calls, ",") == "resize:1,move:1")
+end
+
+function tests.float_geometry_survives_reload_while_tiled_or_floating()
+	local f = fixture(2)
+	f.focus(1); f.set_state("floating")
+	set_rectangle(f.windows[1], 170, 230, 680, 440)
+	f.set_state("tiled")
+	for _ = 1, 3 do
+		f.reload(); f.set_state("floating")
+		expect_rectangle(f.windows[1], 170, 230, 680, 440)
+		f.set_state("tiled")
+	end
+	f.set_state("floating")
+	set_rectangle(f.windows[1], 220, 140, 500, 350)
+	f.reload(); f.set_state("tiled"); f.set_state("floating")
+	expect_rectangle(f.windows[1], 220, 140, 500, 350)
+end
+
+function tests.initially_floating_client_acquires_geometry_on_first_tile()
+	local f = fixture(0)
+	f.open(1); f.float(1)
+	f.states[1].tree = nil -- window was born floating; no previous tiled slot
+	set_rectangle(f.windows[1], 110, 120, 640, 380)
+	f.set_state("tiled")
+	assert(f.leaf(1).floating_geometry.x == 110)
+	f.set_state("floating")
+	expect_rectangle(f.windows[1], 110, 120, 640, 380)
+end
+
+function tests.fullscreen_and_pseudo_transitions_do_not_replace_float_rectangle()
+	for _, state in ipairs({ "fullscreen", "pseudo_tiled" }) do
+		local f = fixture(2)
+		f.focus(1); f.set_state("floating")
+		set_rectangle(f.windows[1], 75, 85, 650, 450)
+		f.set_state(state); f.set_state(state); f.set_state("floating")
+		expect_rectangle(f.windows[1], 75, 85, 650, 450)
+	end
+	local f = fixture(1)
+	f.set_state("floating"); set_rectangle(f.windows[1], 75, 85, 650, 450)
+	-- A client can request fullscreen while retaining its floating flag.
+	hl.dispatch(hl.dsp.window.fullscreen_state({ window=f.windows[1], internal=2, client=2 }))
+	f.set_state("tiled"); f.set_state("floating")
+	expect_rectangle(f.windows[1], 75, 85, 650, 450)
+end
+
+function tests.restoration_uses_original_window_even_if_dispatch_changes_focus()
+	local f = fixture(2)
+	f.focus(1); f.set_state("floating")
+	set_rectangle(f.windows[1], 80, 90, 650, 430)
+	f.set_state("tiled")
+	f.after_float_dispatch = function() f.focus(2) end
+	f.set_state("floating")
+	expect_rectangle(f.windows[1], 80, 90, 650, 430)
+	assert(f.active.stable_id == 2 and table.concat(f.geometry_calls, ",") == "move:1")
+end
+
+function tests.failed_or_interrupted_float_dispatch_never_moves_a_tile_or_closed_window()
+	for _, failure in ipairs({ "reject_float", "ignore_float", "close" }) do
+		local f = fixture(1)
+		f.set_state("floating"); set_rectangle(f.windows[1], 80, 90, 650, 430)
+		f.set_state("tiled")
+		if failure == "close" then f.after_float_dispatch = function() f.close(1) end
+		else f[failure] = true end
+		f.set_state("floating")
+		assert(#f.geometry_calls == 0)
+	end
+end
+
+function tests.monitor_change_translates_saved_position_and_fits_smaller_output()
+	local f = fixture(1)
+	f.set_state("floating"); set_rectangle(f.windows[1], 900, 550, 300, 200)
+	f.set_state("tiled")
+	f.windows[1].monitor = { position={ x=-800, y=0 }, width=800, height=600, scale=1 }
+	f.set_state("floating")
+	expect_rectangle(f.windows[1], -300, 400, 300, 200)
+end
+
+function tests.remapped_client_does_not_inherit_old_float_geometry()
+	local f = fixture(1)
+	f.set_state("floating"); set_rectangle(f.windows[1], 80, 90, 650, 430)
+	f.set_state("tiled"); f.close(1); f.open(1); f.set_state("floating")
+	assert(not f.leaf(1).floating_geometry and #f.geometry_calls == 0)
 end
 
 local names, failures = {}, 0

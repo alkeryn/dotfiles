@@ -1,11 +1,12 @@
 -- Session-only layout checkpoints. Data-only, bounded parser: never load/eval
--- a state file as Lua. Geometry/userdata are rebuilt by the compositor.
+-- a state file as Lua. Tiled geometry/userdata are rebuilt by the compositor.
 local collect_ids = require("lua/extensions/bspwm_tree").collect_ids
 local M = {}
-local HEADER = "BSPWM_LAYOUT_V2"
-local LEGACY_HEADER = "BSPWM_LAYOUT_V1"
+local HEADER = "BSPWM_LAYOUT_V3"
+local V2_HEADER, LEGACY_HEADER = "BSPWM_LAYOUT_V2", "BSPWM_LAYOUT_V1"
 local MAX_BYTES, MAX_NODES, MAX_DEPTH, MAX_WORKSPACES = 1048576, 8192, 128, 256
 local MAX_INTEGER = 9007199254740991
+local MAX_COORDINATE = 2147483647
 local DIRECTIONS = {
 	l = true, r = true, u = true, d = true,
 	west = true, east = true, north = true, south = true, up = true, down = true,
@@ -26,6 +27,22 @@ local function presel_tokens(pre)
 	if not pre then return "- -" end
 	assert(DIRECTIONS[pre.dir], "invalid preselection direction")
 	return pre.dir .. " " .. string.format("%.17g", ratio(pre.ratio or 0.5))
+end
+
+local function coordinate(value, minimum)
+	integer(value, minimum)
+	assert(value <= MAX_COORDINATE, "invalid geometry coordinate")
+	return value
+end
+
+local function box_tokens(box)
+	if not box then return "-" end
+	return string.format("R %.0f %.0f %.0f %.0f", coordinate(box.x, -MAX_COORDINATE),
+		coordinate(box.y, -MAX_COORDINATE), coordinate(box.w, 1), coordinate(box.h, 1))
+end
+
+local function floating_tokens(box)
+	return box_tokens(box) .. (box and " " .. box_tokens(box.monitor) or "")
 end
 
 local function focus_token(path, value)
@@ -56,8 +73,8 @@ function M.encode(states, pending)
 				integer(node.id, 1)
 				assert(not seen_ids[node.id], "duplicate leaf")
 				seen_ids[node.id] = true
-				rows[#rows + 1] = string.format("L %.0f %.0f %s", node.id,
-					integer(node.n or 0, 0), presel_tokens(node.presel))
+				rows[#rows + 1] = string.format("L %.0f %.0f %s %s", node.id,
+					integer(node.n or 0, 0), presel_tokens(node.presel), floating_tokens(node.floating_geometry))
 			else
 				assert(node.t == "split" and node.a and node.b, "invalid split")
 				local pull_focus = node.pull_focus_id and string.format("%.0f", integer(node.pull_focus_id, 1)) or "-"
@@ -103,8 +120,16 @@ function M.decode(text)
 			assert(DIRECTIONS[dir], "invalid preselection direction")
 			return { dir = dir, ratio = ratio(tonumber(value)) }
 		end
+		local function read_box()
+			local kind = next_token()
+			if kind == "-" then return nil end
+			assert(kind == "R", "invalid geometry record")
+			return { x = coordinate(tonumber(next_token()), -MAX_COORDINATE),
+				y = coordinate(tonumber(next_token()), -MAX_COORDINATE),
+				w = coordinate(tonumber(next_token()), 1), h = coordinate(tonumber(next_token()), 1) }
+		end
 		local header = next_token()
-		assert(header == HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
+		assert(header == HEADER or header == V2_HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
 		assert(next_token() == "P", "missing pending preselection")
 		local result = { states = {}, pending = read_presel() }
 		while pos < #tokens do
@@ -125,13 +150,18 @@ function M.decode(text)
 					local leaf_id, age = read_integer(1), read_integer(0)
 					assert(not seen_ids[leaf_id], "duplicate leaf")
 					seen_ids[leaf_id] = true
-					return { t = "leaf", id = leaf_id, n = age, presel = read_presel() }
+					local node = { t = "leaf", id = leaf_id, n = age, presel = read_presel() }
+					if header == HEADER then
+						node.floating_geometry = read_box()
+						if node.floating_geometry then node.floating_geometry.monitor = read_box() end
+					end
+					return node
 				end
 				assert(kind == "S", "invalid node type")
 				local axis, split_ratio = next_token(), ratio(tonumber(next_token()))
 				assert(axis == "h" or axis == "v", "invalid axis")
 				local node = { t = "split", axis = axis, ratio = split_ratio, presel = read_presel() }
-				local pull_focus = header == HEADER and next_token() or "-"
+				local pull_focus = header ~= LEGACY_HEADER and next_token() or "-"
 				node.a, node.b = read_node(depth + 1), read_node(depth + 1)
 				assert(node.a and node.b, "split missing child")
 				if pull_focus ~= "-" then
