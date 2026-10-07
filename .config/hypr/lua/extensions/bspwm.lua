@@ -50,7 +50,7 @@ local feedback_sink
 local prune_pull_sources
 local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
 local transferring = false -- also suppress checkpoints/feedback through final replay
-local closing = {} -- window.close precedes mapped=false and target removal
+local closing = {} -- stable_id -> HL.Window (native weak ref), until destroy/remap
 local float_geometry = require("lua/extensions/bspwm_float_geometry")
 local monocle_display = require("lua/extensions/bspwm_monocle")
 local monocle = monocle_display.new()
@@ -361,22 +361,36 @@ local function window_leaves_selection(w)
 	end
 end
 on_event("window.close", function(w)
-	if not w then return end
-	closing[w.stable_id] = true
+	local id = w and w.stable_id
+	if not id then return end
+	closing[id] = w -- retaining Lua userdata does not keep the native window alive
 	window_leaves_selection(w)
 	if rehydrating or transferring then return end
 	-- Floats (and the last tile) may never trigger another layout callback.
 	for _, st in pairs(states) do
-		detach_node(st, w.stable_id)
-		st.boxes[w.stable_id] = nil
+		detach_node(st, id)
+		st.boxes[id] = nil
 		tree.update_vacancy(st.tree)
 	end
 end)
-on_event("window.destroy", function(w) if w then closing[w.stable_id] = nil end end)
-on_event("window.open_early", function(w) if w then closing[w.stable_id] = nil end end)
+local function clear_closing(w)
+	local id = w and w.stable_id
+	if id then closing[id] = nil end
+end
+on_event("window.destroy", function(w)
+	clear_closing(w)
+	-- v0.56.2 emits destroy from ~CWindow: the weak reference has already
+	-- expired. CLuaWindow::push still creates truthy userdata, but stable_id
+	-- (like every property) is nil. Sweep the weak handles saved at close
+	-- instead of indexing by that missing ID or leaking its tombstone.
+	for id, window in pairs(closing) do
+		if not window.stable_id then closing[id] = nil end
+	end
+end)
+on_event("window.open_early", clear_closing)
 -- A client can unmap/remap the same window object, retaining its old tags.
 on_event("window.open", function(w)
-	if w then closing[w.stable_id] = nil end
+	clear_closing(w)
 	tag_window(w, false)
 end)
 on_event("window.move_to_workspace", function(w, ws)

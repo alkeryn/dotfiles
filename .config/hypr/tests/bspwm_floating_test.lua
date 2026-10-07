@@ -146,6 +146,16 @@ local function fixture(count)
 		f.remove_target(id)
 		f.recalculate(w.workspace.id)
 	end
+	function f.destroy(id)
+		local w = assert(f.windows[id])
+		f.windows[id], f.targets[id] = nil, nil
+		if f.active == w then f.active = nil end
+		-- CLuaWindow::push creates truthy userdata even for an expired weak
+		-- reference. Its __index returns nil for EVERY property, including ID.
+		-- The saved handle expires too; the event supplies a fresh wrapper.
+		for key in pairs(w) do w[key] = nil end
+		f.emit("window.destroy", {})
+	end
 	function f.message(message, wsid)
 		assert(provider.layout_msg(f.context(wsid or 1), message) == true)
 		f.recalculate(wsid)
@@ -245,6 +255,54 @@ function tests.close_last_float_and_remap_do_not_resurrect_stale_slot()
 	assert(not f.states[1].tree and not next(f.states[1].boxes))
 	f.open(1)
 	assert(f.leaf(1).n == 2 and not f.leaf(1).vacant)
+end
+
+function tests.destroy_expired_windows_does_not_raise_or_restore_closed_slots()
+	local f = fixture(3)
+	f.float(2)
+	for _, id in ipairs({ 2, 3, 1 }) do
+		f.close(id)
+		f.destroy(id)
+		assert(not f.leaf(id), "destroy restored a closed leaf")
+		f.emit("config.props_refreshed", true)
+	end
+	assert(not f.states[1].tree and not next(f.states[1].boxes))
+	f.open(4)
+	expect_box(f.targets[4].box, 0, 0, 1200, 800)
+end
+
+function tests.destroy_releases_saved_weak_handles()
+	local f = fixture(1)
+	local handles = setmetatable({ f.windows[1] }, { __mode = "v" })
+	f.close(1)
+	f.destroy(1)
+	collectgarbage("collect")
+	assert(not handles[1], "destroy leaked a closing record")
+end
+
+function tests.destroy_untracked_or_nil_window_is_harmless()
+	local f = fixture(1)
+	local original = f.snapshot()
+	f.emit("window.destroy", {}) -- destroyed before ever mapping
+	f.emit("window.destroy", nil)
+	f.emit("config.props_refreshed", true)
+	assert(f.snapshot() == original)
+end
+
+function tests.destroy_does_not_clear_another_in_progress_close()
+	local f = fixture(3)
+	f.close(1)
+	local closing = f.windows[2]
+	f.emit("window.close", closing) -- still mapped and still a native target
+	local placements = f.targets[2].placements
+	f.destroy(1)
+	f.recalculate()
+	assert(not f.leaf(2) and f.targets[2].placements == placements,
+		"destroying another window forgot the in-progress close")
+	-- The same native object can remap without being destroyed first.
+	f.remove_target(2)
+	f.open(2)
+	assert(f.leaf(2) and not f.leaf(2).vacant)
 end
 
 function tests.close_selected_tile_is_safe_during_reentrant_tag_updates()

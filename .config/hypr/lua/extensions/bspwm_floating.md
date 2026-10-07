@@ -37,6 +37,14 @@ through reentrant callbacks, then released on destroy/remap. Close and workspace
 move events remove stale slots even when no tiled callback follows. Guarded
 workspace transfers retain unrelated floating leaves during reconciliation.
 
+`window.destroy` is emitted from `~CWindow`, after native weak references have
+expired. Its Lua argument is still truthy `HL.Window` userdata, but every property
+(including `stable_id`) is nil. Indexing `closing[w.stable_id]` on this event caused
+`table index is nil` runtime errors after commit `424ac42`. Closing records now
+retain the weak window handles captured at close; destruction sweeps expired
+handles without dropping other in-progress closes or accumulating stale IDs.
+Remap events clear the record by its still-valid ID.
+
 ## Restoring the last floating position (Lua only)
 
 Hyprland's `CDefaultFloatingAlgorithm::removeTarget` saves only floating size.
@@ -72,7 +80,8 @@ native floating-placement behavior; no global event/timer override is installed.
 
 `tests/bspwm_floating_test.lua` models native callback ordering, repeated toggles,
 all-floating trees, reversed restoration order, changing focus, inserting/closing
-other windows, remapping, workspace moves and monocle. The tree, checkpoint,
+other windows, expired destroy handles, remapping, workspace moves and monocle.
+The tree, checkpoint,
 workspace-transfer and feedback suites cover the corresponding lower-level paths.
 
 Reload the config to activate changes. Slots already deleted by the old code
