@@ -5,17 +5,20 @@ plugin framework, polling, or extra config language. Currently: the focus fix
 from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998), plus
 restoring the pre-lock window and monitor after session unlock (v0.2.0).
 
-**Automatic loading is enabled in `hyprland.lua`.** Live-session validation is
-still pending. Native plugins run inside the compositor and can crash it.
+**Automatic loading and changed-binary reloading are enabled in `hyprland.lua`.**
+`hyprctl reload` picks up rebuilt libraries; unchanged binaries stay loaded.
+Live-session validation is still pending. Native plugins can crash the compositor.
 
 ## Build and check
 
-For a fresh build, or with the plugin unloaded, from `~/.config/hypr`:
+From `~/.config/hypr` (see the one-time migration note below if the original
+build-path library is still loaded directly):
 
 ```sh
 cmake -S plugins/hypr_extras -B plugins/hypr_extras/build -G Ninja
 cmake --build plugins/hypr_extras/build
 ctest --test-dir plugins/hypr_extras/build --output-on-failure
+hyprctl reload
 ```
 
 Requires Clang, CMake, Ninja, pkg-config, and installed Hyprland development
@@ -72,17 +75,37 @@ Unload from that same session with:
 hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build/hypr_extras.so"
 ```
 
-The `hl.plugin.load(...)` line near the start of `hyprland.lua` enables automatic
-loading on startup and config reload. There is no Lua workaround: without the
-plugin loaded, Hyprland's native refocus behavior applies.
+The `require("lua/plugins").load(...)` declaration near the start of `hyprland.lua`
+enables automatic loading and changed-binary reloading. There is no Lua focus
+workaround: without the plugin loaded, Hyprland's native refocus behavior applies.
 
-To disable a config-loaded plugin, comment out its load line and reload. A plugin
-loaded manually with `hyprctl plugin load` also needs a manual unload.
+To disable a config-managed plugin, comment out its declaration and reload.
+
+**One-time migration:** a plugin loaded by the earlier manual `hyprctl plugin load`
+commands is not config-owned. Hyprland will not automatically unload that instance
+when the declared path changes. Restart Hyprland once to hand ownership to the
+config. Alternatively, disable the declaration and reload, manually unload the
+original build-path plugin, then re-enable the declaration and reload. Do not
+manually load it again. An existing config-owned instance migrates automatically.
 
 ### Updating a running session
 
-Do not rebuild/overwrite a loaded `.so` in place. Build and test separately, then
-replace the file by rename (existing mappings keep their old inode):
+`lua/plugins.lua` runs the short `scripts/plugin_snapshot.py` helper during config
+parsing. It hashes a consistent read of the source `.so` and publishes an immutable
+copy under `${XDG_CACHE_HOME:-~/.cache}/hypr/plugin-cache/<name>/<sha256>.so`.
+Hyprland loads that cached path, **not** the build output. A changed binary gives
+a new declaration: Hyprland unloads the old config-owned library before loading
+the new one. Plugin-triggered reloads see the same hash and do nothing, avoiding
+loops. There is no watcher, daemon, synchronous IPC, or extra native hook.
+
+Build first, then run `hyprctl reload`. Touching a file without changing its content
+does not reload it. The helper rejects missing/non-ELF files, observed concurrent
+writes and corrupted cache entries. Config verification without an instance just
+checks the ordinary declaration; it does not run the snapshot helper.
+
+Once using snapshots, rebuilding the original output cannot overwrite the mapped
+library. Before the first migration, or when using manual loading for tests, build
+separately and atomically replace the original instead:
 
 ```sh
 cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-next -G Ninja
@@ -92,17 +115,15 @@ cp plugins/hypr_extras/build-next/hypr_extras.so plugins/hypr_extras/build/hypr_
 mv plugins/hypr_extras/build/hypr_extras.so.new plugins/hypr_extras/build/hypr_extras.so
 ```
 
-The running session still uses the old version until you restart it or explicitly
-reload the plugin **while unlocked**:
+Then run `hyprctl reload` **while unlocked**, and check `hyprctl plugin list`.
+Unchanged config reloads leave the plugin and its lock snapshot intact. A reload
+that replaces the plugin cannot preserve its in-memory pre-lock snapshot.
 
-```sh
-plugin="$HOME/.config/hypr/plugins/hypr_extras/build/hypr_extras.so"
-hyprctl plugin unload "$plugin" && hyprctl plugin load "$plugin"
-hyprctl plugin list
-```
-
-Check that `hypr_extras` reports **0.2.0**. A config reload alone does not replace
-an already-loaded plugin at the same path.
+Older cached versions are intentionally not overwritten or automatically deleted;
+other sessions may still use them. Remove `~/.cache/hypr/plugin-cache` (or its
+`XDG_CACHE_HOME` equivalent) when Hyprland is stopped if you want to reclaim space.
+The helper works for other self-contained plugins too; plugins depending on files
+next to their original `.so` need their own packaging.
 
 ## Implementation and scope
 
@@ -156,7 +177,9 @@ window with `focus_on_close = 1` is still native behavior; this config uses `2`.
   rollback, and reverse-order unload/reload. Unlock tests cover all follow-mouse
   modes, pinned/closed/expired windows, focus changes during lock, re-locking,
   disconnected monitors, pending-work cleanup and the still-locked safety guard.
-- Installed-executable call-site checks and config verification pass.
+- Installed-executable call-site checks and config verification pass. Config-side
+  reload tests cover stable/changed declarations, reload-loop convergence, quoting,
+  immutable snapshots, concurrent publication and helper failures.
 - **Real trampoline installation and desktop behavior still need a live test.**
   The disposable headless attempt in this sandbox aborted at
   `CBackend::create() failed!`, before plugin initialization. Neither the actual

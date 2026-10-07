@@ -18,9 +18,9 @@
 --   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
--- Native extras; build, testing, and rollback instructions:
--- plugins/hypr_extras/README.md
-hl.plugin.load(os.getenv("HOME") .. "/.config/hypr/plugins/hypr_extras/build/hypr_extras.so")
+-- Native extras: config reload picks up changed binaries without reload loops.
+-- Build, testing, and rollback instructions: plugins/hypr_extras/README.md
+require("lua/plugins").load(os.getenv("HOME") .. "/.config/hypr/plugins/hypr_extras/build/hypr_extras.so")
 
 local bspwm = require("lua/extensions/bspwm") -- registers the "lua:bspwm" layout
 require("lua/extensions/presel_feedback").setup(bspwm)
