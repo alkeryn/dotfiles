@@ -5,11 +5,36 @@ plugin framework, polling, or extra config language. Currently: the focus fix
 from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998), plus
 restoring the pre-lock window and monitor after session unlock (v0.2.0).
 
-**Automatic loading and changed-binary reloading are enabled in `hyprland.lua`.**
-`hyprctl reload` picks up rebuilt libraries; unchanged binaries stay loaded.
-Live-session validation is still pending. Native plugins can crash the compositor.
+**Automatic first builds, loading, and changed-binary reloading are enabled.**
+Startup or `hyprctl reload` builds a missing library; existing binaries are not
+rebuilt automatically. Reload picks up changed binaries, leaving unchanged ones
+loaded. Live-session validation is still pending. Native plugins can crash the compositor.
 
-## Build and check
+## First-use automatic build
+
+The config passes `source_dir` and `target` to `lua/plugins.lua`. If the `.so` is
+missing, it starts `scripts/plugin_build.py` asynchronously and does not declare
+the plugin yet. This avoids blocking the compositor or exceeding its 1.5-second
+Lua config timeout. Startup/reload continues without the plugin until it is ready.
+
+The worker configures CMake with **Clang**, Ninja, Release, and tests disabled;
+builds only the requested target with two jobs in `build/.autobuild-hypr_extras`;
+and atomically publishes the finished `.so`. It then requests a reload of the
+**exact instance that started it**, which loads the normal immutable snapshot.
+There is no persistent daemon. Concurrent requests share one build; repeated
+requests from the same instance are deduplicated.
+
+Build output and errors: `plugins/hypr_extras/build/hypr_extras.so.build.log`.
+Failures do not trigger reload loops: fix the problem, then reload to retry.
+Required build dependencies must already be installed; nothing is auto-installed.
+An existing but stale/incompatible binary is not automatically rebuilt. Source
+changes still require a manual build. `--verify-config` never starts a build.
+
+Other local CMake plugins can opt in with
+`load(binary_path, { source_dir = project_dir, target = target_name })`; the target
+must produce the requested `.so` filename at the root of its build directory.
+
+## Manual build and check
 
 From `~/.config/hypr` (see the one-time migration note below if the original
 build-path library is still loaded directly):
@@ -76,7 +101,7 @@ hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build/hypr_e
 ```
 
 The `require("lua/plugins").load(...)` declaration near the start of `hyprland.lua`
-enables automatic loading and changed-binary reloading. There is no Lua focus
+enables first-use building, automatic loading, and changed-binary reloading. There is no Lua focus
 workaround: without the plugin loaded, Hyprland's native refocus behavior applies.
 
 To disable a config-managed plugin, comment out its declaration and reload.
@@ -179,7 +204,10 @@ window with `focus_on_close = 1` is still native behavior; this config uses `2`.
   disconnected monitors, pending-work cleanup and the still-locked safety guard.
 - Installed-executable call-site checks and config verification pass. Config-side
   reload tests cover stable/changed declarations, reload-loop convergence, quoting,
-  immutable snapshots, concurrent publication and helper failures.
+  immutable snapshots, concurrent publication and helper failures. Build tests
+  cover missing/existing outputs, Clang selection, failed-build retry, deduplicated
+  jobs, cross-session builds and exact-instance reloads. A real clean first-use
+  build also passed, using a stub reload command rather than a live compositor.
 - **Real trampoline installation and desktop behavior still need a live test.**
   The disposable headless attempt in this sandbox aborted at
   `CBackend::create() failed!`, before plugin initialization. Neither the actual
