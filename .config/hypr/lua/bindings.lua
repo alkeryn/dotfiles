@@ -111,7 +111,8 @@ hl.bind("SUPER + i",                   hl.dsp.layout("flip v"), { repeating = tr
 hl.bind("SUPER + ALT + b",             hl.dsp.layout("balance"), { repeating = true })
 hl.bind("SUPER + CTRL + b",            hl.dsp.layout("equalize"), { repeating = true })
 
--- Set mutually exclusive states, overriding fullscreen/float/pseudo rather than toggling.
+-- Set mutually exclusive WM states, never toggle or change the client's mode.
+-- A browser fullscreen video stays fullscreen inside a floating/tiled window.
 hl.bind("SUPER + s",                   function() helpers.set_window_state("tiled") end, { repeating = true })
 hl.bind("SUPER + d",                   function() helpers.set_window_state("floating") end, { repeating = true })
 hl.bind("SUPER + f",                   function() helpers.set_window_state("fullscreen") end, { repeating = true })

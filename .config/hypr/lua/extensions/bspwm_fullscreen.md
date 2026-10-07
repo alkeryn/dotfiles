@@ -1,85 +1,123 @@
-# Fullscreen across reloads — Lua only
+# One-way fullscreen policy — Lua only
 
-`bspwm_fullscreen.lua` keeps tiled fullscreen/maximized windows working across
-`hyprctl reload`, the reload shortcut, and automatic file-edit reloads. There is
-no new native hook, timer, daemon, command wrapper or disk checkpoint.
+Application fullscreen requests cover the monitor. Window-manager actions can
+then tile or float the window without making the application leave fullscreen.
 
-## Why a reload breaks fullscreen
+## Behavior
 
-In Hyprland v0.56.2, fullscreen tracking belongs to the layout instance. Lua
-provider teardown and the bspwm alias flip replace that instance without
-transferring its fullscreen records. The Wayland toplevel can still advertise
-FULLSCREEN even though Hyprland now reports internal/client modes of zero.
-Clearing an already-zero mode is a no-op; a later node operation resends the
-cached protocol fullscreen flag along with its geometry.
+| Action | Hyprland layout | Application presentation |
+| --- | --- | --- |
+| Application enters fullscreen | Covers the monitor | Fullscreen |
+| Open/focus another tile | Covering window returns to its tile | Still fullscreen |
+| `Super+d` | Floating | Unchanged |
+| `Super+s` / `Super+t` | Tiled / pseudo-tiled | Unchanged |
+| `Super+f` | Tiled, covering the monitor | Unchanged |
+| Application exits fullscreen | Leaves monitor fullscreen | Normal |
 
-Lua's `config.reloaded` event happens **after** provider teardown. Saving the
-window's fullscreen fields in that callback would therefore be too late.
+`Super+f` does not itself hide browser UI; use the application's fullscreen
+control for that. Saved floating geometry and BSP placement are preserved.
+`misc.on_focus_under_fullscreen = 2` prevents new tiles from inheriting the old
+window's fullscreen layout. Floating dialogs retain the usual overlay behavior.
 
-## Window-tag checkpoint
+The observer covers mapped, nonhidden tiles and floats in bspwm workspaces,
+plus windows explicitly controlled with the state shortcuts. Other layouts are
+not automatically enrolled. There are no application-specific rules or native
+plugin changes. Applications still receive necessary geometry notifications.
 
-A private **static** window tag, `bspwm_fullscreen_<internal>_<client>`, records
-the two modes while the window is healthy. Values are `0` (none), `1`
-(maximized), and `2` (fullscreen); zero/zero has no marker. Static tags stay on
-the native window when Lua/layout instances are replaced. They are distinct
-from dynamic window-rule tags (which end in `*`). Other tags, including the
-subtree selection marker, are not modified by this module.
+## Implementation
 
-- `window.fullscreen` records internal transitions.
-- `window.update_rules` also records client-only changes, which do not emit a
-  fullscreen event when the internal mode is unchanged.
-- Open, close, floating and workspace changes retire stale markers. Only mapped,
-  nonhidden tiles in `lua:bspwm` / `lua:bspwm_b` are eligible. Inactive desktops
-  are included; floating windows retain their native handler and need no replay.
-- Tag writes are idempotent and guarded against recursive rule notifications.
+Hyprland tracks **internal** (compositor) and **client** (application) modes:
+`0` = none, `1` = maximized, `2` = fullscreen. `lua/helpers.lua` snapshots the
+client mode before switching tiled/floating handlers, which have separate mode
+records in v0.56.2. It clears only internal fullscreen before the transition,
+then restores the saved client mode in the destination handler. No intermediate
+request unsets the application's fullscreen flag.
 
-The module is registered before the tree provider's event handlers. After
-`config.reloaded`, the first `config.props_refreshed` restores each unambiguous
-marker **only if both live modes were lost**, using an explicitly targeted
-`fullscreen_state` **set**, not a toggle. It does not unset fullscreen first.
-New nonzero live states take precedence. Another fullscreen window in the same
-workspace, such as a surviving fullscreen float, is never evicted to replay a
-marker. Ordinary property refreshes do not replay anything.
+`bspwm_fullscreen.set_wm_modes` uses targeted `fullscreen_state` **set** requests,
+not toggles. The native dispatcher temporarily bypasses synchronization, then
+rewrites `sync_fullscreen` to `internal == client`. The Lua setter therefore
+applies this policy after each request, including no-ops:
 
-The v0.56.2 reload sequence clears user entries in `package.loaded` before
-unregistering providers, while the old Lua event subscriptions can still fire.
-The module checks its cache identity to ignore those teardown notifications;
-otherwise their zero-mode queries could erase the very marker being restored.
-A syntax-failed reload retains the old Lua callbacks, so `config.reloaded`
-re-arms that instance before the alias flip. **Recheck this ordering when
+- **Client not fullscreen:** enable synchronization for managed windows, so the
+  next application fullscreen request covers the monitor natively.
+- **Client fullscreen:** disable synchronization on the fullscreen/rule event,
+  before a native focus/new-window demotion can clear its client flag.
+- **Client exits fullscreen:** re-enable synchronization. If internal mode is
+  still fullscreen, clear it with a 1ms Lua oneshot after the native request
+  returns; do not recursively change fullscreen inside its rule callback.
+
+A demotion that leaves client mode `2` is not a new application request.
+Ordinary updates and repeated assertions of that mode do not inflate a `0/2`
+video tile again. Explicit WM writes are guarded and adopted as a baseline,
+not interpreted as application input.
+
+Deferred exits check window lifetime, module identity and live modes. New
+client entry, WM actions, close, destroy and reload invalidate pending tokens.
+Invalidated oneshots expire harmlessly: disabling them would retain their Lua
+callback references in v0.56.2. There is no polling or background daemon.
+
+## Reload checkpoints
+
+In v0.56.2, replacing a Lua layout loses its fullscreen records while the
+Wayland protocol flag can survive. `config.reloaded` happens after provider
+teardown, so saving modes in that callback would be too late.
+
+Two static window tags survive layout/Lua replacement:
+
+- `bspwm_fullscreen_<internal>_<client>` records live modes for mapped, nonhidden
+  bspwm tiles. Zero/zero has no mode tag; floats retain their native handler.
+- `bspwm_fullscreen_independent` records policy ownership, **not** a fixed sync
+  value. Its name stays stable across reloads. It can exist without a mode tag
+  and is never authority to restore fullscreen.
+
+`window.fullscreen` and `window.update_rules` maintain mode tags; the latter
+also catches client-only changes. Open/close/workspace events retire stale
+records, and guarded tag writes prevent recursive observation. Close/remap
+also releases the policy override back to normal rules/defaults.
+
+The module registers before the tree provider. On the first
+`config.props_refreshed` after reload, it restores an unambiguous mode tag only
+if **both live modes were lost** and no other fullscreen window occupies the
+workspace. New live requests and surviving fullscreen floats take precedence.
+It then reapplies policy from the restored client mode and adopts the result.
+Ordinary property refreshes never replay mode tags.
+
+Old callbacks check their `package.loaded` identity because v0.56.2 clears user
+modules before provider teardown. A syntax-failed reload retains the old Lua
+callbacks, which re-arm their module identity. **Recheck this ordering when
 upgrading Hyprland.**
 
-## Activation and limitations
+Tags are session-local, do not change the tree checkpoint format, and need no
+disk checkpoint. Do not manually edit these reserved tags. Already-lost modes
+cannot be inferred from zero fields: recover with the application's fullscreen
+controls. A valid `0/2` video tile remains tiled through reload; use `Super+f`
+or a fresh application exit/entry to cover the monitor. Dispatcher failures are
+logged with `bspwm fullscreen:` and are not retried in a loop.
 
-For the first reload installing this feature, leave fullscreen first: the old
-config has not recorded any markers yet. Once loaded, both manual and automatic
-reloads should retain fullscreen until you explicitly exit it. A window whose
-tracking was already lost cannot be inferred from its zero-mode fields; recover
-it once with `Super+f`, then `Super+s`.
+## Validation
 
-The tags are visible in `hyprctl -j clients`; do not clear or manually edit these
-reserved markers while a window is fullscreen. This is session-local, not a way
-to launch applications fullscreen or restore them after a compositor restart.
-The existing tree checkpoint format is unchanged, and fullscreen recovery does
-not depend on its file being writable. Dispatcher failures are logged with
-`bspwm fullscreen:` and are not retried in a loop.
-
-## Checks
+From `~/.config/hypr`:
 
 ```sh
-lua tests/bspwm_fullscreen_test.lua
-luajit tests/bspwm_fullscreen_test.lua
+for runtime in lua luajit; do
+    "$runtime" tests/window_state_bindings_test.lua
+    "$runtime" tests/bspwm_floating_test.lua
+    "$runtime" tests/bspwm_fullscreen_test.lua
+done
 ```
 
-The tests run the real Lua modules against mocked native event/dispatcher
-semantics. An unpatched control reproduces the stale-fullscreen recurrence.
-Coverage includes all nine mode pairs, teardown callbacks, provider registration,
-repeated alias flips, failed syntax reloads, client-only changes, inactive
-workspaces, floats/hidden windows, close/remap, conflicting tags, live-state
-precedence, reentrant notifications and failed dispatches.
+The mocks cover mode pairs, intermediate client flags, handler transfers,
+repeats, focus changes, floating geometry, native new-window demotion, reloads,
+policy cleanup, deferred-exit races and dispatch failures. They reject recursive
+fullscreen dispatches; they do not replace a live Wayland/XWayland check.
 
-Live check: fullscreen a tiled window, reload, exit fullscreen, then preselect,
-resize or swap a neighboring node. It must stay tiled. Repeat via a file edit
-and with a fullscreen window on an inactive workspace. The sandbox cannot reach
-the running compositor; mocked tests and config verification are not a live
-Wayland round trip.
+Live check with Brave and mpv:
+
+1. With two tiles open, enter fullscreen using the application: expect `2/2`.
+2. Open another tile: the video returns to its tile but keeps its presentation
+   (`0/2`); the new window must not inherit fullscreen.
+3. Try `Super+d/s/t/f`, resize/move, and reload while floating and tiled. The
+   application must keep its fullscreen presentation.
+4. Exit using the application: expect `0/0`. Enter again: expect `2/2`.
+5. Repeat on an inactive workspace and after a file-edit reload. Preselect,
+   resize or swap neighboring nodes after exit; fullscreen must not resurrect.

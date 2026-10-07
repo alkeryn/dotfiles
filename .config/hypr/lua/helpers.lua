@@ -2,6 +2,7 @@
 -- Module paths resolve against the main config directory, not lua/.
 local vars = require("lua/vars")
 local bspwm = require("lua/extensions/bspwm")
+local fullscreen_control = require("lua/extensions/bspwm_fullscreen")
 local M = {}
 
 -- ---------------------------------------------------------------------------
@@ -13,22 +14,22 @@ function M.set_window_state(state)
 	if not window or window.mapped == false then return end
 
 	local fullscreen = state == "fullscreen"
-	-- Clear compositor AND client fullscreen/maximized modes before changing
-	-- float state, or Hyprland restores fullscreen. Repeated Super+f must not
-	-- leave/re-enter fullscreen unless the window is floating.
+	-- Preserve application fullscreen through v0.56.2's tiled/floating handler
+	-- transfer. Snapshot BEFORE float(), which can expose empty/stale records.
+	local client = window.fullscreen_client or 0
+	local function set_fullscreen_mode(internal)
+		return fullscreen_control.set_wm_modes(window, internal, client)
+	end
+	-- Clear internal fullscreen before float() can re-enter it; never unset
+	-- the client flag, even temporarily. Repeated Super+f stays fullscreen.
 	if not fullscreen or window.floating then
-		hl.dispatch(hl.dsp.window.fullscreen_state({
-			internal = 0, client = 0, action = "set", layout_aware = false, window = window,
-		}))
+		if not set_fullscreen_mode(0) then return end
 	end
 	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = window }))
-	bspwm.set_floating(window, state == "floating")
-	if fullscreen then
-		-- fullscreen_state: 2 = full fullscreen, 1 = maximized.
-		hl.dispatch(hl.dsp.window.fullscreen_state({
-			internal = 2, client = 2, action = "set", layout_aware = false, window = window,
-		}))
-	end
+	local result = bspwm.set_floating(window, state == "floating")
+	if (result and result.ok == false) or window.mapped == false then return end
+	-- Reattach the saved client mode to the destination handler, including 0/2.
+	set_fullscreen_mode(fullscreen and 2 or 0)
 end
 
 -- ---------------------------------------------------------------------------

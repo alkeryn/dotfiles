@@ -52,6 +52,7 @@ local function fixture(count)
 		end end,
 		fullscreen_state = function(opts) return function()
 			local w = opts.window
+			if f.preserve_client then assert(opts.client == f.preserve_client, "client fullscreen changed during geometry transition") end
 			if opts.internal ~= 0 and (w.fullscreen or 0) == 0 then w.before_fullscreen = { at=w.at, size=w.size } end
 			w.fullscreen, w.fullscreen_client = opts.internal, opts.client
 			if opts.internal == 0 and w.before_fullscreen then
@@ -61,11 +62,19 @@ local function fixture(count)
 				w.at, w.size = { x=0, y=0 }, { x=1200, y=800 }
 			end
 		end end,
+		set_prop = function(opts) return function()
+			assert(opts.prop == "sync_fullscreen" and (opts.value == "false" or opts.value == "true"))
+			opts.window.sync_fullscreen = opts.value == "true"
+			return { ok=true }
+		end end,
 		pseudo = function(opts) return function() opts.window.pseudo = opts.action == "on" end end,
 		float = function(opts) return function()
 			local w, floating = opts.window, opts.action == "on"
 			if f.reject_float then return { ok=false } end
 			if floating ~= w.floating and not f.ignore_float then
+				assert((w.fullscreen or 0) == 0, "must leave internal fullscreen before float dispatch")
+				-- The destination handler has no record of client-only fullscreen.
+				w.fullscreen, w.fullscreen_client = 0, 0
 				if floating then f.float(w.stable_id) else f.tile(w.stable_id) end
 			end
 			if f.after_float_dispatch then f.after_float_dispatch(w) end
@@ -446,6 +455,21 @@ function tests.fullscreen_and_pseudo_transitions_do_not_replace_float_rectangle(
 	hl.dispatch(hl.dsp.window.fullscreen_state({ window=f.windows[1], internal=2, client=2 }))
 	f.set_state("tiled"); f.set_state("floating")
 	expect_rectangle(f.windows[1], 75, 85, 650, 450)
+end
+
+function tests.fullscreen_video_keeps_client_mode_and_saved_float_geometry()
+	local f = fixture(2)
+	f.focus(1); f.set_state("floating")
+	local window = f.windows[1]
+	set_rectangle(window, 75, 85, 650, 450)
+	hl.dispatch(hl.dsp.window.fullscreen_state({ window=window, internal=2, client=2 }))
+	f.preserve_client = 2
+	for _, state in ipairs({ "tiled", "pseudo_tiled", "fullscreen", "floating", "tiled", "floating" }) do
+		f.set_state(state)
+		assert(window.fullscreen_client == 2 and not window.sync_fullscreen)
+		assert(window.fullscreen == (state == "fullscreen" and 2 or 0))
+		if state == "floating" then expect_rectangle(window, 75, 85, 650, 450) end
+	end
 end
 
 function tests.restoration_uses_original_window_even_if_dispatch_changes_focus()
