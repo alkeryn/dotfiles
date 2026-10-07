@@ -306,10 +306,13 @@ function tests.close_selected_window_clears_highlights()
 	f.message("focus parent"); f.expect_selection(2, 4)
 end
 
-function tests.float_selected_window_prunes_cursor()
+function tests.float_selected_window_clears_cursor_but_preserves_parent()
 	local f = fixture()
 	f.message("focus parent")
+	local parent = f.states[1].selected
 	f.remove(3, false); f.expect_selection(4); f.expect_no_tags()
+	f.message("focus parent"); f.expect_selection(4)
+	assert(f.states[1].selected == parent and parent.a.id == 3 and parent.a.vacant)
 	f.message("focus parent"); f.expect_selection(2, 4)
 end
 

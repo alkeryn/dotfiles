@@ -263,13 +263,42 @@ function tests.closed_between_checkpoint_and_reload_are_pruned_not_resurrected()
 	assert(#f.contexts[1].targets == 2)
 end
 
-function tests.floating_between_checkpoint_and_reload_is_not_a_tile()
+function tests.floating_between_checkpoint_and_reload_keeps_vacant_slot()
 	local f = fixture()
 	for id=1,3 do f.open(id) end
+	local expected, saved = f.geometry(), read_file(f.path)
 	f.windows[2].floating = true
-	table.remove(f.contexts[1].targets, 2)
+	local target = table.remove(f.contexts[1].targets, 2)
+	for _ = 1, 3 do
+		f.reload()
+		local st = f.states[1]
+		assert(st.tree.a.id == 1 and st.tree.b.a.id == 2 and st.tree.b.b.id == 3)
+		assert(st.tree.b.a.vacant and not st.tree.b.vacant and not st.boxes[2])
+		assert(read_file(f.path) == saved, "float changed topology/ratios/ages")
+	end
+	f.windows[2].floating = false
+	table.insert(f.contexts[1].targets, target)
+	f.focus(1); f.recalculate()
+	f.expect_geometry(expected)
+	assert(f.states[1].seq == 3)
+end
+
+function tests.all_floating_reload_preserves_tree_and_restores_in_reverse_order()
+	local f = fixture()
+	for id = 1, 3 do f.open(id) end
+	local expected, targets = f.geometry(), f.contexts[1].targets
+	f.contexts[1].targets = {}
+	for _, w in pairs(f.windows) do w.floating = true end
+	f.emit("config.props_refreshed", true)
 	f.reload()
-	assert(f.states[1].tree.a.id == 1 and f.states[1].tree.b.id == 3)
+	assert(f.states[1].tree.vacant and not next(f.states[1].boxes))
+	for i = #targets, 1, -1 do
+		targets[i].window.floating = false
+		table.insert(f.contexts[1].targets, targets[i])
+		f.recalculate()
+	end
+	f.expect_geometry(expected)
+	assert(f.states[1].seq == 3)
 end
 
 function tests.reload_shortcut_checkpoints_then_invokes_real_reload()

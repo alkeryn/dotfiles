@@ -27,6 +27,7 @@ local function fixture(count)
 		window_rule = function() return { set_enabled = function() end } end,
 		workspace_rule = function() return { set_enabled = function() end } end,
 		on = function() end,
+		get_windows = function() return f.windows end,
 		dispatch = function(callback) return callback() end,
 		dsp = { window = {
 			tag = function() return function() end end,
@@ -140,6 +141,19 @@ function tests.close_or_float_last_window_hides_feedback()
 		f.recalculate()
 		assert(#f.previews == 0, "empty workspace kept an old preview")
 	end
+end
+
+function tests.preview_skips_vacant_splits_like_tile_placement()
+	local f = fixture(3)
+	f.windows[2].floating = true
+	table.remove(f.ctx.targets, 2)
+	f.recalculate()
+	f.focus(3); f.message("preselect d")
+	local preview = assert(f.previews[1])
+	expect_box(preview, 5760, 1120, 1920, 1080)
+	local target = f.open(4)
+	expect_box(target.box, preview.x, preview.y, preview.w, preview.h)
+	assert(#f.previews == 0 and f.states[1].tree.b.a.id == 2)
 end
 
 function tests.monitor_geometry_change_repositions_feedback()

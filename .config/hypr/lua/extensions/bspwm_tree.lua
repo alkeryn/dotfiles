@@ -84,6 +84,24 @@ function M.prune(node, live)
 	return nil, false
 end
 
+-- bspwm keeps floating clients in the tree. Vacancy affects geometry, never
+-- topology: a split is vacant only when BOTH children are vacant. The tiled
+-- set is separate from the set of mapped windows used by prune(). Omit it to
+-- recompute internal flags after structural operations, retaining leaf flags.
+function M.update_vacancy(node, tiled)
+	if not node then return true end
+	if node.t == "leaf" then
+		if tiled then node.vacant = not tiled[node.id] end
+	else
+		local first = M.update_vacancy(node.a, tiled)
+		local second = M.update_vacancy(node.b, tiled)
+		node.vacant = first and second
+	end
+	-- tree.c:set_vacant_local cancels preselections on vacant nodes.
+	if node.vacant then node.presel = nil end
+	return node.vacant or false
+end
+
 function M.walk_splits(node, callback)
 	if not node or node.t ~= "split" then return end
 	callback(node)
@@ -170,7 +188,7 @@ function M.resize(state, target, direction, delta)
 	local axis = (direction == "l" or direction == "r") and "h" or "v"
 	for i = #path - 1, 1, -1 do
 		local parent, child = path[i], path[i + 1]
-		if parent.axis == axis and parent._box then
+		if parent.axis == axis and parent._box and not parent.a.vacant and not parent.b.vacant then
 			local is_first = parent.a == child
 			local owns_edge = (is_first and (direction == "r" or direction == "d"))
 				or (not is_first and (direction == "l" or direction == "u"))
@@ -214,15 +232,17 @@ function M.flip(node, axis)
 end
 
 function M.balance(node)
-	if not node or node.t ~= "split" then return end
-	local first_count, second_count = #M.leaves(node.a), #M.leaves(node.b)
-	node.ratio = first_count / (first_count + second_count)
-	M.balance(node.a)
-	M.balance(node.b)
+	if not node or node.vacant then return 0 end
+	if node.t == "leaf" then return 1 end
+	local first_count, second_count = M.balance(node.a), M.balance(node.b)
+	if first_count > 0 and second_count > 0 then
+		node.ratio = first_count / (first_count + second_count)
+	end
+	return first_count + second_count
 end
 
 function M.equalize(node, ratio)
-	if not node or node.t ~= "split" then return end
+	if not node or node.vacant or node.t ~= "split" then return end
 	node.ratio = ratio
 	M.equalize(node.a, ratio)
 	M.equalize(node.b, ratio)
@@ -241,17 +261,26 @@ function M.transplant(state, target)
 	return true
 end
 
-function M.place(node, box, boxes)
+local function place(node, box, boxes)
 	if not node then return end
+	node._box = box
 	if node.t == "leaf" then
-		boxes[node.id] = box
-		node._box = box
+		if not node.vacant then boxes[node.id] = box end
 		return
 	end
-	node._box = box
-	local first, second = geometry.split_box(box, node.axis, node.ratio)
-	M.place(node.a, first, boxes)
-	M.place(node.b, second, boxes)
+	-- tree.c:apply_layout gives both children the parent's rectangle when
+	-- either is vacant. Keep the dormant split's axis and ratio untouched.
+	local first, second = box, box
+	if not node.a.vacant and not node.b.vacant then
+		first, second = geometry.split_box(box, node.axis, node.ratio)
+	end
+	place(node.a, first, boxes)
+	place(node.b, second, boxes)
+end
+
+function M.place(node, box, boxes)
+	M.update_vacancy(node)
+	place(node, box, boxes)
 end
 
 function M.clear_presels(node)

@@ -122,6 +122,49 @@ function tests.split_rounding_and_monitor_fallback_are_shared()
 	assert(monitor.x == -720 and monitor.y == 5 and monitor.w == 720 and monitor.h == 1280)
 end
 
+function tests.vacancy_propagates_without_changing_splits_or_identity()
+	local a, b, c = tree.leaf(1), tree.leaf(2), tree.leaf(3)
+	local branch = split(b, c, "v", 0.3)
+	local root = split(a, branch, "h", 0.7)
+	local pre = { dir = "r", ratio = 0.4 }
+	root.presel, branch.presel, b.presel = pre, pre, pre
+	tree.update_vacancy(root, { [1] = true, [3] = true })
+	local boxes = {}
+	tree.place(root, { x = -100, y = 20, w = 1000, h = 800 }, boxes)
+	assert(not boxes[2] and b.vacant and not branch.vacant and not root.vacant)
+	assert(boxes[3].x == 600 and boxes[3].w == 300 and boxes[3].h == 800)
+	assert(not b.presel and branch.presel == pre and root.presel == pre)
+	tree.update_vacancy(root, { [1] = true })
+	boxes = {}
+	tree.place(root, { x = -100, y = 20, w = 1000, h = 800 }, boxes)
+	assert(branch.vacant and not branch.presel and root.presel == pre)
+	assert(boxes[1].w == 1000 and root.b == branch and branch.a == b and branch.ratio == 0.3)
+	tree.update_vacancy(root, { [1] = true, [2] = true, [3] = true })
+	boxes = {}
+	tree.place(root, root._box, boxes)
+	assert(boxes[1].w == 700 and boxes[2].h == 240 and boxes[3].h == 560)
+end
+
+function tests.balance_counts_tiled_leaves_and_preserves_dormant_ratios()
+	local branch = split(tree.leaf(2), tree.leaf(3), "v", 0.3)
+	local root = split(tree.leaf(1), branch, "h", 0.7)
+	tree.update_vacancy(root, { [1] = true, [3] = true })
+	assert(tree.balance(root) == 2 and root.ratio == 0.5 and branch.ratio == 0.3)
+	tree.update_vacancy(root, { [1] = true })
+	tree.equalize(root, 0.4)
+	assert(root.ratio == 0.4 and branch.ratio == 0.3)
+end
+
+function tests.resize_skips_invisible_fences_while_floating()
+	local branch = split(tree.leaf(2), tree.leaf(3), "h", 0.3)
+	local root = split(tree.leaf(1), branch, "h", 0.7)
+	tree.update_vacancy(root, { [1] = true, [3] = true })
+	tree.place(root, { x = 0, y = 0, w = 1000, h = 800 }, {})
+	assert(tree.resize({ tree = root }, 3, "l", 20))
+	assert(math.abs(root.ratio - 0.68) < 0.000001 and branch.ratio == 0.3)
+	assert(not tree.resize({ tree = root }, 3, "r", 20))
+end
+
 local names = {}
 for name in pairs(tests) do names[#names + 1] = name end
 table.sort(names)

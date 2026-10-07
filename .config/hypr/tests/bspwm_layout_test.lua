@@ -6,10 +6,16 @@ package.loaded["lua/extensions/bspwm_state"] = { open_session = function() retur
 
 local function fixture(width, height, x, y)
 	local providers = {}
+	local ctx = { area = { x = x or 0, y = y or 0, w = width, h = height }, targets = {} }
 	local function rule() return { set_enabled = function() end } end
 	_G.hl = {
 		layout = { register = function(name, impl) providers[name] = impl end },
 		on = function() end,
+		get_windows = function()
+			local windows = {}
+			for _, t in ipairs(ctx.targets) do windows[#windows + 1] = t.window end
+			return windows
+		end,
 		window_rule = rule,
 		workspace_rule = rule,
 		dispatch = function() end,
@@ -17,7 +23,6 @@ local function fixture(width, height, x, y)
 	}
 	dofile("lua/extensions/bspwm.lua")
 	local provider = assert(providers.bspwm)
-	local ctx = { area = { x = x or 0, y = y or 0, w = width, h = height }, targets = {} }
 	local f = { ctx = ctx }
 
 	function f.add(id, workspace_id)

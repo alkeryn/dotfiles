@@ -244,6 +244,42 @@ local function fixture()
 	return f
 end
 
+function tests.selected_move_does_not_prune_an_unrelated_vacant_leaf()
+	local f = fixture()
+	for id = 1, 3 do f.open(id) end
+	local node = f.leaf(1)
+	local target = table.remove(f.contexts[1].targets, 1)
+	f.recalculate(1) -- removal before floating flag
+	f.windows[1].floating = true
+	f.emit("window.update_rules", f.windows[1])
+	f.focus(3); f.message("focus parent")
+	assert(f.api.move_to_workspace(2) == true)
+	assert(f.states[1].tree == node and node.vacant and not next(f.states[1].boxes))
+	f.windows[1].floating = false
+	table.insert(f.contexts[1].targets, target)
+	f.recalculate(1)
+	assert(f.states[1].tree == node and not node.vacant and node.n == 1)
+	f.consistent()
+end
+
+function tests.workspace_swap_keeps_floating_slots_with_their_original_trees()
+	local f = fixture()
+	for id = 1, 3 do f.open(id) end
+	f.open(4, 2)
+	local root, node = f.states[1].tree, f.leaf(2)
+	local target = table.remove(f.contexts[1].targets, 2)
+	f.recalculate(1)
+	f.windows[2].floating = true
+	f.emit("window.update_rules", f.windows[2])
+	assert(f.api.swap_workspaces(f.workspaces[1], f.workspaces[2]) == true)
+	assert(f.states[2].tree == root and root.b.a == node and node.vacant)
+	f.windows[2].floating = false
+	table.insert(f.contexts[2].targets, target)
+	f.recalculate(2)
+	assert(not node.vacant and node.n == 2 and f.states[2].seq == 3)
+	f.consistent()
+end
+
 local function expect_box(b, x, y, w, h)
 	assert(b.x == x and b.y == y and b.w == w and b.h == h,
 		string.format("unexpected box %g,%g %gx%g", b.x, b.y, b.w, b.h))

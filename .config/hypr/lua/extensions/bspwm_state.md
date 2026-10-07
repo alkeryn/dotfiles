@@ -15,6 +15,10 @@ Stored per workspace:
 - Remembered `Super+y` source groups and their representative window IDs,
   independent of which window currently has focus or selection borders.
 
+Vacant floating leaves remain in the saved topology. Vacancy itself is derived
+from live windows/targets on reload rather than serialized, so tiling again
+restores the saved slot even after reloading while every window is floating.
+
 Geometry and Hyprland userdata are not serialized. The new config's monitor
 workareas and gaps still apply; this preserves the tree, not overrides to other
 configuration options. Selections are retained only if their focused window and
@@ -24,10 +28,12 @@ subtree still exist.
 
 Registering/switching providers can synchronously recalculate after each window
 is attached. Until `config.props_refreshed` follows `config.reloaded`, absent
-layout targets are checked against all live tiled windows, not mistaken for
+layout targets are checked against all mapped windows for tree membership and
+all live tiled windows for occupancy. Floating leaves are retained as vacant;
+missing targets during partial reattachment are not mistaken for floating or
 closed windows. Transient focus events and checkpoint writes are suppressed in
-that phase. The final refresh reconciles closed/floating/moved windows, restores
-selection borders and resumes normal checkpointing.
+that phase. The final refresh prunes closed/moved leaves, refreshes vacancy,
+restores selection borders and resumes normal checkpointing.
 
 The existing two-provider workaround remains: it replaces stale provider
 instances without throwing away the tree.

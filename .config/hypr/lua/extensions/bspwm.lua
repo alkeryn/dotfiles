@@ -13,6 +13,7 @@
 --   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
 --   * cross-layer directional focus, node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
+--   * vacant floating leaves retain their original splits when tiled again
 --
 -- NOT implemented (see discussion):
 --   * mouse border-drag resize (use the grow/shrink binds)
@@ -49,6 +50,7 @@ local feedback_sink
 local prune_pull_sources
 local transfer_contexts -- defer reentrant layout callbacks during cross-workspace moves
 local transferring = false -- also suppress checkpoints/feedback through final replay
+local closing = {} -- window.close precedes mapped=false and target removal
 local monocle_display = require("lua/extensions/bspwm_monocle")
 local monocle = monocle_display.new()
 
@@ -78,7 +80,7 @@ end
 local tree = require("lua/extensions/bspwm_tree")
 local directional_focus = require("lua/extensions/bspwm_focus")
 local leaf, find_path, collect_ids = tree.leaf, tree.find_path, tree.collect_ids
-local leaves, first_leaf, last_leaf = tree.leaves, tree.first_leaf, tree.last_leaf
+local leaves, last_leaf = tree.leaves, tree.last_leaf
 local prune_tree, walk_splits = tree.prune, tree.walk_splits
 local insert_adjacent, detach_node, swap_nodes = tree.insert_adjacent, tree.detach, tree.swap_nodes
 local resize, subtree_of = tree.resize, tree.parent_or_root
@@ -126,6 +128,7 @@ prune_pull_sources = function()
 			collect_ids(node, ids)
 			local expected = node.pull_ids or {}
 			local valid = ids[node.pull_focus_id] and expected[node.pull_focus_id]
+			for _, child in ipairs(leaves(node)) do if child.vacant then valid = false end end
 			for id in pairs(ids) do if not expected[id] then valid = false end end
 			for id in pairs(expected) do if not ids[id] then valid = false end end
 			-- A closed/floated member or an insertion/pointer swap inside the
@@ -220,6 +223,20 @@ local function state_for(wsid)
 	return st
 end
 
+-- Membership is NOT the tiled target list. Native Algorithm::setFloating
+-- removes the target (and calls Lua) BEFORE changing window.floating. Keep
+-- mapped leaves belonging to this desktop even during that intermediate pass.
+local function workspace_members(wsid)
+	local members, tiled = {}, {}
+	for _, w in ipairs(hl.get_windows()) do
+		if w.mapped and not closing[w.stable_id] and w.workspace and w.workspace.id == wsid then
+			members[w.stable_id] = true
+			if not w.floating and not w.hidden then tiled[w.stable_id] = true end
+		end
+	end
+	return members, tiled
+end
+
 local function workspace_selector(ws)
 	-- Negative IDs are parsed as relative moves; named/special desktops need
 	-- an absolute name selector even when a workspace object is available.
@@ -286,6 +303,15 @@ local function clear_selection(st)
 	highlight_selection(st, {})
 end
 
+local function reconcile_tree(st, members, tiled)
+	st.tree = prune_tree(st.tree, members)
+	tree.update_vacancy(st.tree, tiled)
+	for id in pairs(st.boxes) do if not tiled[id] then st.boxes[id] = nil end end
+	local lost_selection = st.selected and (not find_path(st.tree, st.selected) or not tiled[st.selected_focus_id])
+	for id in pairs(st.highlighted) do if not tiled[id] then lost_selection = true end end
+	if lost_selection then clear_selection(st) end
+end
+
 local function clear_selections()
 	if selection_focus or rehydrating or transferring then return end
 	for _, st in pairs(states) do clear_selection(st) end
@@ -333,10 +359,50 @@ local function window_leaves_selection(w)
 		end
 	end
 end
-on_event("window.close", window_leaves_selection)
+on_event("window.close", function(w)
+	if not w then return end
+	closing[w.stable_id] = true
+	window_leaves_selection(w)
+	if rehydrating or transferring then return end
+	-- Floats (and the last tile) may never trigger another layout callback.
+	for _, st in pairs(states) do
+		detach_node(st, w.stable_id)
+		st.boxes[w.stable_id] = nil
+		tree.update_vacancy(st.tree)
+	end
+end)
+on_event("window.destroy", function(w) if w then closing[w.stable_id] = nil end end)
+on_event("window.open_early", function(w) if w then closing[w.stable_id] = nil end end)
 -- A client can unmap/remap the same window object, retaining its old tags.
-on_event("window.open", function(w) tag_window(w, false) end)
-on_event("window.move_to_workspace", window_leaves_selection)
+on_event("window.open", function(w)
+	if w then closing[w.stable_id] = nil end
+	tag_window(w, false)
+end)
+on_event("window.move_to_workspace", function(w, ws)
+	window_leaves_selection(w)
+	if not w or rehydrating or transferring then return end
+	ws = ws or w.workspace
+	for id, st in pairs(states) do
+		if not ws or id ~= ws.id then
+			detach_node(st, w.stable_id)
+			st.boxes[w.stable_id] = nil
+			tree.update_vacancy(st.tree)
+		end
+	end
+end)
+-- setFloating updates rules after setting the flag, even when removing the
+-- last tile skipped the Lua layout callback. Do not revive leaves here: on the
+-- return transition the tiled target has not been added yet.
+on_event("window.update_rules", function(w)
+	if not w or not w.floating or rehydrating or transferring then return end
+	local st = w.workspace and states[w.workspace.id]
+	local path = st and find_path(st.tree, w.stable_id)
+	if not path or path[#path].vacant then return end
+	path[#path].vacant = true
+	tree.update_vacancy(st.tree)
+	st.boxes[w.stable_id] = nil
+	window_leaves_selection(w)
+end)
 on_event("window.fullscreen", window_leaves_selection)
 on_event("workspace.removed", function(ws)
 	if ws then monocle.remove(ws) end
@@ -357,14 +423,27 @@ on_event("config.reloaded", function()
 	end
 end)
 on_event("config.props_refreshed", function()
-	if not rehydrating or not config_seen then return end
-	local windows, live, targets = hl.get_windows(), {}, {}
+	if transferring or (rehydrating and not config_seen) then return end
+	if not rehydrating then
+		-- Lua has no window.floating event in v0.56.2. The property-refresh
+		-- barrier also reconciles float-only desktops (no layout callback).
+		for id, st in pairs(states) do
+			local members, tiled = workspace_members(id)
+			reconcile_tree(st, members, tiled)
+		end
+		publish_feedback()
+		return
+	end
+	local windows, live, tiled, targets = hl.get_windows(), {}, {}, {}
 	for _, w in ipairs(windows) do
-		if w.mapped and not w.floating and w.workspace then
+		if w.mapped and not closing[w.stable_id] and w.workspace then
 			local id = w.workspace.id
-			live[id], targets[id] = live[id] or {}, targets[id] or {}
+			live[id], tiled[id], targets[id] = live[id] or {}, tiled[id] or {}, targets[id] or {}
 			live[id][w.stable_id] = true
-			targets[id][#targets[id] + 1] = { window = w }
+			if not w.floating and not w.hidden then
+				tiled[id][w.stable_id] = true
+				targets[id][#targets[id] + 1] = { window = w }
+			end
 		end
 	end
 	rehydrating, config_seen = false, false
@@ -373,7 +452,7 @@ on_event("config.props_refreshed", function()
 	local active = hl.get_active_window()
 	for id, st in pairs(states) do
 		st.highlighted = {}
-		st.tree = prune_tree(st.tree, live[id] or {})
+		reconcile_tree(st, live[id] or {}, tiled[id] or {})
 		if st.selected and (not find_path(st.tree, st.selected) or not active
 			or active.stable_id ~= st.selected_focus_id
 			or not find_path(st.selected, st.selected_focus_id)) then clear_selection(st) end
@@ -398,7 +477,7 @@ local layout_impl = {
 	recalculate = function(ctx)
 		local targets = {}
 		for _, t in ipairs(ctx.targets) do
-			if t.window and t.window.mapped ~= false then
+			if t.window and t.window.mapped ~= false and not closing[t.window.stable_id] and not t.window.floating then
 				table.insert(targets, t)
 			end
 		end
@@ -423,14 +502,11 @@ local layout_impl = {
 		for _, t in ipairs(targets) do
 			live[t.window.stable_id] = t
 		end
+		local members, tiled = workspace_members(wsid)
 		if rehydrating then
 			-- newTarget() recalculates after EACH reattached window. Missing
-			-- ctx targets are not closed windows: preserve all live saved leaves.
-			for _, w in ipairs(hl.get_windows()) do
-				if w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
-					live[w.stable_id] = live[w.stable_id] or { window = w }
-				end
-			end
+			-- tiled targets are not vacant during partial reload reattachment.
+			for id in pairs(tiled) do live[id] = live[id] or true end
 		end
 
 		-- focused id
@@ -439,11 +515,9 @@ local layout_impl = {
 			if t.window.active then focused_id = t.window.stable_id end
 		end
 
-		-- prune dead windows, including a selection whose node was collapsed
-		st.tree = prune_tree(st.tree, live)
-		if st.selected and (not find_path(st.tree, st.selected)
-			or not live[st.selected_focus_id]
-			or (not rehydrating and focused_id and focused_id ~= st.selected_focus_id and find_path(st.tree, focused_id))) then
+		-- Prune only closed/moved leaves; absent tiled targets become vacant.
+		reconcile_tree(st, members, live)
+		if st.selected and (not rehydrating and focused_id and focused_id ~= st.selected_focus_id and find_path(st.tree, focused_id)) then
 			clear_selection(st)
 		end
 
@@ -493,6 +567,8 @@ local layout_impl = {
 			end
 		end
 
+		-- Insertions and transfers can introduce new internal nodes.
+		tree.update_vacancy(st.tree, live)
 		-- place
 		st.boxes = {}
 		if st.mode == "monocle" then
@@ -659,7 +735,13 @@ local layout_impl = {
 			if not target then return true end
 			-- Hyprland still needs one keyboard-focused window. Keep it when
 			-- climbing; pick a representative only when entering another branch.
-			local tid = find_path(target, fid) and fid or first_leaf(target).id
+			local tid = find_path(target, fid) and fid or nil
+			if not tid then
+				for _, child in ipairs(leaves(target)) do
+					if not child.vacant then tid = child.id; break end
+				end
+			end
+			if not tid then return true end -- branch contains only floats
 			st.selected, st.selected_focus_id = target, tid
 			if tid ~= fid and not focus_id(tid) then clear_selection(st) end
 			if st.selected then remember_pull_source(st, target, tid) end
@@ -797,10 +879,7 @@ pull = function(st, node, focused, context)
 		if to.st ~= from.st then clear_selection(to.st) end
 		-- Prune before replay/checkpointing: an empty source produces no native
 		-- callback, and a partially failed move must not leave duplicate leaves.
-		local live = {}
-		for _, w in ipairs(hl.get_windows()) do
-			if w.mapped and not w.floating and w.workspace and w.workspace.id == source_ws.id then live[w.stable_id] = true end
-		end
+		local live = workspace_members(source_ws.id)
 		from.st.tree = prune_tree(from.st.tree, live)
 		if not from.st.tree then from.st.boxes = {} end
 		transfer_contexts = nil
@@ -945,7 +1024,7 @@ function M.move_to_workspace(selector)
 		for _, ws in ipairs(dest and { source, dest } or { source }) do
 			local st, live = states[ws.id], {}
 			for _, w in ipairs(ws:get_windows() or {}) do
-				if w.mapped and not w.floating then live[w.stable_id] = true end
+				if w.mapped and not closing[w.stable_id] then live[w.stable_id] = true end
 			end
 			if st then
 				st.tree = prune_tree(st.tree, live)
@@ -1019,7 +1098,7 @@ function M.swap_workspaces(cur, tgt)
 		local live = { [cur.id] = {}, [tgt.id] = {} }
 		for _, w in ipairs(hl.get_windows()) do
 			local ids = w.workspace and live[w.workspace.id]
-			if ids and w.mapped and not w.floating then ids[w.stable_id] = true end
+			if ids and w.mapped and not closing[w.stable_id] then ids[w.stable_id] = true end
 		end
 		for _, ws in ipairs({ cur, tgt }) do
 			local st = states[ws.id]
@@ -1042,7 +1121,7 @@ function M.swap_workspaces(cur, tgt)
 end
 
 -- Pointer operations never enter Hyprland's native tiled drag controller:
--- it temporarily floats/removes the source and destroys its original slot.
+-- it temporarily floats/removes the source instead of doing bspwm pointer swaps.
 function M.drag_valid(w)
 	local ws = w and w.workspace
 	local st = ws and states[ws.id]
@@ -1096,7 +1175,7 @@ function M.drag_transfer(w, dest)
 		for _, ws in ipairs({ source, dest }) do
 			local st, live = states[ws.id], {}
 			for _, window in ipairs(ws:get_windows() or {}) do
-				if window.mapped and not window.floating then live[window.stable_id] = true end
+				if window.mapped and not closing[window.stable_id] then live[window.stable_id] = true end
 			end
 			st.tree = prune_tree(st.tree, live)
 			st.boxes = {}

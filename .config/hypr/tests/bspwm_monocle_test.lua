@@ -60,6 +60,11 @@ local function fixture()
 			table.insert(f.workspace_rules, handle(spec)); return spec
 		end,
 		window_rule = function(spec) table.insert(f.window_rules, handle(spec)); return spec end,
+		get_windows = function()
+			local windows = {}
+			for _, w in pairs(f.windows) do windows[#windows + 1] = w end
+			return windows
+		end,
 		dispatch = function(dispatcher) return dispatcher() end,
 		dsp = { window = {
 			alter_zorder = function(opts)

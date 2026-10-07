@@ -65,17 +65,28 @@ function M.rectangles(states, workspaces, windows, options)
 	for _, w in ipairs(windows) do
 		if w.mapped and not w.floating and w.workspace then live[w.stable_id] = w.workspace.id end
 	end
-	local function collect(node, ws, box, area)
+	local occupied = {}
+	local function mark_occupied(node, ws)
 		if not node then return false end
-		local valid
 		if node.t == "leaf" then
-			valid = live[node.id] == ws.id
+			occupied[node] = not node.vacant and live[node.id] == ws.id
 		else
-			local first, second = geometry.split_box(box, node.axis, node.ratio)
-			local a, b = collect(node.a, ws, first, area), collect(node.b, ws, second, area)
-			valid = a and b
+			local first, second = mark_occupied(node.a, ws), mark_occupied(node.b, ws)
+			occupied[node] = first or second
 		end
-		if valid and node.presel then
+		return occupied[node]
+	end
+	local function collect(node, ws, box, area)
+		if not node or not occupied[node] then return end
+		if node.t == "split" then
+			local first, second = box, box
+			if occupied[node.a] and occupied[node.b] then
+				first, second = geometry.split_box(box, node.axis, node.ratio)
+			end
+			collect(node.a, ws, first, area)
+			collect(node.b, ws, second, area)
+		end
+		if node.presel then
 			local preview = M.window_box(M.preview_box(box, node.presel), area, options.gaps_in)
 			preview.output = ws.monitor.name
 			local bounds = M.monitor_box(ws.monitor) or area
@@ -83,7 +94,6 @@ function M.rectangles(states, workspaces, windows, options)
 			preview.monitor_w, preview.monitor_h = bounds.w, bounds.h
 			if preview.w > 0 and preview.h > 0 then result[#result + 1] = preview end
 		end
-		return valid
 	end
 	for _, ws in ipairs(workspaces) do
 		local st, mon = states[ws.id], ws.monitor
@@ -93,7 +103,10 @@ function M.rectangles(states, workspaces, windows, options)
 			and mon.dpms_status ~= false
 			and (not special or special.id == ws.id) then
 			local area = M.future_area(st, ws, options.gaps_out)
-			if area and area.w > 0 and area.h > 0 then collect(st.tree, ws, area, area) end
+			if area and area.w > 0 and area.h > 0 then
+				mark_occupied(st.tree, ws)
+				collect(st.tree, ws, area, area)
+			end
 		end
 	end
 	table.sort(result, function(a, b)

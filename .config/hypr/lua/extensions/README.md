@@ -29,6 +29,10 @@ Empty-workspace refocus prevention is provided by the native
 
 - A split ratio is always the **first** child's share. Only that share is
   rounded down; the second child gets the remainder.
+- Floating an existing tile keeps its leaf and splits as **vacant** nodes, like
+  bspwm. Placement expands the nonvacant sibling without changing topology or
+  ratios. Tiling again revives that exact leaf, not a new insertion. See
+  [`bspwm_floating.md`](bspwm_floating.md) for callback-ordering details.
 - A selected node can be an entire subtree. Detaching, swapping and transferring
   it must retain its identity, ages, ratios and preselection metadata.
 - Native moves and rule changes can reenter layout callbacks synchronously.
