@@ -37,7 +37,11 @@ that phase. The final refresh prunes closed/moved leaves, refreshes vacancy,
 restores selection borders and resumes normal checkpointing.
 
 The existing two-provider workaround remains: it replaces stale provider
-instances without throwing away the tree.
+instances without throwing away the tree. Fullscreen is preserved separately by
+[`bspwm_fullscreen.lua`](bspwm_fullscreen.md): static window tags retain the two
+fullscreen modes across native layout replacement, and Lua restores lost modes
+at the refresh barrier before tree checkpointing resumes. The disk checkpoint
+format is unchanged; no native fullscreen hook is needed.
 
 ## Storage and safety
 

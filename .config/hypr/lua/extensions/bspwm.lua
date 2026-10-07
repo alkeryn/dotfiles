@@ -34,6 +34,10 @@
 --   focus <parent|brother|first|second>
 -- ============================================================================
 
+-- Restore fullscreen before the tree's props_refreshed handler unfreezes its
+-- checkpoints/selection. This must be registered before either layout provider.
+require("lua/extensions/bspwm_fullscreen").setup()
+
 -- Load BEFORE registering either provider: registration itself can reattach
 -- existing windows and call recalculate with an incomplete target list.
 local state_store, store_error = require("lua/extensions/bspwm_state").open_session()

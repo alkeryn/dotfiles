@@ -11,6 +11,8 @@
   tree placement, monocle and preselection previews.
 - `bspwm_state.lua`: bounded data-only checkpoint codec and atomic session
   storage. V1/V2 checkpoints remain readable; V3 also saves floating rectangles.
+- `bspwm_fullscreen.lua`: static-window-tag checkpoint and post-reload fullscreen
+  restoration, entirely in Lua; see [`bspwm_fullscreen.md`](bspwm_fullscreen.md).
 - `bspwm_monocle.lua`: reversible workspace/window rules and guarded raising.
 - `bspwm_float_geometry.lua`: goal-geometry capture and post-dispatch restoration
   for explicit state shortcuts; no native plugin hooks or polling.
