@@ -156,7 +156,7 @@ hl.config({
 
 	misc = {
 		-- New tiles/focus demote the covering window, not inherit fullscreen.
-		-- bspwm_fullscreen.lua keeps that window's client fullscreen flag set.
+		-- bspwm_fullscreen_policy.lua keeps that window's client fullscreen flag set.
 		on_focus_under_fullscreen = 2,
 		force_default_wallpaper = -1,
 		disable_hyprland_logo = false,

@@ -2,7 +2,7 @@
 -- Module paths resolve against the main config directory, not lua/.
 local vars = require("lua/vars")
 local bspwm = require("lua/extensions/bspwm")
-local fullscreen_control = require("lua/extensions/bspwm_fullscreen")
+local fullscreen_control = require("lua/extensions/bspwm_fullscreen_policy")
 local M = {}
 
 -- ---------------------------------------------------------------------------

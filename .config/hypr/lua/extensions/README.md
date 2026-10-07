@@ -11,8 +11,11 @@
   tree placement, monocle and preselection previews.
 - `bspwm_state.lua`: bounded data-only checkpoint codec and atomic session
   storage. V1/V2 checkpoints remain readable; V3 also saves floating rectangles.
-- `bspwm_fullscreen.lua`: static-window-tag checkpoint and post-reload fullscreen
-  restoration, entirely in Lua; see [`bspwm_fullscreen.md`](bspwm_fullscreen.md).
+- `bspwm_fullscreen_policy.lua`: application/WM fullscreen behavior and explicit
+  state changes; see [`bspwm_fullscreen_policy.md`](bspwm_fullscreen_policy.md).
+- `bspwm_fullscreen_reload.lua`: the independent Lua-layout reload workaround,
+  owning mode checkpoint tags and replay; see
+  [`bspwm_fullscreen_reload.md`](bspwm_fullscreen_reload.md).
 - `bspwm_monocle.lua`: reversible workspace/window rules and guarded raising.
 - `bspwm_float_geometry.lua`: goal-geometry capture and post-dispatch restoration
   for explicit state shortcuts; no native plugin hooks or polling.
@@ -47,6 +50,10 @@ Empty-workspace refocus prevention is provided by the native
   Transfer guards, reconciliation, final placement and focus ordering matter.
 - Reload reattachment supplies partial target lists. Do not prune saved windows
   or checkpoint intermediate state before the property-refresh barrier.
+- Fullscreen reload restoration registers before fullscreen policy and the tree.
+  The policy receives only the reload module's readiness callback, so it cannot
+  adopt partial restoration during a reentrant refresh. Neither feature imports
+  the other; focused tests run each alone, plus a separate integration suite.
 - Dispatcher return conventions differ between call sites. In particular, the
   workspace-swap helper falls back to workspace focus on a missing result.
 
