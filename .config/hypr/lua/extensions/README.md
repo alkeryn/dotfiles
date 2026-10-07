@@ -4,9 +4,8 @@
 
 - `bspwm.lua`: per-workspace state, layout commands, focus/selection events,
   guarded workspace transfers, checkpoint and feedback coordination.
-- `bspwm_workspace_slots.lua`: plain-data return slots for desktop sends;
-  restores the original split only while the remaining layout still matches.
-  See [`bspwm_workspace_move.md`](bspwm_workspace_move.md).
+  Desktop sends insert at destination focus; see
+  [`bspwm_workspace_move.md`](bspwm_workspace_move.md).
 - `bspwm_tree.lua`: compositor-independent tree traversal, insertion/removal,
   swaps, resizing, transforms and placement. Operations preserve node identity
   and metadata rather than rebuilding subtrees.

@@ -88,11 +88,6 @@ end
 -- Pure tree operations are separate from native focus/layout callbacks.
 local tree = require("lua/extensions/bspwm_tree")
 local directional_focus = require("lua/extensions/bspwm_focus")
-local workspace_slot = require("lua/extensions/bspwm_workspace_slots")
--- Keys survive intact transfers but not closed/rebuilt nodes. Values contain
--- only plain slot data, so even LuaJIT's weak tables cannot retain dead trees.
--- Deliberately transient: config reload starts a new set of return positions.
-local workspace_slots = setmetatable({}, { __mode = "k" })
 local leaf, find_path, collect_ids = tree.leaf, tree.find_path, tree.collect_ids
 local leaves, last_leaf = tree.leaves, tree.last_leaf
 local prune_tree, walk_splits = tree.prune, tree.walk_splits
@@ -433,10 +428,7 @@ on_event("window.update_rules", function(w)
 end)
 on_event("window.fullscreen", window_leaves_selection)
 on_event("workspace.removed", function(ws)
-	if ws then
-		monocle.remove(ws)
-		for _, slots in pairs(workspace_slots) do slots[ws.id] = nil end
-	end
+	if ws then monocle.remove(ws) end
 	local st = ws and states[ws.id]
 	if st then
 		clear_selection(st)
@@ -1014,8 +1006,8 @@ function M.set_floating(window, floating)
 	return result
 end
 
--- Transfer intact nodes, including unselected tiles. Native remove/reinsert
--- loses both leaf metadata and the original split when moving back and forth.
+-- Transfer intact nodes, including unselected tiles, beside the destination's
+-- last-focused node. Preserve their metadata, not an old destination position.
 function M.move_to_workspace(selector)
 	if rehydrating or transferring then return "workspace move: layout is busy" end
 	local active = hl.get_active_window()
@@ -1091,7 +1083,6 @@ function M.move_to_workspace(selector)
 		anchor = to.selected or (path and path[#path]) or last_leaf(to.tree)
 	end
 	if dest then set_destination(dest) end
-	local source_slot = workspace_slot.capture(from, node)
 	local contexts = {}
 	transferring, transfer_contexts = true, contexts
 	local ok, failure = pcall(function()
@@ -1132,16 +1123,10 @@ function M.move_to_workspace(selector)
 			detach_node(from, node)
 			local context = contexts[dest.id]
 			if context then place(to.tree, context.area, {}) end
-			local slots = workspace_slots[node] or {}
-			-- Explicit insertion intent wins. Otherwise restore the original
-			-- side/axis/ratio only if the remaining destination tree still fits.
-			if (anchor and anchor.presel) or pending_presel
-				or not workspace_slot.restore(to, node, slots[dest.id]) then
-				local pre = take_preselection(anchor)
-				insert_adjacent(to, node, anchor, pre and pre.dir, pre and pre.ratio)
-			end
-			slots[dest.id], slots[source.id] = nil, source_slot
-			workspace_slots[node] = slots
+			-- Every send, including a return, uses the destination focus
+			-- snapshotted before native moves could change its history.
+			local pre = take_preselection(anchor)
+			insert_adjacent(to, node, anchor, pre and pre.dir, pre and pre.ratio)
 			for _, child in ipairs(leaves(node)) do to.seq = math.max(to.seq, child.n) end
 		end
 		for _, ws in ipairs(dest and { source, dest } or { source }) do

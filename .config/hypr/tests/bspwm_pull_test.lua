@@ -466,52 +466,59 @@ local function layout_signature(f, wsid)
 	return codec.encode({ [wsid] = { tree = f.states[wsid].tree, seq = 0, mode = "tiled" } })
 end
 
-function tests.desktop_move_relative_round_trips_restore_every_leaf_and_split()
+local function expect_inserted_beside(f, wsid, node, anchor)
+	local path = require("lua/extensions/bspwm_tree").find_path(f.states[wsid].tree, node)
+	local parent = path and path[#path - 1]
+	assert(parent and parent.a == anchor and parent.b == node, "move ignored destination's last-focused node")
+end
+
+function tests.desktop_move_relative_round_trips_follow_changed_destination_focus()
 	for moving_id = 1, 5 do
 		local f = fixture()
 		local mon = f.workspace(1).monitor
 		f.workspace(2, mon)
 		for id = 1, 5 do f.open(id, 1) end
 		for id = 6, 8 do f.open(id, 2) end
-		f.focus(1); f.message("grow r 120")
-		f.focus(moving_id)
 		local node = f.leaf(moving_id)
-		local original = layout_signature(f, 1)
-		local boxes = {}
-		for id = 1, 5 do boxes[id] = f.box(id) end
 		f.load_bindings()
-		local destination
-		for _ = 1, 4 do
+		for i, destination_id in ipairs({ 6, 7, 8, 6 }) do
+			-- Change only focus, not topology, on the receiving desktop.
+			f.focus(destination_id); f.focus(moving_id)
+			local anchor = f.leaf(destination_id)
 			f.binds["SUPER + SHIFT + dollar"]()
 			assert(f.active_ws.id == 2 and f.leaf(moving_id) == node)
-			local current = layout_signature(f, 2)
-			assert(not destination or current == destination, "destination insertion drifted")
-			destination = current
+			expect_inserted_beside(f, 2, node, anchor)
+			local source_id = ((moving_id - 1 + i) % 5) + 1
+			f.focus(source_id); f.focus(moving_id)
+			anchor = f.leaf(source_id)
 			f.binds["SUPER + SHIFT + dead_circumflex"]()
 			assert(f.active_ws.id == 1 and f.leaf(moving_id) == node)
-			assert(layout_signature(f, 1) == original, "return changed original split for leaf " .. moving_id)
-			for id = 1, 5 do
-				local b = boxes[id]
-				expect_box(f.box(id), b.x, b.y, b.w, b.h)
-			end
+			expect_inserted_beside(f, 1, node, anchor)
 			assert(not f.states[1].selected and not f.states[2].selected)
 			f.consistent()
 		end
 	end
 end
 
-function tests.desktop_move_subtree_round_trips_restore_outer_and_inner_splits()
+function tests.desktop_move_subtree_follows_destination_focus_without_rebuilding_internal_splits()
 	local f = fixture()
 	for id = 1, 4 do f.open(id) end
-	f.focus(1); f.message("grow r 100")
-	f.focus(4); f.message("focus parent"); f.message("grow l 80")
-	local node, original = f.states[1].selected, layout_signature(f, 1)
-	f.workspace(2)
-	for _ = 1, 4 do
-		assert(f.api.move_to_workspace(2) == true)
-		assert(f.api.move_to_workspace(1) == true)
-		assert(f.states[1].selected == node and layout_signature(f, 1) == original)
-		f.consistent()
+	f.focus(4); f.message("grow l 80"); f.message("focus parent")
+	local node = f.states[1].selected
+	local original = codec.encode({ [1] = { tree = node, seq = 0, mode = "tiled" } })
+	f.open(5, 2); f.open(6, 2)
+	for _, pair in ipairs({ { 5, 1 }, { 6, 2 }, { 5, 2 }, { 6, 1 } }) do
+		for wsid, anchor_id in ipairs(pair) do
+			local dest = wsid == 1 and 2 or 1
+			f.focus(anchor_id); f.focus(4); f.message("focus parent")
+			assert(f.states[f.active_ws.id].selected == node)
+			local anchor = f.leaf(anchor_id)
+			assert(f.api.move_to_workspace(dest) == true)
+			expect_inserted_beside(f, dest, node, anchor)
+			assert(f.states[dest].selected == node)
+			assert(codec.encode({ [1] = { tree = node, seq = 0, mode = "tiled" } }) == original)
+			f.consistent()
+		end
 	end
 end
 
@@ -533,7 +540,7 @@ function tests.desktop_move_single_tile_snapshots_anchor_and_places_before_follo
 	f.consistent()
 end
 
-function tests.desktop_move_return_preselection_overrides_saved_slot()
+function tests.desktop_move_return_consumes_current_preselection_once()
 	local f = fixture()
 	f.open(1); f.open(2); f.focus(1)
 	assert(f.api.move_to_workspace(2) == true)
@@ -542,15 +549,15 @@ function tests.desktop_move_return_preselection_overrides_saved_slot()
 	local root = f.states[1].tree
 	assert(root.axis == "v" and root.ratio == 0.3 and root.a.id == 2 and root.b.id == 1)
 	assert(not f.leaf(2).presel)
-	-- The override becomes the new return slot, not the superseded one.
-	local expected = layout_signature(f, 1)
+	-- The next return is automatic; do not replay an already consumed slot.
 	assert(f.api.move_to_workspace(2) == true)
 	assert(f.api.move_to_workspace(1) == true)
-	assert(layout_signature(f, 1) == expected)
+	root = f.states[1].tree
+	assert(root.axis == "h" and root.ratio == 0.5 and root.a.id == 2 and root.b.id == 1)
 	f.consistent()
 end
 
-function tests.desktop_move_stale_slot_falls_back_after_layout_changes()
+function tests.desktop_move_uses_current_anchor_after_layout_changes()
 	for _, change in ipairs({ "close", "insert", "rotate", "resize", "float" }) do
 		local f = fixture()
 		for id = 1, 4 do f.open(id) end
@@ -569,17 +576,18 @@ function tests.desktop_move_stale_slot_falls_back_after_layout_changes()
 		f.focus(2); f.focus(1)
 		assert(f.api.move_to_workspace(1) == true)
 		local path = require("lua/extensions/bspwm_tree").find_path(f.states[1].tree, 1)
-		assert(path[#path - 1].a == anchor, "stale slot overrode current anchor after " .. change)
+		assert(path[#path - 1].a == anchor, "wrong insertion anchor after " .. change)
 		f.consistent()
 	end
 end
 
-function tests.desktop_move_failed_return_preserves_slot_for_retry()
+function tests.desktop_move_failed_return_keeps_trees_and_retries_at_current_focus()
 	for _, kind in ipairs({ "fail_id", "throw_id", "ignore_move", "after_move" }) do
 		local f = fixture()
 		f.open(1); f.open(2); f.focus(1)
-		local node, original = f.leaf(1), layout_signature(f, 1)
+		local node, anchor = f.leaf(1), f.leaf(2)
 		assert(f.api.move_to_workspace(2) == true)
+		local source_before, dest_before = layout_signature(f, 2), layout_signature(f, 1)
 		if kind == "after_move" then
 			f.after_move = function(_, dest)
 				if dest.id == 1 then error("failure after ownership changed") end
@@ -587,9 +595,11 @@ function tests.desktop_move_failed_return_preserves_slot_for_retry()
 		else f[kind] = kind == "ignore_move" or 1 end
 		assert(type(f.api.move_to_workspace(1)) == "string")
 		assert(f.windows[1].workspace.id == 2 and f.leaf(1) == node)
+		assert(layout_signature(f, 2) == source_before and layout_signature(f, 1) == dest_before)
 		f[kind] = nil; f.focus(1)
 		assert(f.api.move_to_workspace(1) == true)
-		assert(layout_signature(f, 1) == original and f.leaf(1) == node)
+		assert(f.leaf(1) == node)
+		expect_inserted_beside(f, 1, node, anchor)
 		f.consistent()
 	end
 end
@@ -683,7 +693,7 @@ function tests.desktop_move_empty_source_does_not_choose_a_foreign_history_windo
 	f.consistent()
 end
 
-function tests.desktop_move_pending_preselection_overrides_saved_slot()
+function tests.desktop_move_return_consumes_pending_preselection()
 	local f = fixture()
 	f.open(1); f.open(2); f.focus(1)
 	assert(f.api.move_to_workspace(2) == true)

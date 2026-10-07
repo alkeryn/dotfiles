@@ -12,20 +12,17 @@ Desktop sends transfer the focused tile, or the whole parent node selected with
 Reference: `~/tmp/bspwm/src/messages.c` handles `node -d --follow` by passing the
 selected node to `tree.c:transfer_node`, which unlinks and inserts it intact.
 The Lua implementation likewise preserves internal splits, ratios, insertion
-ages and preselections. On a first visit it inserts beside the destination's
-last focused node, consuming that node's preselection if present; an empty
-desktop receives the node as its root. Tiled/monocle mode remains a property of
-each desktop.
+ages and preselections. Every send inserts beside the destination's last
+focused node, consuming that node's preselection if present; an empty desktop
+receives the node as its root. Without preselection, insertion splits the
+anchor's longest side at 50/50, with the incoming node second. Tiled/monocle mode
+remains a property of each desktop.
 
-Return trips reuse the node's old position on that desktop: sibling, split
-axis, side and ratio. This applies to both individual tiles and selected
-subtrees, so repeated next/previous sends do not gradually rearrange either
-layout. The remaining destination tree must still have the same leaf order,
-splits, ratios and floating vacancies; otherwise insertion falls back to the
-current destination anchor. Explicit anchor or pending preselection takes
-priority over a remembered slot. Focus and monitor geometry changes do not
-invalidate slots. These return positions are transient (reset on config reload),
-not placeholders in the tree or extra checkpointed windows.
+Return trips follow the same rule: they do not remember or restore an old slot.
+Changing the focused window on the receiving desktop changes the next insertion
+point, even if its layout is otherwise unchanged. The destination anchor is
+snapshotted before source refocusing or native move callbacks can change focus
+history. This applies equally to individual tiles and selected subtrees.
 
 Before a move, snapshot the source desktop's most recently focused **staying**
 window (including floats, excluding all members of the moving subtree, hidden
@@ -56,12 +53,10 @@ partially transferring the selection.
 
 Tests: `lua tests/bspwm_pull_test.lua` and `luajit tests/bspwm_pull_test.lua`.
 They exercise actual bindings, subtree geometry/identity, empty/new/named and
-monocle destinations, repeated relative sends, exact return geometry for every
-leaf and selected subtrees, stale-slot/preselection overrides, focus/highlights,
+monocle destinations, repeated relative sends with changing destination focus,
+intact subtree metadata, one-shot preselections, focus/highlights,
 move/return/ordinary-switch focus with deliberately wrong spatial candidates,
 floating survivors, fullscreen ordering, focus refusal, native callback ordering,
-rollback, and reload persistence of the live tree.
-The plain-data slot helper is also covered by
-`tests/bspwm_workspace_slots_test.lua`. Native moves are mocked; verify on the
-desktop by sending each tile back and forth with the next/previous shortcuts,
-then repeat with two or more windows selected using `Super+b`.
+rollback, and reload persistence of the live tree. Native moves are mocked;
+verify on the desktop by changing its focused window between sends and checking
+that the next tile arrives beside it. Repeat with a `Super+b` subtree selection.
