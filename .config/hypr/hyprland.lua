@@ -35,6 +35,14 @@ hl.layer_rule({
 	blur = false,
 })
 
+-- Slurp uses the "selection" namespace. Never retain its border in a closing
+-- layer snapshot: grim captures shortly after selection.
+hl.layer_rule({
+	name = "slurp-selection",
+	match = { namespace = "^selection$" },
+	no_anim = true,
+})
+
 local vars = require("lua/vars")
 
 local PC       = vars.PC
