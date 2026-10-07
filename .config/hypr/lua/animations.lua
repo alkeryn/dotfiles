@@ -1,4 +1,4 @@
--- Picom-style opacity fades, except window close; geometry/borders are immediate.
+-- Picom-style opacity fades, except window open/close; geometry/borders are immediate.
 -- Reference: ~/tmp/dotfiles/.config/picom.conf
 --   fading = true; fade-delta = 3; fade-in-step = fade-out-step = 0.03;
 -- 3 ms / 0.03 = 100 ms for a full-opacity fade. Hyprland speed is in 100 ms
@@ -24,10 +24,11 @@ hl.animation({ leaf = "windows",    enabled = false, speed = 1, bezier = "linear
 hl.animation({ leaf = "layers",     enabled = false, speed = 1, bezier = "linear", style = "fade" })
 hl.animation({ leaf = "fade",       enabled = false, speed = 1, bezier = "linear" })
 
--- Opening and opacity changes; active/inactive opacity remains 1.
+-- Opacity changes; active/inactive opacity remains 1.
 -- Keep fade's other children off: no extra dim, shadow-colour, glow or DPMS
 -- transitions. A window's shadow already follows its overall opacity.
-hl.animation({ leaf = "fadeIn",     enabled = true,  speed = fade_in_speed,  bezier = "linear" })
+-- Open windows immediately, without a fade-in.
+hl.animation({ leaf = "fadeIn",     enabled = false, speed = fade_in_speed,  bezier = "linear" })
 -- Close-fade workaround: Hyprland snapshots the border, then retiles surviving
 -- windows underneath it. Do not retain that snapshot over the new layout:
 -- translucent terminals can expose border fragments during the fade. Disabling

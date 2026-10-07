@@ -33,7 +33,7 @@ local function effective(leaf)
 	return effective(assert(parents[leaf], "unknown animation: " .. leaf))
 end
 local fade_leaves = {
-	fadeIn = true, fadeSwitch = true,
+	fadeSwitch = true,
 	fadeLayers = true, fadeLayersIn = true, fadeLayersOut = true,
 	fadePopups = true, fadePopupsIn = true, fadePopupsOut = true,
 	workspaces = true, workspacesIn = true, workspacesOut = true,
@@ -58,11 +58,15 @@ local curve = assert(curves.linear, "missing linear curve")
 assert(curve.type == "bezier" and #curve.points == 2, "expected cubic bezier")
 assert(curve.points[1][1] == 0 and curve.points[1][2] == 0
 	and curve.points[2][1] == 1 and curve.points[2][2] == 1, "curve must be exactly linear")
-print("PASS Picom fades: window opening, opacity changes, layers and popups at 100 ms linear")
+print("PASS Picom fades: opacity changes, layers and popups at 100 ms linear")
+
+assert(animations.fadeIn and not animations.fadeIn.enabled,
+	"window opening must stay immediate, without a fade-in")
+print("PASS window opening: no fade-in")
 
 -- Close snapshots include borders while surviving tiles reflow immediately.
 -- windowsOut=false only disables movement: explicitly keep fadeOut off without
--- disabling fadeIn/fadeSwitch or the separate layer/popup/workspace branches.
+-- disabling fadeSwitch or the separate layer/popup/workspace branches.
 assert(animations.fadeOut and not animations.fadeOut.enabled,
 	"window close fade must stay explicitly disabled to avoid retained border fragments")
 print("PASS close workaround: immediate window removal, other opacity fades preserved")

@@ -12,18 +12,20 @@ fade-exclude = [ ];
 ```
 
 `no-fading-openclose` is commented out, so the original fades opening and closing.
-The port now makes window closing an exception (see below).
+The port makes window opening and closing exceptions: opening is immediate by
+preference, and closing is immediate to avoid border fragments (see below).
 Active, inactive and frame opacity are all 1: focus does not dim windows.
 There are no geometry animations in the original config.
 
 ## Translation
 
-- **Linear, 100 ms full-opacity fades, except window closing.** Picom changes
+- **Linear, 100 ms full-opacity fades, except window opening/closing.** Picom changes
   opacity by 0.03 every 3 ms: `3 / 0.03 = 100 ms`. Hyprland measures animation
   speed in 100 ms units, so this is `speed = 1` with the linear Bézier curve.
-- Enable window opening and opacity fades, layer-shell fades (panels,
+- Enable window opacity-change fades, layer-shell fades (panels,
   launchers, notifications), and native popup fades (menus/tooltips).
-  Window closing is immediate; layers and popups still fade in both directions.
+  Window opening and closing are immediate (`fadeIn`/`fadeOut` disabled);
+  layers and popups still fade in both directions.
 - Disable position/size, border-colour, zoom, monitor-entry, DPMS and independent
   shadow/glow/dim animations. Shadows still follow overall window opacity.
 - Use `popin 100%` for the disabled window geometry branch. Hyprland 0.56.2
@@ -61,8 +63,8 @@ is insufficient; capture a recording for further diagnosis.
 
 ## Limits of a configuration-only match
 
-Apart from the close-fade workaround, this matches the original fade rate and
-effects, not every rendered frame:
+Apart from the disabled window-open/close fades, this matches the original fade
+rate and effects, not every rendered frame:
 
 - Picom's steps are discrete: an opaque window reaches its endpoint after
   34 steps (nominally 102 ms). Hyprland interpolates over 100 ms and presents
@@ -96,5 +98,5 @@ lua tests/animations_test.lua
 
 The test covers effective animation-tree inheritance, timing, linearity,
 full-size window endpoints, stationary layer/workspace fades, explicit exclusion
-of window-close fading, and exclusion of unrelated effects. It does not validate
+of window-open/close fading, and exclusion of unrelated effects. It does not validate
 rendered frames.
