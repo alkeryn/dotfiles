@@ -80,8 +80,10 @@ hl.config({
 	render = {
 		cm_enabled = true,
 		cm_auto_hdr = 1,      -- auto HDR when a fullscreen app requests it
-		-- Workaround for stale frames after closing fullscreen mpv: keep compositing.
-		direct_scanout = 0,
+		-- 1: fullscreen HDR passthrough. Compositing tone-mapped real HDR content
+		-- against a wrong target luminance -> grey/washed-out picture.
+		-- Known cost: stale frames can appear after closing fullscreen mpv.
+		direct_scanout = 1,
 		-- cm_fs_passthrough: existed on the old build, gone in v0.56.2 --
 		-- cm_auto_hdr + surface-driven metadata cover it.
 	},
