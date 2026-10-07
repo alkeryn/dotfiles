@@ -27,8 +27,20 @@ priority over a remembered slot. Focus and monitor geometry changes do not
 invalidate slots. These return positions are transient (reset on config reload),
 not placeholders in the tree or extra checkpointed windows.
 
-Moves are silent until every selected window has reached the destination and
-both layouts have been recalculated. Focus then follows the original
+Before a move, snapshot the source desktop's most recently focused **staying**
+window (including floats, excluding all members of the moving subtree, hidden
+and closed windows). Focus that survivor inside the transfer guard before the
+first native move. This bypasses v0.56.2's silent-move spatial fallback: it would
+otherwise pick a window at the departing tile's old center, or force cursor
+refocus, and overwrite the desktop's remembered focus. A later ordinary desktop
+switch must return to the real last-focused survivor, not that spatial pick.
+No extra cursor warp is enabled; `cursor.no_warps` remains unchanged. For a
+covering fullscreen window, defer survivor focus until after the native moves
+so focusing underneath it cannot demote it before transfer. A failed move that
+rolls back also restores the original keyboard focus.
+
+The desktop switch waits until every selected window has reached the destination
+and both layouts have been recalculated. Focus then follows the original
 representative once, and the moved subtree remains selected. This also makes
 repeated desktop sends operate on the same selection. Unselected tiles use the
 same guarded transfer without acquiring subtree highlighting. Floating windows,
@@ -46,7 +58,9 @@ Tests: `lua tests/bspwm_pull_test.lua` and `luajit tests/bspwm_pull_test.lua`.
 They exercise actual bindings, subtree geometry/identity, empty/new/named and
 monocle destinations, repeated relative sends, exact return geometry for every
 leaf and selected subtrees, stale-slot/preselection overrides, focus/highlights,
-native callback ordering, rollback, and reload persistence of the live tree.
+move/return/ordinary-switch focus with deliberately wrong spatial candidates,
+floating survivors, fullscreen ordering, focus refusal, native callback ordering,
+rollback, and reload persistence of the live tree.
 The plain-data slot helper is also covered by
 `tests/bspwm_workspace_slots_test.lua`. Native moves are mocked; verify on the
 desktop by sending each tile back and forth with the next/previous shortcuts,

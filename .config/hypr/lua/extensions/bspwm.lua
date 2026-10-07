@@ -1056,6 +1056,33 @@ function M.move_to_workspace(selector)
 		end
 		moving[#moving + 1] = w
 	end
+	-- Actions::moveToWorkspace(silent=true) otherwise focuses the window at
+	-- the departing tile's OLD center, then falls back to cursor refocus. That
+	-- overwrites workspace.last_window and contaminates native focus history.
+	-- Pick a surviving source window BEFORE any of those callbacks can run.
+	local moving_ids, source_focus, best_rank = {}, nil, nil
+	for _, w in ipairs(moving) do moving_ids[w.stable_id] = true end
+	for _, w in pairs(windows) do
+		if w.mapped and not w.hidden and not closing[w.stable_id] and not moving_ids[w.stable_id]
+			and w.workspace and w.workspace.id == source.id then
+			local rank = w.focus_history_id
+			if not rank or rank < 0 then rank = math.huge end
+			if not source_focus or rank < best_rank or (rank == best_rank and w.stable_id < source_focus.stable_id) then
+				source_focus, best_rank = w, rank
+			end
+		end
+	end
+	local source_focus_requested = false
+	local function focus_source()
+		if not source_focus or not source_focus.mapped or source_focus.hidden
+			or not source_focus.workspace or source_focus.workspace.id ~= source.id or source_focus.active then return end
+		source_focus_requested = true
+		local result = hl.dispatch(hl.dsp.focus({ window = source_focus }))
+		local current = hl.get_active_window()
+		if (result and result.ok == false) or not current or current.stable_id ~= source_focus.stable_id then
+			error("could not focus source workspace survivor", 0)
+		end
+	end
 	local to, anchor
 	local function set_destination(ws)
 		if not compatible_workspace(ws) then error("selected subtree requires the bspwm layout", 0) end
@@ -1068,6 +1095,10 @@ function M.move_to_workspace(selector)
 	local contexts = {}
 	transferring, transfer_contexts = true, contexts
 	local ok, failure = pcall(function()
+		-- Focus a STAYING window while still on this desktop. The moving
+		-- window is then inactive, so native silent moves skip spatial refocus.
+		-- Do not demote a covering fullscreen window before it is transferred.
+		if not source.has_fullscreen and (active.fullscreen or 0) == 0 then focus_source() end
 		for _, w in ipairs(moving) do
 			local moved
 			if not dest then
@@ -1084,6 +1115,9 @@ function M.move_to_workspace(selector)
 			end
 			if not moved then error("could not move window " .. w.stable_id, 0) end
 		end
+		-- Fullscreen transfers defer this until the covering window has left.
+		-- Also repair a native callback that changed focus during the moves.
+		focus_source()
 	end)
 	if not ok then
 		-- Best-effort rollback: even a dispatcher that reports failure may
@@ -1138,6 +1172,14 @@ function M.move_to_workspace(selector)
 			local targets = {}
 			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
 			highlight_selection(to, targets)
+		end
+	elseif not ok and source_focus_requested and active.mapped and active.workspace and active.workspace.id == source.id then
+		-- A rejected/rolled-back move must not leave our preparatory source
+		-- focus behind. Do not follow a window whose rollback did not succeed.
+		local restored_focus, result = pcall(function() return hl.dispatch(hl.dsp.focus({ window = active })) end)
+		local current = hl.get_active_window()
+		if not restored_focus or (result and result.ok == false) or not current or current.stable_id ~= active.stable_id then
+			failure = tostring(failure) .. "; could not restore source focus"
 		end
 	end
 	publish_feedback()

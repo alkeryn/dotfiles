@@ -111,6 +111,16 @@ local function fixture()
 			get_workspace = function(sel)
 				if type(sel) == "table" then return f.workspaces[sel.id] end
 				if tonumber(sel) then return f.workspaces[tonumber(sel)] end
+				if sel == "m+1" or sel == "m-1" then
+					local workspaces = {}
+					for _, ws in pairs(f.workspaces) do
+						if ws.monitor == f.active_ws.monitor and not ws.special then workspaces[#workspaces + 1] = ws end
+					end
+					table.sort(workspaces, function(a, b) return a.id < b.id end)
+					for i, ws in ipairs(workspaces) do
+						if ws == f.active_ws then return workspaces[((i - 1 + (sel == "m+1" and 1 or -1)) % #workspaces) + 1] end
+					end
+				end
 				for _, ws in pairs(f.workspaces) do if sel == "name:" .. ws.name then return ws end end
 			end,
 			get_workspaces = function()
@@ -126,10 +136,16 @@ local function fixture()
 				layout = function(message) return function() return { ok = f.message(message) == true } end end,
 				focus = function(opts) return function()
 					if opts.workspace then
-						f.active_ws, f.active = assert(hl.get_workspace(opts.workspace)), nil
-						for _, w in pairs(f.windows) do w.active = false end
-						f.emit("workspace.active", f.active_ws)
-						f.emit("window.active", nil)
+						local ws = assert(hl.get_workspace(opts.workspace))
+						local remembered = ws.last_window
+						if remembered and remembered.mapped and not remembered.hidden and remembered.workspace == ws then
+							f.focus(remembered.stable_id)
+						else
+							f.active_ws, f.active = ws, nil
+							for _, w in pairs(f.windows) do w.active = false end
+							f.emit("workspace.active", f.active_ws)
+							f.emit("window.active", nil)
+						end
 						return { ok = true }
 					end
 					f.focus_calls[#f.focus_calls + 1] = opts.window.stable_id
@@ -171,8 +187,12 @@ local function fixture()
 					f.recalculate(dest.id)
 					if w.active then
 						w.active = false
+						-- Native silent moves hit-test the old window center, then
+						-- force cursor refocus. Neither uses workspace focus history.
 						local remaining = f.contexts[source.id].targets[1]
-						if remaining then f.focus(remaining.window.stable_id)
+						local picked = f.spatial_pick and f.spatial_pick(source, w)
+							or (remaining and remaining.window)
+						if picked then f.focus(picked.stable_id)
 						else f.active = nil; f.emit("window.active", nil) end
 					end
 					if opts.follow then f.focus(w.stable_id) end
@@ -295,6 +315,10 @@ function tests.selected_desktop_move_number_binding_transfers_intact_subtree()
 	local node = f.states[1].selected
 	local before = codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } })
 	f.before_focus = function(w)
+		if w == f.windows[1] then
+			assert(#f.moves == 0 and f.states[1].selected == node, "source focus must precede native moves")
+			return
+		end
 		assert(w == f.windows[4] and #f.moves == 3, "follow must wait for all selected windows")
 		assert(f.states[2].tree.a == node, "follow must wait for subtree insertion")
 		assert(f.box(4).x >= 2000, "follow must wait for destination geometry")
@@ -309,7 +333,7 @@ function tests.selected_desktop_move_number_binding_transfers_intact_subtree()
 	assert(f.states[1].tree.id == 1 and f.states[2].tree.a == node and f.states[2].tree.ratio == 0.3)
 	assert(not f.leaf(5).presel and f.states[2].selected == node and f.states[2].selected_focus_id == 4)
 	assert(codec.encode({ [1] = { tree = node, seq = 4, mode = "tiled" } }) == before)
-	assert(f.active == f.windows[4] and #f.focus_calls == 1)
+	assert(f.active == f.windows[4] and #f.focus_calls == 2 and f.focus_calls[1] == 1)
 	expect_box(f.box(1), 0, 0, 1600, 900)
 	f.consistent()
 end
@@ -498,12 +522,13 @@ function tests.desktop_move_single_tile_snapshots_anchor_and_places_before_follo
 	f.open(1); f.open(2); f.focus(1)
 	local node = f.leaf(1)
 	f.after_move = function() f.workspaces[2].last_window = f.windows[6] end
-	f.before_focus = function()
+	f.before_focus = function(w)
+		if w == f.windows[2] then assert(#f.moves == 0); return end
 		assert(f.states[2].tree.a.a == anchor and f.states[2].tree.a.b == node)
 		assert(f.box(1).x >= 2000)
 	end
 	assert(f.api.move_to_workspace(2) == true)
-	assert(#f.moves == 1 and not f.moves[1].follow and #f.focus_calls == 1)
+	assert(#f.moves == 1 and not f.moves[1].follow and #f.focus_calls == 2 and f.focus_calls[1] == 2)
 	assert(not f.states[2].selected and not f.windows[1].tags.bspwm_selected)
 	f.consistent()
 end
@@ -567,6 +592,95 @@ function tests.desktop_move_failed_return_preserves_slot_for_retry()
 		assert(layout_signature(f, 1) == original and f.leaf(1) == node)
 		f.consistent()
 	end
+end
+
+function tests.desktop_move_round_trip_preserves_focus_on_later_workspace_switch()
+	for _, source_kind in ipairs({ "tile", "float", "subtree", "fullscreen" }) do
+		local f = fixture()
+		local mon = f.workspace(1).monitor
+		f.workspace(2, mon)
+		f.open(1, 1); f.open(2, 1); f.open(3, 1)
+		f.open(4, 2); f.open(5, 2); f.open(6, 2, source_kind == "float")
+		f.focus(6); f.focus(3)
+		if source_kind == "subtree" then f.message("focus parent") end
+		if source_kind == "fullscreen" then
+			f.windows[3].fullscreen = 2
+			f.before_focus = function(w)
+				if w.stable_id ~= 3 then
+					assert(w.workspace ~= f.windows[3].workspace, "source refocus would demote the departing fullscreen window")
+				end
+			end
+		end
+		-- What is under the old center/cursor is deliberately NOT last focus.
+		local spatial_calls = 0
+		f.spatial_pick = function(source)
+			spatial_calls = spatial_calls + 1
+			return f.windows[source.id == 1 and 1 or 4]
+		end
+		f.load_bindings()
+		for _ = 1, 3 do
+			f.binds["SUPER + SHIFT + dollar"]()
+			f.binds["SUPER + SHIFT + dead_circumflex"]()
+			assert(f.active.stable_id == 3 and f.active_ws.id == 1)
+			f.binds["SUPER + dollar"]()
+			assert(f.active.stable_id == 6, "source desktop forgot its real last focus: " .. source_kind)
+			f.binds["SUPER + dead_circumflex"]()
+			assert(f.active.stable_id == 3)
+			if source_kind == "subtree" then f.message("focus parent") end
+		end
+		if source_kind ~= "fullscreen" then assert(spatial_calls == 0, "native spatial fallback should be bypassed") end
+		f.consistent()
+	end
+end
+
+function tests.desktop_move_source_focus_uses_history_not_enumeration_and_skips_unavailable_windows()
+	local f = fixture()
+	for id = 1, 6 do f.open(id) end
+	f.focus(4); f.focus(3); f.focus(2); f.focus(6)
+	f.windows[2].hidden = true
+	f.windows[3].mapped = false
+	f.workspace(2)
+	assert(f.api.move_to_workspace(2) == true)
+	assert(f.workspaces[1].last_window == f.windows[4])
+	assert(f.focus_calls[1] == 4 and f.focus_calls[#f.focus_calls] == 6)
+end
+
+function tests.desktop_move_failed_after_source_focus_restores_original_focus()
+	for _, kind in ipairs({ "fail_id", "throw_id", "ignore_move" }) do
+		local f = fixture()
+		f.open(1); f.open(2); f.open(3); f.focus(1); f.focus(3)
+		local before = layout_signature(f, 1)
+		f.workspace(2)
+		f[kind] = kind == "ignore_move" or 3
+		assert(type(f.api.move_to_workspace(2)) == "string")
+		assert(f.active == f.windows[3] and f.active_ws.id == 1)
+		assert(f.focus_calls[1] == 1 and f.focus_calls[#f.focus_calls] == 3)
+		assert(layout_signature(f, 1) == before)
+		f.consistent()
+	end
+end
+
+function tests.desktop_move_source_focus_refusal_cancels_without_moving()
+	local f = fixture()
+	f.open(1); f.open(2)
+	f.workspace(2)
+	local before = layout_signature(f, 1)
+	f.fail_focus = true
+	assert(type(f.api.move_to_workspace(2)) == "string")
+	assert(#f.moves == 0 and f.active == f.windows[2] and layout_signature(f, 1) == before)
+	f.fail_focus = nil
+	assert(f.api.move_to_workspace(2) == true, "source focus failure left transfer guard set")
+	f.consistent()
+end
+
+function tests.desktop_move_empty_source_does_not_choose_a_foreign_history_window()
+	local f = fixture()
+	f.open(4, 2); f.open(5, 2); f.open(1, 1)
+	assert(f.api.move_to_workspace(2) == true)
+	assert(#f.focus_calls == 1 and f.focus_calls[1] == 1)
+	hl.dispatch(hl.dsp.focus({ workspace = 1 }))
+	assert(f.active_ws.id == 1 and not f.active)
+	f.consistent()
 end
 
 function tests.desktop_move_pending_preselection_overrides_saved_slot()
