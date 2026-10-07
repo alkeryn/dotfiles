@@ -1,4 +1,4 @@
--- Held-button pointer moves, without Hyprland's temporary floating tile.
+-- Held-button pointer moves/resizes, without Hyprland's temporary floating tile.
 -- v0.56.2 exposes cursor queries/timers but no Lua pointer-motion event.
 -- Sample only during a grab, at bspwm's default pointer_motion_interval (17ms).
 local M = {}
@@ -44,19 +44,22 @@ local function pointer_window(pos, monitor)
 	return best
 end
 
-function M.new(layout)
-	local grabbed, timer, last_pos
+function M.new(layout, action)
+	local resizing = action == "resize"
+	local grabbed, timer, last_pos, resize_grab
 	local native_active = false
-	local native_drag = hl.dsp.window.drag()
+	local native_drag = resizing and hl.dsp.window.resize() or hl.dsp.window.drag()
 	local drag = {}
 
 	function drag.stop()
-		grabbed, last_pos = nil, nil
+		grabbed, last_pos, resize_grab = nil, nil, nil
 		if timer then timer:set_enabled(false) end
 	end
 
 	local function motion()
-		if not grabbed or not layout.drag_valid(grabbed) or not hl.get_active_window() then
+		local active = hl.get_active_window()
+		if not grabbed or not layout.drag_valid(grabbed) or not active
+			or (resizing and (active.stable_id ~= grabbed.stable_id or grabbed.workspace.id ~= resize_grab.workspace_id)) then
 			drag.stop()
 			return
 		end
@@ -66,7 +69,11 @@ function M.new(layout)
 			return
 		end
 		if last_pos and pos.x == last_pos.x and pos.y == last_pos.y then return end
-		last_pos = pos
+		last_pos = { x = pos.x, y = pos.y }
+		if resizing then
+			if not layout.resize_motion(grabbed, resize_grab, pos) then drag.stop() end
+			return -- resizing never swaps or transfers the grabbed window
+		end
 		local source_monitor = grabbed.workspace.monitor
 		if source_monitor and source_monitor.id ~= monitor.id then
 			local dest = monitor.active_special_workspace or monitor.active_workspace
@@ -77,6 +84,20 @@ function M.new(layout)
 		if hovered and hovered.stable_id ~= grabbed.stable_id and layout.drag_valid(hovered) then
 			if not layout.drag_swap(grabbed, hovered) then drag.stop() end
 		end
+	end
+
+	local function sample()
+		local ok, err = pcall(motion)
+		if not ok then
+			drag.stop()
+			print("bspwm pointer " .. (resizing and "resize" or "drag") .. ": " .. tostring(err))
+		end
+	end
+
+	function drag.release()
+		-- Commit motion since the last timer tick, even on a quick release.
+		if resizing and grabbed then sample() end
+		drag.stop()
 	end
 
 	function drag.begin()
@@ -100,15 +121,14 @@ function M.new(layout)
 		if not layout.drag_valid(w) then return end
 		-- Grab the window under the pointer, not the keyboard-focused window.
 		hl.dispatch(hl.dsp.focus({ window = w }))
-		grabbed, last_pos = w, pos
+		if resizing then
+			if not w.active then return end
+			resize_grab = layout.resize_begin(w, pos)
+			if not resize_grab then return end
+		end
+		grabbed, last_pos = w, { x = pos.x, y = pos.y }
 		if not timer then
-			timer = hl.timer(function()
-				local ok, err = pcall(motion)
-				if not ok then
-					drag.stop()
-					print("bspwm pointer drag: " .. tostring(err))
-				end
-			end, { timeout = MOTION_INTERVAL_MS, type = "repeat" })
+			timer = hl.timer(sample, { timeout = MOTION_INTERVAL_MS, type = "repeat" })
 			hl.on("window.close", function(closed)
 				if grabbed and closed and closed.stable_id == grabbed.stable_id then drag.stop() end
 			end)

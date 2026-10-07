@@ -10,13 +10,13 @@
 --   * transplant (-n @/), global history-based send/pull (super+y)
 --   * selected-subtree desktop transfers (-d --follow)
 --   * directional subtree swap, leaf move, subtree edge grow/shrink
---   * tiled pointer swaps during Super-drag (input in bspwm_drag.lua)
+--   * tiled pointer swaps and corner resizing (input in bspwm_drag.lua)
 --   * cross-layer directional focus, node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
 --   * vacant floating leaves retain their original splits when tiled again
 --
 -- NOT implemented (see discussion):
---   * mouse border-drag resize (use the grow/shrink binds)
+--   * unmodified border-drag resize (use Super + right drag)
 --   * pseudo_tiled (use stock hl.dsp.window.pseudo)
 --
 -- layout_msg commands (via hl.dsp.layout("...")):
@@ -25,6 +25,7 @@
 --   preselect cancel | preselect clear
 --   swap <l|r|u|d>          move <l|r|u|d>
 --   pointer_swap <source stable_id> <target stable_id> (decimal, same workspace)
+--   pointer_resize <stable_id> <l|r> <ratio> <u|d> <ratio> (grabbed leaf, -1 = no fence)
 --   grow <l|r|u|d> <px>     shrink <l|r|u|d> <px>
 --   rotate <90|270>         flip <h|v>
 --   balance                 equalize
@@ -685,6 +686,23 @@ local layout_impl = {
 			if target and swap_nodes(st, source, target) then clear_selection(st) end
 			return true
 
+		elseif cmd == "pointer_resize" then
+			if rehydrating or transferring or st.mode ~= "tiled" or not fw.active
+				or tonumber(parts[2]) ~= fid or fw.floating or fw.hidden or fw.group
+				or (fw.fullscreen or 0) ~= 0 then return true end
+			-- Mouse gestures always target the grabbed leaf, not a keyboard
+			-- subtree selection. Both axes commit in one layout recalculation.
+			for i = 3, 5, 2 do
+				local dir, ratio = parts[i], tonumber(parts[i + 1])
+				if (dir == "l" or dir == "r" or dir == "u" or dir == "d")
+					and ratio and ratio >= 0.1 and ratio <= 0.9 then
+					local fence = tree.resize_fence(st, fid, dir)
+					if fence then fence.ratio = ratio end
+				end
+			end
+			clear_selection(st)
+			return true
+
 		elseif cmd == "swap" then
 			if rehydrating or transferring or not fw.active or fw.floating or fw.hidden then return true end
 			local nid = neighbor_id(st, node, parts[2] or "r")
@@ -1170,6 +1188,64 @@ function M.drag_valid(w)
 		and not w.hidden and w.visible ~= false and not w.group and (w.fullscreen or 0) == 0
 		and ws.visible ~= false and (ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b")
 		and st.mode == "tiled" and find_path(st.tree, w.stable_id) ~= nil
+end
+
+-- The native Lua layout bridge's resizeTarget() only recalculates: it never
+-- forwards the corner/delta to Lua. Snapshot the two visible fences ourselves.
+function M.resize_begin(w, pos)
+	if not M.drag_valid(w) or not w.at or not w.size then return nil end
+	local st = states[w.workspace.id]
+	local path = find_path(st.tree, w.stable_id)
+	local box = st.tree._box
+	if not box then return nil end
+	local grab = {
+		workspace_id = w.workspace.id, leaf = path[#path],
+		origin = { x = pos.x, y = pos.y },
+		area = { x = box.x, y = box.y, w = box.w, h = box.h }, fences = {},
+	}
+	local directions = {
+		pos.x < w.at.x + w.size.x / 2 and "l" or "r",
+		pos.y < w.at.y + w.size.y / 2 and "u" or "d",
+	}
+	for i, dir in ipairs(directions) do
+		local node = tree.resize_fence(st, w.stable_id, dir)
+		grab.fences[i] = { dir = dir, node = node }
+		if node then
+			local fence = grab.fences[i]
+			fence.a, fence.b, fence.axis, fence.ratio = node.a, node.b, node.axis, node.ratio
+			fence.span = i == 1 and node._box.w or node._box.h
+		end
+	end
+	return grab
+end
+
+function M.resize_motion(w, grab, pos)
+	if not grab or not M.drag_valid(w) or not w.active or w.workspace.id ~= grab.workspace_id then return false end
+	local st = states[w.workspace.id]
+	local path = find_path(st.tree, w.stable_id)
+	if path[#path] ~= grab.leaf then return false end
+	local box, area = st.tree._box, grab.area
+	if not box or box.x ~= area.x or box.y ~= area.y or box.w ~= area.w or box.h ~= area.h then return false end
+	local ratios, changed = {}, false
+	for i, fence in ipairs(grab.fences) do
+		local node = tree.resize_fence(st, w.stable_id, fence.dir)
+		-- Stop if topology/vacancy changed; never resize a replacement split.
+		if node ~= fence.node then return false end
+		ratios[i] = -1
+		if node then
+			local span = i == 1 and node._box.w or node._box.h
+			if node.a ~= fence.a or node.b ~= fence.b or node.axis ~= fence.axis or span ~= fence.span then return false end
+			local delta = i == 1 and (pos.x - grab.origin.x) or (pos.y - grab.origin.y)
+			-- Absolute displacement avoids rounding drift and keeps the original
+			-- corner pinned when crossing the centre or reaching a ratio limit.
+			ratios[i] = math.min(0.9, math.max(0.1, fence.ratio + delta / math.max(fence.span, 1)))
+			changed = changed or ratios[i] ~= node.ratio
+		end
+	end
+	if not changed then return true end
+	local result = hl.dispatch(hl.dsp.layout(string.format("pointer_resize %d %s %.17g %s %.17g",
+		w.stable_id, grab.fences[1].dir, ratios[1], grab.fences[2].dir, ratios[2])))
+	return not result or result.ok ~= false
 end
 
 function M.drag_swap(w, other)

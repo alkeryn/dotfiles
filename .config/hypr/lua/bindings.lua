@@ -236,8 +236,14 @@ hl.bind("SUPER + KP_Insert",     hl.dsp.exec_cmd("pkill paplay"), { repeating = 
 
 -- bspwm pointer move: tiles swap on hover while held; floats move normally.
 -- Do NOT use native window.drag for tiles: it floats/removes them until drop.
-local pointer_drag = require("lua/extensions/bspwm_drag").new(require("lua/extensions/bspwm"))
-hl.bind("SUPER + mouse:272", pointer_drag.begin)
+local pointer_input = require("lua/extensions/bspwm_drag")
+local pointer_layout = require("lua/extensions/bspwm")
+local pointer_drag = pointer_input.new(pointer_layout)
+local pointer_resize = pointer_input.new(pointer_layout, "resize")
+hl.bind("SUPER + mouse:272", function() pointer_resize.stop(); pointer_drag.begin() end)
+-- Native resizeTarget discards mouse deltas for Lua layouts in v0.56.2.
+-- Resize the tile's grabbed corner directly; floats retain native resizing.
+hl.bind("SUPER + mouse:273", function() pointer_drag.stop(); pointer_resize.begin() end)
 -- A release must end the grab even if Super went up first, another modifier
 -- was pressed, an inhibitor appeared, or the submap/lock state changed. This
 -- observer does not consume ordinary clicks or interfere with native drags.
@@ -245,9 +251,12 @@ hl.bind("mouse:272", pointer_drag.stop, {
 	release = true, ignore_mods = true, non_consuming = true, transparent = true,
 	locked = true, dont_inhibit = true, submap_universal = true,
 })
--- Explicit native move override and resize retain their previous behavior.
+hl.bind("mouse:273", pointer_resize.release, {
+	release = true, ignore_mods = true, non_consuming = true, transparent = true,
+	locked = true, dont_inhibit = true, submap_universal = true,
+})
+-- Explicit native move override retains its previous behavior.
 hl.bind("SUPER + CTRL + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind("SUPER + mouse:273",     hl.dsp.window.resize(), { mouse = true })
 
 -- mouse scroll workspace nav (from previous attempt)
 hl.bind("SUPER + mouse_down",    hl.dsp.focus({ workspace = "e+1" }))

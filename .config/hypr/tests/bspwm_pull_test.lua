@@ -1309,7 +1309,7 @@ end
 -- native-layout fixture. No desktop, IPC polling process or physical mouse.
 local function pointer_fixture()
 	local f = fixture()
-	f.layers, f.timers, f.native_drags = {}, {}, 0
+	f.layers, f.timers, f.native_drags, f.native_resizes = {}, {}, 0, 0
 	hl.get_cursor_pos = function() return f.pos end
 	hl.get_monitor_at_cursor = function() return f.pointer_monitor end
 	hl.get_layers = function() return f.layers end
@@ -1321,6 +1321,7 @@ local function pointer_fixture()
 		return timer
 	end
 	hl.dsp.window.drag = function() return function() f.native_drags = f.native_drags + 1 end end
+	hl.dsp.window.resize = function() return function() f.native_resizes = f.native_resizes + 1 end end
 	f.helpers()
 	package.loaded["lua/bindings"] = nil
 	require("lua/bindings")
@@ -1333,6 +1334,8 @@ local function pointer_fixture()
 	end
 	function f.start() f.binds["SUPER + mouse:272"]() end
 	function f.release() f.binds["mouse:272"]() end
+	function f.resize_start() f.binds["SUPER + mouse:273"]() end
+	function f.resize_release() f.binds["mouse:273"]() end
 	return f
 end
 
@@ -1497,6 +1500,214 @@ function tests.pointer_failed_native_transfer_stops_and_releases_layout_guard()
 		assert(f.api.drag_valid(f.windows[1]), "transfer guard must be released")
 		f.recalculate(1); f.recalculate(2); f.consistent()
 	end
+end
+
+-- Resize input must bypass the native Lua bridge, which discards its delta.
+function tests.pointer_resize_all_four_corners_target_hovered_leaf()
+	local cases = {
+		{ id = 1, x = 700, y = 350, bx = 0, by = 0, w = 880, h = 495 },
+		{ id = 2, x = 900, y = 350, bx = 880, by = 0, w = 720, h = 495 },
+		{ id = 3, x = 900, y = 550, bx = 880, by = 495, w = 720, h = 405 },
+		{ id = 4, x = 700, y = 550, bx = 0, by = 495, w = 880, h = 405 },
+	}
+	for _, c in ipairs(cases) do
+		local f = pointer_fixture()
+		f.open(1); f.open(2); f.open(3); f.focus(1); f.open(4)
+		f.focus(c.id == 4 and 1 or 4)
+		local root, leaf = f.states[1].tree, f.leaf(c.id)
+		f.point(c.x, c.y); f.resize_start()
+		assert(f.active.stable_id == c.id, "resize must grab the hovered, not focused tile")
+		f.point(c.x + 80, c.y + 45); f.tick()
+		local box = f.box(c.id)
+		assert(box.x == c.bx and box.y == c.by and box.w == c.w and box.h == c.h, "wrong corner: " .. c.id)
+		assert(f.states[1].tree == root and f.leaf(c.id) == leaf)
+		assert(f.native_resizes == 0 and f.native_drags == 0 and #f.moves == 0)
+		for _, w in pairs(f.windows) do assert(not w.floating) end
+		f.resize_release(); f.consistent()
+	end
+end
+
+function tests.pointer_resize_uses_leaf_not_selected_subtree_and_preserves_metadata()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.open(3)
+	f.presel(2, "l", 0.3); f.focus(2); f.message("focus parent")
+	assert(f.states[1].selected)
+	local leaf = f.leaf(2)
+	f.point(900, 350); f.resize_start()
+	f.point(980, 395); f.tick()
+	assert(f.box(2).w == 720 and f.box(2).h == 495)
+	assert(not f.states[1].selected and f.leaf(2) == leaf and leaf.presel.ratio == 0.3)
+	f.resize_release()
+end
+
+function tests.pointer_resize_ancestor_fence_and_outer_edges()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.presel(2, "r"); f.open(3)
+	f.point(850, 100); f.resize_start() -- middle tile's left edge belongs to root
+	f.point(1010, 300); f.tick()
+	assert(f.box(1).w == 960 and f.box(2).x == 960 and f.box(2).w == 320)
+	assert(f.box(2).h == 900, "top screen edge must not resize another fence")
+	f.resize_release()
+	f.point(1590, 890); f.resize_start() -- bottom-right outer corner
+	local before = codec.encode(f.states)
+	f.point(1400, 700); f.tick(); f.resize_release()
+	assert(codec.encode(f.states) == before, "outer edges must be no-ops")
+end
+
+function tests.pointer_resize_absolute_motion_clamps_and_returns_without_drift()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(700, 700); f.resize_start()
+	f.point(2700, 700); f.tick()
+	assert(f.box(1).w == 1440)
+	f.point(2600, 700); f.tick()
+	assert(f.box(1).w == 1440, "ratio must stay clamped until cursor returns within range")
+	f.point(-2000, 700); f.tick()
+	assert(f.box(1).w == 160)
+	f.point(700, 700); f.tick()
+	assert(f.box(1).w == 800)
+	for i = 1, 800 do f.point(700 + i / 10, 700); f.tick() end
+	assert(f.box(1).w == 880, "fractional motion must not accumulate rounding drift")
+	f.point(700, 700); f.tick()
+	assert(f.box(1).w == 800, "corner must not change when pointer crosses tile centre")
+	f.resize_release()
+end
+
+function tests.pointer_resize_release_flushes_last_motion_and_checkpoint_survives_reload()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(700, 700); f.resize_start()
+	f.point(780, 700); f.resize_release() -- no timer tick
+	assert(f.box(1).w == 880 and not f.timers[1].enabled)
+	local after = codec.encode(f.states)
+	f.point(1000, 700); f.tick(); f.resize_release()
+	assert(codec.encode(f.states) == after)
+	f.load(after)
+	assert(codec.encode(f.states) == after and f.box(1).w == 880)
+end
+
+function tests.pointer_resize_no_idle_recalculation_and_timer_reused()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(700, 700); f.resize_start()
+	local original_layout, calls = hl.dsp.layout, 0
+	hl.dsp.layout = function(msg) calls = calls + 1; return original_layout(msg) end
+	for _ = 1, 10 do f.tick() end
+	assert(calls == 0)
+	f.point(780, 700); f.tick()
+	assert(calls == 1)
+	for _ = 1, 10 do f.tick() end
+	assert(calls == 1)
+	f.resize_release(); f.resize_start()
+	assert(#f.timers == 1 and f.timers[1].enabled)
+end
+
+function tests.pointer_resize_native_floats_and_other_layouts_keep_release_pairing()
+	for _, floating in ipairs({ false, true }) do
+		local f = pointer_fixture()
+		local w = f.open(1, 1, floating)
+		w.at, w.size = { x = 0, y = 0 }, { x = 500, y = 500 }
+		if not floating then w.workspace.tiled_layout = "dwindle" end
+		f.point(200, 200); f.resize_start()
+		assert(f.native_resizes == 1 and #f.timers == 0)
+		f.resize_release(); f.resize_start() -- native releasePending callback
+		assert(f.native_resizes == 2 and #f.timers == 0)
+		f.resize_start(); f.resize_start(); f.resize_release()
+		assert(f.native_resizes == 4 and f.native_drags == 0)
+	end
+end
+
+function tests.pointer_resize_layers_empty_space_and_feedback_hit_testing()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(1700, 700); f.resize_start()
+	assert(#f.timers == 0)
+	f.layers = { { mapped = true, layer = 3, namespace = "launcher", x = 600, y = 600, w = 200, h = 200 } }
+	f.point(700, 700); f.resize_start()
+	assert(#f.timers == 0)
+	f.layers[1].namespace = "bspwm-presel-feedback"
+	f.resize_start(); f.point(780, 700); f.tick()
+	assert(f.box(1).w == 880)
+end
+
+function tests.pointer_resize_invalid_sources_and_failed_focus_do_not_start()
+	for _, prop in ipairs({ "fullscreen", "group", "monocle", "fail_focus" }) do
+		local f = pointer_fixture()
+		local w = f.open(1); f.open(2)
+		if prop == "monocle" then f.message("monocle")
+		elseif prop == "fail_focus" then f.fail_focus = true
+		else w[prop] = prop == "fullscreen" and 2 or {} end
+		f.point(700, 700); f.resize_start()
+		assert(#f.timers == 0 and f.native_resizes == 0, prop)
+	end
+end
+
+function tests.pointer_resize_cancels_when_grab_becomes_invalid()
+	for _, prop in ipairs({ "floating", "hidden", "fullscreen", "group", "mapped", "visible", "workspace", "focus", "area", "topology" }) do
+		local f = pointer_fixture()
+		local w = f.open(1); f.open(2)
+		f.point(700, 700); f.resize_start()
+		if prop == "focus" then f.focus(2)
+		elseif prop == "workspace" then w.workspace = f.workspace(2)
+		elseif prop == "area" then f.contexts[1].area.w = 1800; f.recalculate(1)
+		elseif prop == "topology" then f.message("focus parent"); f.message("rotate 90")
+		else w[prop] = ({ floating = true, hidden = true, fullscreen = 2, group = {}, mapped = false, visible = false })[prop] end
+		local before = codec.encode(f.states)
+		f.point(780, 700); f.tick()
+		assert(not f.timers[1].enabled and codec.encode(f.states) == before, prop)
+	end
+end
+
+function tests.pointer_resize_cancels_on_close_reload_submap_monitor_and_shutdown()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	for _, event in ipairs({ "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }) do
+		f.point(700, 700); f.resize_start()
+		assert(#f.timers == 1 and f.timers[1].enabled)
+		f.emit(event)
+		assert(not f.timers[1].enabled)
+	end
+	f.resize_start(); f.emit("window.close", f.windows[2]); assert(f.timers[1].enabled)
+	f.emit("window.close", f.windows[1]); assert(not f.timers[1].enabled)
+end
+
+function tests.pointer_resize_never_transfers_or_swaps_across_monitors()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.open(3, 2)
+	local before = codec.encode({ [2] = f.states[2] })
+	f.point(700, 700); f.resize_start()
+	f.point(2100, 700, f.workspaces[2].monitor); f.tick()
+	assert(f.windows[1].workspace.id == 1 and #f.moves == 0 and f.box(1).w == 1440)
+	assert(codec.encode({ [2] = f.states[2] }) == before)
+	f.resize_release(); f.consistent()
+end
+
+function tests.pointer_resize_skips_vacant_fences_and_stops_if_owner_changes()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.presel(2, "r"); f.open(3)
+	local dormant = f.states[1].tree.b
+	table.remove(f.contexts[1].targets, 2)
+	f.windows[2].floating = true
+	f.windows[2].at, f.windows[2].size = { x = 10, y = 10 }, { x = 100, y = 100 }
+	f.recalculate(1)
+	f.point(900, 700); f.resize_start()
+	f.point(1060, 700); f.tick()
+	assert(f.box(1).w == 960 and f.box(3).w == 640 and dormant.ratio == 0.5)
+	f.windows[1].floating = true
+	f.recalculate(1)
+	local before = codec.encode(f.states)
+	f.point(1100, 700); f.tick()
+	assert(not f.timers[1].enabled and codec.encode(f.states) == before)
+end
+
+function tests.pointer_move_and_resize_grabs_are_mutually_exclusive()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(700, 700); f.start(); f.resize_start()
+	assert(#f.timers == 2 and not f.timers[1].enabled and f.timers[2].enabled)
+	f.point(780, 700); f.tick(); assert(f.box(1).w == 880)
+	f.start()
+	assert(f.timers[1].enabled and not f.timers[2].enabled)
 end
 
 local names, failures = {}, 0

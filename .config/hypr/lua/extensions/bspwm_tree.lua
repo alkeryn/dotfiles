@@ -180,11 +180,11 @@ function M.swap_nodes(state, source, target)
 	return true
 end
 
--- Only splits OWNING the requested edge are resized: first-child east/south
--- or second-child west/north. Other splits are skipped on the way to the root.
-function M.resize(state, target, direction, delta)
+-- Find the split OWNING an edge: first-child east/south or second-child
+-- west/north. Skip invisible (vacant) splits and ancestors on the wrong side.
+function M.resize_fence(state, target, direction)
 	local path = M.find_path(state.tree, target)
-	if not path or #path < 2 then return false end
+	if not path or #path < 2 then return nil end
 	local axis = (direction == "l" or direction == "r") and "h" or "v"
 	for i = #path - 1, 1, -1 do
 		local parent, child = path[i], path[i + 1]
@@ -192,16 +192,19 @@ function M.resize(state, target, direction, delta)
 			local is_first = parent.a == child
 			local owns_edge = (is_first and (direction == "r" or direction == "d"))
 				or (not is_first and (direction == "l" or direction == "u"))
-			if owns_edge then
-				local dimension = axis == "h" and parent._box.w or parent._box.h
-				local ratio_delta = math.abs(delta) / math.max(dimension, 1)
-				local sign = ((delta >= 0) == is_first) and 1 or -1
-				parent.ratio = math.min(0.9, math.max(0.1, parent.ratio + sign * ratio_delta))
-				return true
-			end
+			if owns_edge then return parent end
 		end
 	end
-	return false
+	return nil
+end
+
+function M.resize(state, target, direction, delta)
+	local fence = M.resize_fence(state, target, direction)
+	if not fence then return false end
+	local dimension = fence.axis == "h" and fence._box.w or fence._box.h
+	local sign = (direction == "r" or direction == "d") and 1 or -1
+	fence.ratio = math.min(0.9, math.max(0.1, fence.ratio + sign * delta / math.max(dimension, 1)))
+	return true
 end
 
 function M.parent_or_root(state, target)
