@@ -21,8 +21,8 @@ local FLOAT_STEP = vars.FLOAT_STEP
 local terminal   = vars.terminal
 
 -- Screenshot (maim/scrot -> grim/slurp)
-hl.bind("SUPER + Print",          hl.dsp.exec_cmd("grim -g \"$(slurp -b 50000055 -c bb0000)\" - | wl-copy"), { repeating = true })
-hl.bind("SUPER + SHIFT + Print",  hl.dsp.exec_cmd("grim -g \"$(slurp -b 50000055 -c bb0000)\" ~/Images/scrot/$(date +%Y%m%d_%H%M%S).png"), { repeating = true })
+hl.bind("SUPER + Print",          hl.dsp.exec_cmd("grim -g \"$(slurp -b ff000000 -c ff0000)\" - | wl-copy"), { repeating = true })
+hl.bind("SUPER + SHIFT + Print",  hl.dsp.exec_cmd("grim -g \"$(slurp -b ff000000 -c ff0000)\" ~/Images/scrot/$(date +%Y%m%d_%H%M%S).png"), { repeating = true })
 hl.bind("SUPER + CTRL + Print",   hl.dsp.exec_cmd("grim ~/Images/scrot/$(date +%Y%m%d_%H%M%S).png"), { repeating = true })
 
 -- pipe clipboard (xclip socket -> cliphist; adapted)
