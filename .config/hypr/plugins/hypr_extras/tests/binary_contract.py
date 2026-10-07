@@ -70,3 +70,23 @@ assert len(unlock_callbacks) == 1, "normal-unlock callback changed or debug symb
 unlock_assembly = disassemble(unlock_callbacks[0])
 assert unlock_assembly.index("CSignalBase::emitInternal") < unlock_assembly.index("<" + refocus + ">")
 print("PASS installed-binary close/unlock call sites, inline coverage and explicit window focus")
+
+# The geometry hook must see the predicted size AFTER setSize writes it, and
+# BEFORE the native deferred configure is queued. These calls may not be inlined
+# away on an upgraded build. We do not hook the predicted layout itself.
+schedule = "CXDGToplevelResource::scheduleStateApplication()"
+set_size = "CXDGToplevelResource::setSize(Hyprutils::Math::Vector2D const&)"
+surface_schedule = "CXDGSurfaceResource::scheduleConfigure()"
+set_size_calls = calls(set_size)
+assert set_size_calls.count(schedule) == 1
+assert set_size_calls.count(surface_schedule) == 1
+assert set_size_calls.index(schedule) < set_size_calls.index(surface_schedule)
+assert calls("Desktop::View::CWindow::commitWindow()").count(set_size) == 1
+assert calls("Desktop::View::CWindow::sendWindowSize(bool)").count(set_size) == 1
+for setter in ("setMaximized", "setFullscreen", "setActive", "setResizing"):
+    assert calls(f"CXDGToplevelResource::{setter}(bool)").count(schedule) == 1, f"{setter} bypasses geometry hook"
+# setSuspeneded inlines scheduling in this binary. It only changes SUSPENDED,
+# not size/tiling; leave it native. Floating changes force the setSize path.
+assert set_size not in calls("CXDGToplevelResource::setSuspeneded(bool)")
+assert any(name.startswith("CEventLoopManager::doLaterLock(") for name in calls(schedule))
+print("PASS installed-binary initial-size/state scheduling hook and native configure/ack paths")

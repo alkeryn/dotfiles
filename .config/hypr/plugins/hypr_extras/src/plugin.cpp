@@ -1,4 +1,5 @@
 #include "focus.hpp"
+#include "geometry.hpp"
 
 #include <stdexcept>
 #include <string_view>
@@ -19,15 +20,18 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     try {
         // Add future modules here, sharing only hook ownership and the ABI check.
         extras::focus::init(handle, registry);
+        extras::geometry::init(handle, registry);
     } catch (...) {
         registry.clear();
+        extras::geometry::reset();
         extras::focus::reset();
         throw;
     }
-    return {"hypr_extras", "Small native extensions for alkeryn's Hyprland config", "alkeryn", "0.2.0"};
+    return {"hypr_extras", "Small native extensions for alkeryn's Hyprland config", "alkeryn", "0.3.0"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
     registry.clear();
+    extras::geometry::reset();
     extras::focus::reset();
 }

@@ -2,8 +2,9 @@
 
 A small native home for changes that the Lua config cannot make. No daemon,
 plugin framework, polling, or extra config language. Currently: the focus fix
-from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998), plus
-restoring the pre-lock window and monitor after session unlock (v0.2.0).
+from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998),
+restoring the pre-lock window and monitor after session unlock, and preserving
+application-chosen initial floating dimensions (v0.3.0).
 
 **Automatic first builds, loading, and changed-binary reloading are enabled.**
 Startup or `hyprctl reload` builds a missing library; existing binaries are not
@@ -156,6 +157,8 @@ next to their original `.so` need their own packaging.
 installation, lookup and rollback; `src/focus.cpp` contains the feature. To add a
 future change, add its source to CMake and call its `init`/cleanup from the entry
 point. Keep feature policy out of `hooks.*`. No module discovery machinery needed.
+`src/geometry.cpp` owns the initial-size/protocol-state feature, with its small
+state policy in `src/geometry_policy.hpp`.
 
 The focus module uses three native hooks:
 
@@ -191,6 +194,77 @@ It does not add the separate `movetoworkspacesilent` fix discussed in the PR's
 comments, nor globally ban all automatic refocusing. In particular, selecting a
 window with `focus_on_close = 1` is still native behavior; this config uses `2`.
 
+## Initial floating dimensions (v0.3.0)
+
+bspwm saves the client's original X11 rectangle before arranging its tile.
+Hyprland already has equivalent **size** storage (`rememberFloatingSize` in
+`CLayoutManager::newTarget`), but its initial Wayland configure can replace the
+client's natural size with the layout's prediction. The Lua layout predicts the
+whole work area. In addition, v0.56.2 unconditionally advertises all four tiled
+edges, even for floats. Alacritty 0.17 / winit 0.30 then ignores Alacritty's
+post-creation request for the configured 81x24-cell grid, leaving either winit's
+800x600 default or the compositor's predicted work-area size.
+
+The geometry module adds **one** native hook,
+`CXDGToplevelResource::scheduleStateApplication()`:
+
+- During an ordinary initial configure, after `setSize` has written its
+  prediction but before anything is sent, replace it with `0x0` (client chooses)
+  and remove tiled-edge states. Explicit fullscreen/maximized states are not
+  removed and their requested configure sizes are not changed.
+- Subsequent configures retain native sizes. Tiled edges are present for mapped
+  tiled windows, absent for floating/unmapped windows. Other states, including
+  Hyprland's separate post-map MAXIMIZED hint for CSD suppression, stay native.
+- The first committed client geometry is saved by the **existing native**
+  layout manager before arranging the actual tile. No temporary float-then-tile
+  dispatcher, second size cache, app-class table, font formula or delayed resize.
+- A floating-state event forces native `sendWindowSize(true)` after placement,
+  covering equal-size transitions. Native serial/ack bookkeeping, size rules,
+  min/max limits and subsequent user resizing remain authoritative.
+
+The hook runs even when native scheduling is already coalesced: the queued
+callback reads the final pending state. No wire events or serials are generated
+by the hook itself. `setSuspeneded` inlines scheduling in this binary, but changes
+neither geometry nor tiled edges; it stays native.
+
+Weak toplevel records remember whether the constructor advertised tiled edges
+(protocol v2+), so v1 clients never receive unsupported states. Expired records
+are retired on configure, and do not retain windows. Unload restores the native
+unconditional tiled hints without changing geometry; floating listeners are
+removed before cleanup. Hooks are revision/ABI-guarded and share the existing
+reverse-order rollback path.
+
+### Scope and live checks
+
+This is a **new-window** fix. Already-open tiled windows with incorrect saved
+sizes cannot have their original natural size recovered: reopen them, or resize
+them once while floating. XWayland and `xdg_popup` are untouched. Native
+positioning, constraints, persistent-size overrides and the small equal-size
+floating-toggle nudge are unchanged. Applications/toolkits can still choose
+different defaults under Wayland and X11. Font/DPI settings are intentionally
+not changed; at scale 1, the existing Alacritty 11pt override is only an
+approximation of 9pt at Xft.dpi=120.
+
+After building, reload **while unlocked** and verify `hyprctl plugin list` shows
+`hypr_extras` v0.3.0. Prefer the disposable-session procedure above. Open **new**
+windows for all checks:
+
+1. Open Alacritty directly floating, then separately tiled and switch it to
+   floating (`Super+d`). On the same output with the same font/config, their
+   client dimensions should agree, rather than 800x600 versus a work-area size.
+   Use `hyprctl -j activewindow` / `hyprctl -j clients` to inspect `size`; do not
+   compare animated intermediate frames or count borders as client pixels.
+2. Change the terminal's configured columns/lines and open another float: its
+   initial dimensions should follow the grid. `alacritty -vv` logs cell metrics
+   and initial dimensions. Repeat with another native Wayland application.
+3. Resize a float manually, tile it (`Super+s`), float it again: it must retain
+   the manual size. Test multiple windows, workspaces and outputs.
+4. Exercise explicit floating `size` rules, size-limited dialogs, fullscreen and
+   maximized transitions, and ordinary XWayland clients. None should be forced
+   to a generic terminal size or have their fullscreen requests suppressed.
+5. Reload/unload/reload the plugin with windows open; close windows before
+   unloading too. Existing sizes must not be reset. Recheck close/unlock focus.
+
 ## Validation status
 
 - Clang build succeeds; the actual `.so` loads into the isolated test executable.
@@ -208,6 +282,17 @@ window with `focus_on_close = 1` is still native behavior; this config uses `2`.
   cover missing/existing outputs, Clang selection, failed-build retry, deduplicated
   jobs, cross-session builds and exact-instance reloads. A real clean first-use
   build also passed, using a stub reload command rather than a live compositor.
+- Geometry: Release and ASan/UBSan builds pass. The state-policy cross product
+  covers initial/later, mapped/unmapped, tiled/floating, protocol v1/v2,
+  fullscreen/maximized and unrelated states, plus repeated/coalesced calls. A
+  lifecycle model covers first-map size capture and manual float-size retention.
+  The real plugin harness covers the new hook's orphan-resource forwarding,
+  missing/ambiguous symbols, fourth-hook install failure, reverse unload and
+  listener cleanup. Installed-executable checks verify that initial-size,
+  resize, activation and covering-state setters reach the scheduling hook.
+  These are mocks/policy tests, **not an end-to-end Wayland size negotiation**.
+  All 43 config Python tests, all Lua suites under Lua and LuaJIT, and isolated
+  config verification also pass with v0.3.0 sources.
 - **Real trampoline installation and desktop behavior still need a live test.**
   The disposable headless attempt in this sandbox aborted at
   `CBackend::create() failed!`, before plugin initialization. Neither the actual
