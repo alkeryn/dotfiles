@@ -38,7 +38,7 @@ Both axes use displacement from the original pointer position, with the existing
 mid-drag. Crossing monitors during **resize** does not transfer the window.
 The right-button release observer commits any motion since the last timer tick,
 then stops even if Super was released first. Resize and move grabs are mutually
-exclusive. Floating windows and non-bspwm layouts retain native mouse resizing.
+exclusive. Floating windows, pseudo tiles and non-bspwm layouts retain native mouse resizing.
 Reloads, focus loss, workspace/geometry changes or invalidated split ownership
 cancel the tiled resize rather than modifying a different window or split.
 
@@ -46,12 +46,41 @@ Why the custom path is necessary: in Hyprland **v0.56.2**,
 `src/config/lua/layout/LuaLayoutProvider.cpp:CLuaTiledAlgorithm::resizeTarget`
 ignores its delta, target and corner arguments and only calls `recalculate()`.
 The Lua provider API exposes `recalculate` and `layout_msg`, but no resize
-callback. Merely binding `hl.dsp.window.resize()` therefore works on floats but
-cannot change this Lua tree. `bspwm.lua` snapshots the owning splits, then sends
+callback. Merely binding `hl.dsp.window.resize()` therefore works on floats and
+pseudo tiles but cannot change this Lua tree. `bspwm.lua` snapshots the owning splits, then sends
 both updated ratios through one `pointer_resize` layout message per motion.
 
 Unmodified border dragging remains disabled (`general.resize_on_border = false`);
 this fix is for the configured **Super + right-button** gesture.
+
+## Pseudo-tiled resizing
+
+`Super+t` keeps the client tiled, but **both** `Super+Alt+H/J/K/L` (and their
+Ctrl/shrink variants) and `Super+right drag` resize its own rectangle, not a BSP
+split. Neighbouring allocations and split ratios remain unchanged, even at the
+native minimum/maximum size. Hyprland keeps the pseudo rectangle centered and
+fits it inside its tile. `Super+s` restores ordinary split resizing. Moving a
+pseudo tile with `Super+left drag` still swaps leaves, never floats it.
+
+The distinction matters before entering the custom resize path:
+`CLayoutManager::resizeTarget` handles `ITarget::isPseudo()` and updates
+`pseudoSize()` **before** forwarding to the Lua provider. Keyboard pseudo resize
+uses explicit-window relative native deltas (no floating position correction).
+Mouse pseudo resize uses the native press/release dispatcher, with no Lua
+sampling timer. Native resize does not temporarily float the pseudo tile.
+Switching an active custom split-resize grab to pseudo mode cancels that grab.
+
+Hyprland v0.56.2 does not expose the native pseudo flag or size on Lua window or
+layout-target handles. `bspwm_pseudo.lua` mirrors the state set by the four
+window-state shortcuts in the static `bspwm_pseudo_tiled` window tag, updating it
+only after a successful pseudo dispatcher. The tag and native size survive Lua
+reloads; no new size cache/checkpoint or plugin is needed. Other state shortcuts
+remove the marker without touching unrelated tags. This tracks **config-owned**
+states, not direct external `pseudo` dispatches or independent static pseudo
+rules. Use the state shortcuts to keep routing in sync.
+
+After first installing this fix, reload and press **Super+t once** on an existing
+pseudo-tiled window to enroll it. Repeating it does not toggle or reset its size.
 
 ## Implementation constraints
 
@@ -77,6 +106,13 @@ release/cancellation, cross-monitor transfers and transfer failures. Resize case
 cover all four corners, ancestor/outer/vacant edges, both axes, ratio limits,
 fractional motion, selected-subtree isolation, quick releases, checkpoint reload,
 native fallback, timer reuse, invalidated grabs and cross-monitor non-transfer.
+Pseudo regression cases cover native routing/release pairing at all four corners,
+unchanged BSP state, invalid sources, move-vs-resize routing and mode changes.
+`tests/resize_bindings_test.lua` models native pseudo sizing/centering and checks
+all eight keyboard directions, clamping without split fall-through, reloads,
+failed dispatches and returning to ordinary tiling. `tests/window_state_bindings_test.lua`
+also checks marker lifecycle and preserved client fullscreen through all modes.
+These are mocked routing/geometry tests, not a live native mouse test.
 `lua tests/repeat_bindings_test.lua` checks the release flags and retains keyboard
 repeat and the other mouse bindings.
 

@@ -193,7 +193,8 @@ hl.bind("SUPER + CTRL + SHIFT + space",      hl.dsp.layout("preselect clear"), {
 
 -- Move/resize (bspc node -z / -v)
 -- The key specifies the direction the edge MOVES: h grows the left edge
--- outward, Ctrl+h shrinks the RIGHT edge inward. Match sxhkd on tiles AND floats.
+-- outward, Ctrl+h shrinks the RIGHT edge inward. Pseudo tiles resize their
+-- native centered client rectangle, ordinary tiles resize splits, floats keep edges.
 local resize_keys = { h = { "l", "r" }, j = { "d", "u" }, k = { "u", "d" }, l = { "r", "l" } }
 for key, edges in pairs(resize_keys) do
 	hl.bind("SUPER + ALT + " .. key,          function() helpers.resize_edge(edges[1], 20) end, { repeating = true })
@@ -242,8 +243,8 @@ local pointer_layout = require("lua/extensions/bspwm")
 local pointer_drag = pointer_input.new(pointer_layout)
 local pointer_resize = pointer_input.new(pointer_layout, "resize")
 hl.bind("SUPER + mouse:272", function() pointer_resize.stop(); pointer_drag.begin() end)
--- Native resizeTarget discards mouse deltas for Lua layouts in v0.56.2.
--- Resize the tile's grabbed corner directly; floats retain native resizing.
+-- The Lua bridge discards ordinary tile deltas in v0.56.2, so resize their
+-- split corner directly. Floats and pseudo tiles retain native resizing.
 hl.bind("SUPER + mouse:273", function() pointer_drag.stop(); pointer_resize.begin() end)
 -- A release must end the grab even if Super went up first, another modifier
 -- was pressed, an inhibitor appeared, or the submap/lock state changed. This

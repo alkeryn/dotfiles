@@ -1310,6 +1310,19 @@ end
 local function pointer_fixture()
 	local f = fixture()
 	f.layers, f.timers, f.native_drags, f.native_resizes = {}, {}, 0, 0
+	-- Older tree assertions use tag-name keys; also expose native HL.Window's
+	-- array view so real Super+t routing can be exercised without a pseudo field.
+	local native_tag = hl.dsp.window.tag
+	hl.dsp.window.tag = function(opts)
+		local apply = native_tag(opts)
+		return function()
+			local result = apply()
+			local tags, value = opts.window.tags, opts.tag:sub(2)
+			for i = #tags, 1, -1 do if tags[i] == value then table.remove(tags, i) end end
+			if opts.tag:sub(1, 1) == "+" then tags[#tags + 1] = value end
+			return result
+		end
+	end
 	hl.get_cursor_pos = function() return f.pos end
 	hl.get_monitor_at_cursor = function() return f.pointer_monitor end
 	hl.get_layers = function() return f.layers end
@@ -1614,6 +1627,76 @@ function tests.pointer_resize_native_floats_and_other_layouts_keep_release_pairi
 		assert(f.native_resizes == 2 and #f.timers == 0)
 		f.resize_start(); f.resize_start(); f.resize_release()
 		assert(f.native_resizes == 4 and f.native_drags == 0)
+	end
+end
+
+function tests.pointer_pseudo_resize_uses_native_path_without_changing_tree()
+	for _, point in ipairs({ {310, 360}, {490, 360}, {310, 540}, {490, 540} }) do
+		local f = pointer_fixture()
+		local w = f.open(1); f.open(2)
+		f.focus(1); f.binds["SUPER + t"]()
+		-- Pseudo client geometry is smaller than the allocation. Hit testing
+		-- must use it; native code owns corner selection and size/clamping.
+		w.at, w.size = { x = 300, y = 350 }, { x = 200, y = 200 }
+		f.focus(2)
+		local before = codec.encode(f.states)
+		f.point(point[1], point[2]); f.resize_start()
+		assert(f.native_resizes == 1 and #f.timers == 0, "pseudo entered split resizing")
+		f.point(point[1] + 80, point[2] + 45); f.tick()
+		assert(codec.encode(f.states) == before and #f.moves == 0 and not w.floating)
+		f.resize_release(); f.resize_start() -- native releasePending callback
+		assert(f.native_resizes == 2 and f.native_drags == 0 and #f.timers == 0)
+		f.point(point[1], point[2])
+		f.resize_start(); f.resize_start(); f.resize_release() -- opposite release order
+		assert(f.native_resizes == 4)
+	end
+end
+
+function tests.pointer_pseudo_move_still_swaps_and_tiled_resize_returns_to_fences()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.focus(1); f.binds["SUPER + t"]()
+	f.point(700, 700); f.start()
+	f.point(1000, 700); f.tick(); f.release()
+	assert(f.states[1].tree.a.id == 2 and f.native_drags == 0, "pseudo move must still swap")
+	f.binds["SUPER + s"]()
+	f.point(900, 700); f.resize_start()
+	f.point(980, 700); f.tick(); f.resize_release()
+	assert(f.box(1).x == 880 and f.box(1).w == 720 and f.native_resizes == 0)
+end
+
+function tests.pointer_pseudo_release_stays_paired_after_returning_to_tiled()
+	local f = pointer_fixture()
+	f.open(1); f.open(2); f.focus(1)
+	f.binds["SUPER + t"]()
+	f.point(700, 700); f.resize_start()
+	assert(f.native_resizes == 1)
+	f.binds["SUPER + s"]()
+	f.resize_release(); f.resize_start() -- release still belongs to native resize
+	assert(f.native_resizes == 2 and #f.timers == 0)
+	f.resize_start(); f.point(780, 700); f.tick(); f.resize_release()
+	assert(f.box(1).w == 880 and f.native_resizes == 2)
+end
+
+function tests.pointer_tiled_resize_stops_if_window_becomes_pseudo()
+	local f = pointer_fixture()
+	f.open(1); f.open(2)
+	f.point(700, 700); f.resize_start()
+	f.binds["SUPER + t"]()
+	local before = codec.encode(f.states)
+	f.point(780, 700); f.tick()
+	assert(not f.timers[1].enabled and codec.encode(f.states) == before)
+end
+
+function tests.pointer_pseudo_invalid_sources_do_not_start_native_resize()
+	for _, prop in ipairs({ "fullscreen", "group", "monocle" }) do
+		local f = pointer_fixture()
+		local w = f.open(1)
+		f.binds["SUPER + t"]()
+		if prop == "monocle" then f.message("monocle")
+		else w[prop] = prop == "fullscreen" and 2 or {} end
+		f.point(700, 700); f.resize_start()
+		assert(#f.timers == 0 and f.native_resizes == 0, prop)
 	end
 end
 

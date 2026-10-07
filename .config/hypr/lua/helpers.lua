@@ -3,6 +3,7 @@
 local vars = require("lua/vars")
 local bspwm = require("lua/extensions/bspwm")
 local fullscreen_control = require("lua/extensions/bspwm_fullscreen_policy")
+local pseudo = require("lua/extensions/bspwm_pseudo")
 local M = {}
 
 -- ---------------------------------------------------------------------------
@@ -25,7 +26,7 @@ function M.set_window_state(state)
 	if not fullscreen or window.floating then
 		if not set_fullscreen_mode(0) then return end
 	end
-	hl.dispatch(hl.dsp.window.pseudo({ action = state == "pseudo_tiled" and "on" or "off", window = window }))
+	if not pseudo.set(window, state == "pseudo_tiled") then return end
 	local result = bspwm.set_floating(window, state == "floating")
 	if (result and result.ok == false) or window.mapped == false then return end
 	-- Reattach the saved client mode to the destination handler, including 0/2.
@@ -88,6 +89,19 @@ end
 function M.resize_edge(edge, delta)
 	local window = hl.get_active_window()
 	if not window or window.mapped == false or (window.fullscreen or 0) ~= 0 then return end
+
+	if not window.floating and pseudo.is_pseudo(window) then
+		-- Native resizeTarget handles pseudoSize BEFORE calling the Lua layout.
+		-- Keep its centering/clamping; do not move the client or its BSP fences.
+		local horizontal = edge == "l" or edge == "r"
+		hl.dispatch(hl.dsp.window.resize({
+			x = horizontal and delta or 0,
+			y = horizontal and 0 or delta,
+			relative = true,
+			window = window,
+		}))
+		return
+	end
 
 	if not window.floating then
 		local command = delta >= 0 and "grow" or "shrink"

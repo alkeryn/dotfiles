@@ -75,9 +75,16 @@ local function fixture()
 	end
 	function window_dsp.tag(opts)
 		return dispatcher("tag", opts, function(w)
-			assert(opts.tag == "+bspwm_fullscreen_independent")
-			for _, tag in ipairs(w.tags) do if tag == opts.tag:sub(2) then return end end
-			w.tags[#w.tags + 1] = opts.tag:sub(2)
+			assert(opts.tag == "+bspwm_fullscreen_independent"
+				or opts.tag == "+bspwm_pseudo_tiled" or opts.tag == "-bspwm_pseudo_tiled")
+			local value = opts.tag:sub(2)
+			for i, tag in ipairs(w.tags) do
+				if tag == value then
+					if opts.tag:sub(1, 1) == "-" then table.remove(w.tags, i) end
+					return
+				end
+			end
+			if opts.tag:sub(1, 1) == "+" then w.tags[#w.tags + 1] = value end
 		end)
 	end
 	function window_dsp.float(opts)
@@ -126,6 +133,7 @@ local function expect_state(w, target)
 	assert(w.fullscreen == target.fullscreen and w.fullscreen_client == w.expected_client
 		and w.floating == target.floating and w.pseudo == target.pseudo,
 		"did not reach " .. target.name .. " with the original client mode")
+	assert(require("lua/extensions/bspwm_pseudo").is_pseudo(w) == target.pseudo, "wrong pseudo resize routing")
 	assert(w.app_fullscreen == (w.expected_client == 2), "application left fullscreen")
 	assert(w.sync_fullscreen == (w.expected_client ~= 2), "incorrect application-entry / WM-demotion policy")
 end
@@ -232,6 +240,31 @@ function tests.failed_float_does_not_enter_fullscreen_on_wrong_handler()
 	f.fail = "float"
 	f.press("f")
 	assert(f.active.fullscreen == 0 and f.active.fullscreen_client == 2 and f.active.floating)
+end
+
+function tests.failed_pseudo_does_not_change_routing_or_float()
+	local f = fixture()
+	f.active = f.window(0, 0, false, false)
+	f.fail = "pseudo"
+	f.press("t")
+	assert(not f.active.pseudo and not require("lua/extensions/bspwm_pseudo").is_pseudo(f.active))
+	assert(f.calls[#f.calls] == "pseudo")
+end
+
+function tests.pseudo_marker_survives_module_reload_and_repeated_binding()
+	local f = fixture()
+	f.active = f.window(0, 0, false, false)
+	f.active.tags = { "personal" }
+	f.press("t")
+	package.loaded["lua/extensions/bspwm_pseudo"] = nil
+	local pseudo = require("lua/extensions/bspwm_pseudo")
+	assert(pseudo.is_pseudo(f.active), "resize routing lost on reload")
+	for _ = 1, 3 do f.press("t") end
+	local count = 0
+	for _, tag in ipairs(f.active.tags) do if tag == "bspwm_pseudo_tiled" then count = count + 1 end end
+	assert(count == 1)
+	f.press("s")
+	assert(not pseudo.is_pseudo(f.active) and f.active.tags[1] == "personal")
 end
 
 local names = {}

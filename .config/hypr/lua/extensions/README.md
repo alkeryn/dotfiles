@@ -19,8 +19,11 @@
 - `bspwm_monocle.lua`: reversible workspace/window rules and guarded raising.
 - `bspwm_float_geometry.lua`: goal-geometry capture and post-dispatch restoration
   for explicit state shortcuts; no native plugin hooks or polling.
-- `bspwm_drag.lua`: held-button tiled move/resize sampling and native floating
-  fallback; see [`bspwm_drag.md`](bspwm_drag.md).
+- `bspwm_pseudo.lua`: tags config-owned pseudo state across reloads so mouse and
+  keyboard resizing use native client sizing instead of BSP splits; see
+  [`bspwm_drag.md`](bspwm_drag.md#pseudo-tiled-resizing).
+- `bspwm_drag.lua`: held-button tiled move/resize sampling and native floating /
+  pseudo-resize fallback; see [`bspwm_drag.md`](bspwm_drag.md).
 - `bspwm_focus.lua`: bspwm low-tightness directional focus across tiles/floats
   and monitors; see `bspwm_focus.md` for source references and parity checks.
 - `presel_feedback.lua`: preview geometry and atomic V3 JSON publication to the

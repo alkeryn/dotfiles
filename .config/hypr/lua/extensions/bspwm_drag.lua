@@ -1,6 +1,7 @@
 -- Held-button pointer moves/resizes, without Hyprland's temporary floating tile.
 -- v0.56.2 exposes cursor queries/timers but no Lua pointer-motion event.
 -- Sample only during a grab, at bspwm's default pointer_motion_interval (17ms).
+local pseudo = require("lua/extensions/bspwm_pseudo")
 local M = {}
 local MOTION_INTERVAL_MS = 17
 local STOP_EVENTS = { "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }
@@ -59,7 +60,8 @@ function M.new(layout, action)
 	local function motion()
 		local active = hl.get_active_window()
 		if not grabbed or not layout.drag_valid(grabbed) or not active
-			or (resizing and (active.stable_id ~= grabbed.stable_id or grabbed.workspace.id ~= resize_grab.workspace_id)) then
+			or (resizing and (pseudo.is_pseudo(grabbed) or active.stable_id ~= grabbed.stable_id
+				or grabbed.workspace.id ~= resize_grab.workspace_id)) then
 			drag.stop()
 			return
 		end
@@ -102,7 +104,7 @@ function M.new(layout, action)
 
 	function drag.begin()
 		-- The native dispatcher marks its invoking binding release-pending:
-		-- this SAME Lua callback runs again on release for floating windows.
+		-- this SAME Lua callback runs again on release for native grabs.
 		if native_active then
 			native_active = false
 			hl.dispatch(native_drag)
@@ -119,6 +121,13 @@ function M.new(layout, action)
 			return
 		end
 		if not layout.drag_valid(w) then return end
+		-- Native resizeTarget consumes pseudo deltas before the Lua bridge.
+		-- Only resize goes native: moving a pseudo tile still swaps BSP leaves.
+		if resizing and pseudo.is_pseudo(w) then
+			native_active = true
+			hl.dispatch(native_drag)
+			return
+		end
 		-- Grab the window under the pointer, not the keyboard-focused window.
 		hl.dispatch(hl.dsp.focus({ window = w }))
 		if resizing then

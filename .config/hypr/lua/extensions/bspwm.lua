@@ -14,10 +14,10 @@
 --   * cross-layer directional focus, node focus: parent / brother / first / second
 --   * monocle mode (stack, focused on top)
 --   * vacant floating leaves retain their original splits when tiled again
+--   * native pseudo-tiled sizing (resize routing in bspwm_pseudo.lua)
 --
 -- NOT implemented (see discussion):
 --   * unmodified border-drag resize (use Super + right drag)
---   * pseudo_tiled (use stock hl.dsp.window.pseudo)
 --
 -- layout_msg commands (via hl.dsp.layout("...")):
 --   preselect <l|r|u|d|west|east|north|south>
