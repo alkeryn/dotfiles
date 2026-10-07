@@ -2,7 +2,8 @@
 // Only Hyprland services/trampoline installation are mocked; no compositor needed.
 #include "../src/hooks.hpp"
 #include <hyprland/src/config/ConfigValue.hpp>
-#include <hyprland/src/desktop/DesktopTypes.hpp>
+#include <hyprland/src/desktop/state/FocusState.hpp>
+#include <hyprland/src/managers/SessionLockManager.hpp>
 #include <algorithm>
 #include <cassert>
 #include <dlfcn.h>
@@ -11,7 +12,16 @@
 #include <stdexcept>
 
 class CInputManager;
-namespace Desktop { class CFocusState; }
+// Opaque stand-ins: the plugin only passes these through native focus APIs;
+// it never accesses their layout. The native-service shims below model focus.
+namespace Monitor { class CMonitor {}; }
+namespace Desktop::View {
+class CWindow {
+  public:
+    PHLMONITORREF monitor;
+    bool pinned = false;
+};
+}
 PPLUGIN_API_VERSION_FUNC plugin_api_version;
 PPLUGIN_INIT_FUNC plugin_init;
 PPLUGIN_EXIT_FUNC plugin_exit;
@@ -34,9 +44,14 @@ std::string missing, ambiguous;
 int fail_hook = 0, hook_attempts = 0, create_attempts = 0, fail_create = 0;
 std::vector<CFunctionHook*> live_hooks;
 std::vector<void*> removed;
+bool session_locked = false;
+PHLMONITOR current_monitor, cursor_monitor;
+PHLWINDOWREF remembered_window, keyboard_window;
+int restore_calls = 0, surface_clear_calls = 0;
 
 void clear_counts() {
     mouse_calls = monitor_calls = cleanup_calls = 0;
+    restore_calls = surface_clear_calls = 0;
     focus_window = false;
     last_position.reset();
 }
@@ -52,7 +67,10 @@ mouse_fn mouse_entry = native_mouse;
 monitor_fn monitor_entry = native_monitor;
 
 NATIVE void native_window_focus() { monitor_entry(nullptr, {}); }
-NATIVE void native_monitor(Desktop::CFocusState*, PHLMONITOR) { ++fixture::monitor_calls; }
+NATIVE void native_monitor(Desktop::CFocusState*, PHLMONITOR monitor) {
+    ++fixture::monitor_calls;
+    fixture::current_monitor = monitor;
+}
 NATIVE void native_mouse(CInputManager*, uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> position) {
     ++fixture::mouse_calls;
     fixture::last_time = time;
@@ -60,7 +78,7 @@ NATIVE void native_mouse(CInputManager*, uint32_t time, bool refocus, bool mouse
     fixture::last_mouse = mouse;
     fixture::last_position = position;
     if (fixture::mouse_monitor || refocus)
-        monitor_entry(nullptr, {});
+        monitor_entry(nullptr, fixture::cursor_monitor);
     if (fixture::focus_window)
         native_window_focus();
 }
@@ -99,6 +117,36 @@ NATIVE bool native_last_window(bool inlined, bool candidate) {
 }
 
 // Minimal native-service shims, compiled against the installed headers.
+CSessionLockManager::CSessionLockManager() = default;
+bool CSessionLockManager::isSessionLocked() { return fixture::session_locked; }
+UP<Event::CEventBus>& Event::bus() {
+    static auto bus = makeUnique<CEventBus>();
+    return bus;
+}
+Desktop::CFocusState::CFocusState() = default;
+SP<Desktop::CFocusState> Desktop::focusState() {
+    static auto state = makeShared<CFocusState>();
+    return state;
+}
+PHLMONITOR Desktop::CFocusState::monitor() { return fixture::current_monitor; }
+PHLWINDOW Desktop::CFocusState::window() { return fixture::remembered_window.lock(); }
+void Desktop::CFocusState::rawMonitorFocus(PHLMONITOR monitor) { monitor_entry(this, monitor); }
+void Desktop::CFocusState::fullWindowFocus(PHLWINDOW window, Desktop::eFocusReason reason, SP<CWLSurfaceResource>, bool) {
+    assert(!fixture::session_locked && "must NEVER restore application focus while locked");
+    assert(reason == Desktop::FOCUS_REASON_DESKTOP_STATE_CHANGE);
+    ++fixture::restore_calls;
+    fixture::remembered_window = window;
+    if (window) {
+        if (!window->pinned)
+            rawMonitorFocus(window->monitor.lock());
+        fixture::keyboard_window = window;
+    }
+}
+void Desktop::CFocusState::rawSurfaceFocus(SP<CWLSurfaceResource> surface, PHLWINDOW) {
+    assert(!surface);
+    ++fixture::surface_clear_calls;
+    fixture::keyboard_window.reset();
+}
 CHyprColor::CHyprColor(float red, float green, float blue, float alpha) : r(red), g(green), b(blue), a(alpha) {}
 Log::CLogger::CLogger() = default;
 void Log::CLogger::log(Hyprutils::CLI::eLogLevel, const std::string_view& text) { std::cerr << text << '\n'; }
@@ -174,6 +222,123 @@ APICALL bool HyprlandAPI::removeFunctionHook(HANDLE, CFunctionHook* hook) {
     return true;
 }
 
+void lock_session() {
+    g_pSessionLockManager->m_events.lock.emit();
+    fixture::session_locked = true;
+    fixture::keyboard_window.reset(); // lock surfaces take keyboard focus
+}
+
+void unlock_session(bool inlined = false) {
+    fixture::session_locked = false; // protocol changes this BEFORE emitting unlock
+    const auto before = fixture::restore_calls;
+    g_pSessionLockManager->m_events.unlock.emit();
+    assert(fixture::restore_calls == before); // never restore inside the signal
+    if (inlined)
+        mouse_entry(nullptr, 0, true, false, {});
+    else
+        refocus_entry(nullptr, {});
+}
+
+void test_unlock_focus() {
+    auto left = makeShared<Monitor::CMonitor>();
+    auto right = makeShared<Monitor::CMonitor>();
+    auto window = makeShared<Desktop::View::CWindow>();
+    window->monitor = left;
+    fixture::cursor_monitor = right;
+    for (int mode : {0, 1, 2, 3}) {
+        for (bool inlined : {false, true}) {
+            for (bool pinned : {false, true}) {
+                fixture::follow = mode;
+                fixture::clear_counts();
+                fixture::current_monitor = left;
+                fixture::remembered_window = window;
+                window->pinned = pinned;
+                lock_session();
+                fixture::current_monitor = right; // clicking the lock screen can change it
+                unlock_session(inlined);
+                assert(fixture::mouse_calls == (mode == 1 ? 1 : 0));
+                assert(fixture::restore_calls == (mode == 1 ? 0 : 1));
+                assert(fixture::current_monitor == (mode == 1 ? right : left));
+                if (mode != 1)
+                    assert(fixture::keyboard_window == window);
+                const auto restores = fixture::restore_calls;
+                native_explicit_refocus();
+                assert(fixture::restore_calls == restores); // consumed, never sticky
+            }
+        }
+    }
+
+    fixture::follow = 2;
+    fixture::clear_counts();
+    unlock_session(); // forceUnlock when already unlocked: no snapshot, don't steal focus
+    assert(fixture::restore_calls == 0 && fixture::mouse_calls == 1);
+    fixture::clear_counts();
+    fixture::current_monitor = left;
+    fixture::remembered_window = window;
+    lock_session();
+    native_explicit_refocus(); // normal lock-screen input is unaffected
+    assert(fixture::restore_calls == 0 && fixture::mouse_calls == 1);
+    fixture::current_monitor = right;
+    lock_session(); // locker crash/replacement: no unlock, don't overwrite saved monitor
+    unlock_session();
+    assert(fixture::current_monitor == left && fixture::keyboard_window == window);
+
+    fixture::clear_counts();
+    fixture::current_monitor = left;
+    lock_session();
+    auto other_window = makeShared<Desktop::View::CWindow>();
+    other_window->monitor = right;
+    fixture::remembered_window = other_window; // e.g. a focus-priority surface during lock
+    unlock_session();
+    assert(fixture::keyboard_window == window); // pre-lock snapshot, not the later window
+
+    fixture::clear_counts();
+    fixture::current_monitor = left;
+    lock_session();
+    fixture::current_monitor = right;
+    fixture::remembered_window.reset(); // focused window closed while locked
+    Event::bus()->m_events.window.close.emit(window); // object can survive for fade-out
+    unlock_session();
+    assert(fixture::current_monitor == left && !fixture::keyboard_window);
+    assert(fixture::surface_clear_calls == 1 && fixture::mouse_calls == 0);
+
+    fixture::clear_counts();
+    fixture::remembered_window = window;
+    lock_session();
+    window.reset(); // expired snapshot also fails safely without keeping the object alive
+    unlock_session();
+    assert(!fixture::keyboard_window && fixture::surface_clear_calls == 1);
+
+    fixture::clear_counts();
+    fixture::current_monitor = left;
+    lock_session(); // started on an empty workspace
+    fixture::current_monitor = right;
+    Event::bus()->m_events.monitor.removed.emit(left); // still alive, but disconnected
+    unlock_session();
+    assert(fixture::current_monitor == right && fixture::monitor_calls == 0);
+    assert(fixture::surface_clear_calls == 1);
+
+    fixture::clear_counts();
+    fixture::current_monitor = left;
+    lock_session();
+    fixture::current_monitor = right;
+    left.reset(); // weak snapshot must not keep a monitor alive
+    unlock_session();
+    assert(fixture::current_monitor == right && fixture::monitor_calls == 0);
+
+    fixture::clear_counts();
+    lock_session();
+    g_pSessionLockManager->m_events.unlock.emit(); // malformed/early signal: still locked
+    native_explicit_refocus();
+    assert(fixture::restore_calls == 0 && fixture::session_locked);
+    unlock_session();
+    assert(fixture::restore_calls == 1); // early signal did not discard the lock snapshot
+    fixture::current_monitor.reset();
+    fixture::cursor_monitor.reset();
+    fixture::clear_counts();
+    std::cout << "PASS unlock focus, pinned/closed windows, relock, monitor removal and lock guard\n";
+}
+
 void assert_unloaded() {
     assert(fixture::live_hooks.empty());
     assert(CConfigValueBase::registry().empty());
@@ -199,6 +364,8 @@ int main(int argc, char** argv) {
     expect_init_failure();
     assert(fixture::create_attempts == 0);
     fixture::abi = __hyprland_api_get_client_hash();
+    expect_init_failure(); // no session lock manager yet
+    g_pSessionLockManager = makeUnique<CSessionLockManager>();
     for (const auto& name : {"unmapWindow", "onUnmap", "refocusLastWindow", "refocus", "mouseMoveUnified", "rawMonitorFocus"}) {
         fixture::missing = name;
         expect_init_failure();
@@ -220,7 +387,7 @@ int main(int argc, char** argv) {
     std::cout << "PASS ABI, symbol validation and partial-install rollback\n";
 
     const auto description = plugin_init((HANDLE)1);
-    assert(description.name == "hypr_extras" && fixture::live_hooks.size() == 3);
+    assert(description.name == "hypr_extras" && description.version == "0.2.0" && fixture::live_hooks.size() == 3);
     for (int mode : {0, 1, 2, 3}) {
         fixture::follow = mode; // config values stay live without reinstalling hooks
         for (bool inlined : {false, true}) {
@@ -281,14 +448,30 @@ int main(int argc, char** argv) {
     assert(!span.contains(nullptr));
     std::cout << "PASS argument forwarding and ELF range boundaries\n";
 
+    test_unlock_focus();
+    lock_session();
+    fixture::session_locked = false;
+    g_pSessionLockManager->m_events.unlock.emit(); // unload with a pending restoration
     fixture::removed.clear();
     plugin_exit();
     assert_unloaded();
     assert((fixture::removed == std::vector<void*>{(void*)&native_monitor, (void*)&native_mouse, (void*)&native_refocus}));
-    plugin_init((HANDLE)1);
+    fixture::clear_counts();
+    native_explicit_refocus();
+    assert(fixture::restore_calls == 0); // pending work was discarded
+    fixture::session_locked = true;
+    plugin_init((HANDLE)1); // loading mid-lock must not focus an application
+    assert(fixture::restore_calls == 0);
+    unlock_session();
+    assert(fixture::restore_calls == 1);
     plugin_exit();
     assert_unloaded();
     dlclose(module);
     assert_unloaded();
+    // No listeners may retain code in the unloaded .so.
+    lock_session();
+    unlock_session();
+    Event::bus()->m_events.monitor.removed.emit({});
+    Event::bus()->m_events.window.close.emit({});
     std::cout << "PASS reverse-order unload and reload\n";
 }

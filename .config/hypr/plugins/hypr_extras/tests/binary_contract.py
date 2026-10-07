@@ -27,13 +27,16 @@ layer = "Desktop::View::CLayerSurface::onUnmap()"
 history = "CInputManager::refocusLastWindow(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"
 
 
-def calls(name):
+def disassemble(name):
     address, size = symbols[name]
     assert size, f"missing function size: {name}"
-    assembly = run("objdump", "-d", "-C", "--no-show-raw-insn",
-                   f"--start-address={address}", f"--stop-address={address + size}", binary)
+    return run("objdump", "-d", "-C", "--no-show-raw-insn",
+               f"--start-address={address}", f"--stop-address={address + size}", binary)
+
+
+def calls(name):
     # Ignore internal branches (+0x...), but include tail calls to whole functions.
-    return re.findall(r"\b(?:call|jmp)\s+[0-9a-f]+ <(.+)>\s*$", assembly, re.MULTILINE)
+    return re.findall(r"\b(?:call|jmp)\s+[0-9a-f]+ <(.+)>\s*$", disassemble(name), re.MULTILINE)
 
 
 assert calls(window).count(refocus) == 1, "window fallback moved/inlined: review hooks"
@@ -46,4 +49,24 @@ assert calls(mouse).count(monitor) == 1, "mouse monitor-focus call site changed"
 # A focused window must still be able to focus its own monitor independently.
 window_focus = next(name for name in symbols if name.startswith("Desktop::CFocusState::rawWindowFocus("))
 assert calls(window_focus).count(monitor) == 1, "window monitor-focus call site changed"
-print("PASS installed-binary call sites, inline/tail-call coverage and explicit window focus")
+# The session manager emits unlock, tears down its lock surfaces, then makes
+# one synchronous refocus call. The listener arms only that next forced refocus.
+assert calls("CSessionLockManager::forceUnlock()").count(refocus) == 1
+assert calls("CSessionLockManager::forceUnlock()").count("CSessionLockManager::clearSessionLock()") == 1
+# The normal-unlock callback is local, not hookable through the dynamic API.
+# objdump can read it from the installed separate debug symbols.
+unlock_callbacks = []
+for line in run("objdump", "-t", "-C", binary).splitlines():
+    match = re.fullmatch(r"([0-9a-f]+)\s+\w+\s+F\s+\.text\s+([0-9a-f]+)\s+(.+)", line)
+    if not match:
+        continue
+    address, size, name = match.groups()
+    if ("std::_Function_handler<void (), CSessionLockManager::onNewSessionLock(" in name
+            and "::_M_invoke(" in name and "[clone" not in name):
+        symbols[name] = (int(address, 16), int(size, 16))
+        if calls(name).count(refocus) == 1:
+            unlock_callbacks.append(name)
+assert len(unlock_callbacks) == 1, "normal-unlock callback changed or debug symbols unavailable"
+unlock_assembly = disassemble(unlock_callbacks[0])
+assert unlock_assembly.index("CSignalBase::emitInternal") < unlock_assembly.index("<" + refocus + ">")
+print("PASS installed-binary close/unlock call sites, inline coverage and explicit window focus")

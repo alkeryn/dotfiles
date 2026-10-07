@@ -24,7 +24,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         extras::focus::reset();
         throw;
     }
-    return {"hypr_extras", "Small native extensions for alkeryn's Hyprland config", "alkeryn", "0.1.0"};
+    return {"hypr_extras", "Small native extensions for alkeryn's Hyprland config", "alkeryn", "0.2.0"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
