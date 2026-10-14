@@ -74,12 +74,12 @@ hl.bind("SUPER + F12",            hl.dsp.exec_cmd("~/bin/wifitoggle"), { repeati
 -- automatic file reloads; the shortcut flushes once more before hyprctl reload.
 hl.bind("SUPER + Escape",         require("lua/extensions/bspwm").reload, { repeating = true })
 
--- keyboard layouts (setxkbmap {fr, us altgr-intl, ru, us colemak})
+-- keyboard layouts (setxkbmap {fr, us altgr-intl, ua, ru})
 local layouts = {
 	{ key = "F1", layout = "fr", variant = "" },
 	{ key = "F2", layout = "us", variant = "altgr-intl" },
-	{ key = "F3", layout = "ru", variant = "" },
-	{ key = "F4", layout = "us", variant = "colemak" },
+	{ key = "F3", layout = "ua", variant = "" },
+	{ key = "F4", layout = "ru", variant = "" },
 }
 for _, l in ipairs(layouts) do
 	hl.bind("SUPER + " .. l.key, function()
