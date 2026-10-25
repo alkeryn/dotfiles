@@ -26,13 +26,13 @@ in
       unclutter
       xss-lock
       nvidia-offload
+      brightnessctl
     ];
 
     boot.extraModprobeConfig = "options kvm_amd nested=1";
 
     # boot.kernelParams = [ "amdgpu.backlight=0" ]; # fix backlight
     services.tlp.enable = true;
-    programs.light.enable = true;
     hardware.bluetooth.enable = true;
 
     services.libinput = {
@@ -42,12 +42,12 @@ in
         accelSpeed = "0.6";
       };
     };
-    hardware.nvidia.package = (config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs {
-      src = pkgs.fetchurl {
-        url = "https://download.nvidia.com/XFree86/Linux-x86_64/525.147.05/NVIDIA-Linux-x86_64-525.147.05.run";
-        sha256 = "1wgyyd53s1ivxccyazpyprlk72km0zd8cyad0kii4zjwakm86la3";
-      };
-    });
+    # hardware.nvidia.package = (config.boot.kernelPackages.nvidiaPackages.stable.overrideAttrs {
+    #   src = pkgs.fetchurl {
+    #     url = "https://download.nvidia.com/XFree86/Linux-x86_64/525.147.05/NVIDIA-Linux-x86_64-525.147.05.run";
+    #     sha256 = "1wgyyd53s1ivxccyazpyprlk72km0zd8cyad0kii4zjwakm86la3";
+    #   };
+    # });
 
     hardware.openrazer.enable = true;
     hardware.openrazer.users = [ "alkeryn" ];
@@ -74,7 +74,7 @@ in
       hostName = "Blade";
       hostId="8425e349";
       networkmanager.enable = true;
-      wireless.enable = false;
+      wireless.enable = lib.mkForce false;
     };
 
     services.openssh = {

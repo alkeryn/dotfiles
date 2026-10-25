@@ -12,6 +12,7 @@ let
 in
 {
     environment.systemPackages = with pkgs; [
+      android-tools
       bear
       binutils
       ccls
@@ -28,5 +29,4 @@ in
       qemu
       stdman
     ] ++ languages;
-    programs.adb.enable = true;
 }

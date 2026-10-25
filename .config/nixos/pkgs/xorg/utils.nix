@@ -2,8 +2,7 @@
 
 {
   environment.systemPackages = with pkgs; [
-    glxinfo
-    megasync
+    mesa-demos
     virt-manager
     xorg.xev
     xsel

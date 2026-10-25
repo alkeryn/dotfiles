@@ -3,7 +3,7 @@
 {
   environment.systemPackages = with pkgs; [
     mpd
-    mpc_cli
+    mpc
     mpv
     # pythonPackages.subliminal #subtitle fetcher
     ncmpcpp

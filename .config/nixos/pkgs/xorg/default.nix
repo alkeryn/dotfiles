@@ -16,6 +16,7 @@ in
   ];
 
   environment.systemPackages = with pkgs; [
+    alacritty
     bspwm
     i3lock
     picom
@@ -29,7 +30,6 @@ in
     rofi
     scrot
     sxhkd
-    termite
     xclip
     xorg.xhost
   ]
@@ -37,7 +37,7 @@ in
   ++ overlays;
 
   environment.variables = {
-    TERMINAL="termite";
+    TERMINAL="alacritty";
   };
 
   services.xserver = {

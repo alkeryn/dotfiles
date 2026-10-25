@@ -28,7 +28,7 @@ in
     htop
     lsof
     mosh
-    neofetch
+    fastfetch
     neovim
     pulseaudio # for pactl and whatnot
     ranger
@@ -65,7 +65,6 @@ in
 
   virtualisation.libvirtd = {
     enable = true;
-    qemu.ovmf.enable = true;
     qemu.swtpm.enable = true;
   };
   programs.dconf.enable = true; # needed for virt manager to remember connection
@@ -113,7 +112,7 @@ in
 
   services.resolved = {
     enable = true;
-    dnssec = "true";
+    dnssec = "false";
     dnsovertls = "true";
     domains = [ "~." ];
     fallbackDns = [ "1.1.1.1#one.one.one.one" "1.0.0.1#one.one.one.one" ];
@@ -144,5 +143,5 @@ in
   # compatible, in order to avoid breaking some software such as database
   # servers. You should change this only after NixOS release notes say you
   # should.
-  system.stateVersion = "24.11"; # Did you read the comment?
+  system.stateVersion = "26.05"; # Did you read the comment?
 }

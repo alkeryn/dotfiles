@@ -3,7 +3,6 @@
 {
   environment.systemPackages = with pkgs; [
     brave
-    discord
     epiphany
     evince
     nautilus
