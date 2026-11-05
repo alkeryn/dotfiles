@@ -67,6 +67,7 @@ bin/Software
 .config/nvim/spell
 
 !.config/polybar
+!.config/quickshell
 
 #!.config/qBittorrent
 #.config/qBittorrent/*
