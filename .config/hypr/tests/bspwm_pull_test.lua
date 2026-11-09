@@ -1786,6 +1786,39 @@ function tests.pointer_failed_native_transfer_stops_and_releases_layout_guard()
 	end
 end
 
+function tests.hex_ids_pointer_resize_swap_and_reload()
+	local f = pointer_fixture()
+	local a, b = "20000000000001", "ffffffffffffffff"
+	f.open(a); f.open(b)
+	f.point(700, 700); f.resize_start()
+	f.point(780, 700); f.resize_release()
+	assert(f.box(a).w == 880, "full uint64 hex ID must survive the resize message")
+	f.focus(a)
+	assert(f.api.drag_swap(f.windows[a], f.windows[b]))
+	assert(f.box(a).x == 880 and f.box(b).x == 0, "hex IDs must survive the swap message")
+	local saved = codec.encode(f.states)
+	f.load(saved)
+	assert(codec.encode(f.states) == saved and f.box(a).x == 880)
+	f.consistent()
+end
+
+function tests.hex_ids_subtree_pull_selection_and_preselection()
+	local f = fixture()
+	f.open("a"); f.open("10"); f.message("focus parent")
+	local source = f.states[1].selected
+	assert(source)
+	f.open("ffffffffffffffff", 2)
+	f.pull()
+	assert(f.windows.a.workspace.id == 2 and f.windows["10"].workspace.id == 2)
+	assert(f.states[2].selected == source)
+	f.focus("10", 5) -- explicit click selects the leaf rather than its parent
+	f.presel("10", "r", 0.3)
+	local saved = codec.encode(f.states)
+	f.load(saved)
+	assert(codec.encode(f.states) == saved and f.leaf("10").presel.ratio == 0.3)
+	f.consistent()
+end
+
 -- Resize input must bypass the native Lua bridge, which discards its delta.
 function tests.pointer_resize_all_four_corners_target_hovered_leaf()
 	local cases = {

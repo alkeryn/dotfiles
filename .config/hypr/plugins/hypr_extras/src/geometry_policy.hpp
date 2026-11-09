@@ -23,10 +23,11 @@ inline void set_tiled_states(std::vector<xdgToplevelState>& states, bool tiled) 
         states.insert(states.end(), tiled_states.begin(), tiled_states.end());
 }
 
-// Only the initial, ordinary configure relinquishes size selection. Later
-// configures (including the pre-map interval) must retain native size/serials.
+// Apply BEFORE CWaylandBackend::configure caches/records the requested size,
+// never to pendingApply after setSize. Only the initial ordinary configure
+// relinquishes size selection; later/pre-map requests retain their native size.
 // Fullscreen/maximized, activation, resizing, suspension and unknown states
-// remain native. In particular we do not remove Hyprland's post-map CSD hint.
+// remain native. Floating-state transitions force a native configure too.
 inline void prepare_configure(Hyprutils::Math::Vector2D& size, std::vector<xdgToplevelState>& states,
                               bool initial, bool mapped, bool floating, bool tiled_supported) {
     const bool covering = std::ranges::find(states, XDG_TOPLEVEL_STATE_FULLSCREEN) != states.end()

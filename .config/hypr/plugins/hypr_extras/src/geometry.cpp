@@ -1,18 +1,20 @@
 #include "geometry.hpp"
 #include "geometry_policy.hpp"
 
-#include <hyprland/src/desktop/view/Window.hpp>
+#include <hyprland/src/desktop/view/window/Window.hpp>
+#include <hyprland/src/desktop/view/window/WaylandBackend.hpp>
 #include <hyprland/src/protocols/XDGShell.hpp>
+#include <hyprland/src/protocols/core/Compositor.hpp>
 #include <utility>
 
-static_assert(std::string_view(GIT_COMMIT_HASH) == "efb50993780079460b0cbed1363e2166a2de1d9f",
+static_assert(std::string_view(GIT_COMMIT_HASH) == "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9",
               "Review initial configure, floating-size capture and protocol states before updating this guard");
 static_assert(sizeof(void*) == 8);
 
 namespace extras::geometry {
 namespace {
-using schedule_fn = void (*)(CXDGToplevelResource*);
-CFunctionHook* schedule_hook = nullptr;
+using configure_fn = void (*)(Desktop::View::CWaylandBackend*, const CBox&, PHLMONITOR, bool);
+CFunctionHook* configure_hook = nullptr;
 CHyprSignalListener floating_listener;
 
 struct tracked_toplevel {
@@ -22,7 +24,7 @@ struct tracked_toplevel {
 std::vector<tracked_toplevel> toplevels;
 
 bool supports_tiled(CXDGToplevelResource* self) {
-    // v0.56.2's constructor advertises all four tiled edges iff version >= 2.
+    // v0.57.1's constructor advertises all four tiled edges iff version >= 2.
     // Remember that capability BEFORE clearing the edges, without accessing the
     // private protocol wrapper or emitting v2 states to a v1 client. Weak refs
     // prevent address reuse and do not keep closed applications alive.
@@ -36,31 +38,41 @@ bool supports_tiled(CXDGToplevelResource* self) {
     return supported;
 }
 
-void on_schedule(CXDGToplevelResource* self) {
-    const auto owner = self->m_owner.lock();
-    const auto window = self->m_window.lock();
-    if (owner && window && !window->m_isX11) {
-        prepare_configure(self->m_pendingApply.size, self->m_pendingApply.states,
-                          owner->m_initialCommit, window->m_isMapped, window->m_isFloating, supports_tiled(self));
+void on_configure(Desktop::View::CWaylandBackend* self, const CBox& box, PHLMONITOR monitor, bool force) {
+    const auto surface = self->surface();
+    const auto role = surface ? dynamicPointerCast<CXDGSurfaceRole>(surface->m_role) : nullptr;
+    const auto owner = role ? role->m_xdgSurface.lock() : nullptr;
+    const auto toplevel = owner ? owner->m_toplevel.lock() : nullptr;
+    const auto window = toplevel ? toplevel->m_window.lock() : nullptr;
+    auto requested_box = box;
+    if (window) {
+        auto size = box.size();
+        prepare_configure(size, toplevel->m_pendingApply.states,
+                          owner->m_initialCommit, self->isMapped(), window->isFloating(), supports_tiled(toplevel.get()));
+        requested_box.width = size.x;
+        requested_box.height = size.y;
     }
 
-    // setSize has already written the prediction, but nothing was sent yet.
-    // Run before the native coalescing early return too: the deferred callback
-    // reads pendingApply at send time. Native code still owns scheduling,
-    // configure serials, acknowledgements, constraints and actual layout.
-    reinterpret_cast<schedule_fn>(schedule_hook->m_original)(self);
+    // 0.57 caches this size and records it against the configure serial in the
+    // backend. Changing only pendingApply later sends 0x0 but records the tile
+    // prediction: the first client-chosen buffer is then falsely "small" and
+    // rendered as a rectangle in an otherwise transparent tile. Change the
+    // INPUT instead, so the native cache, wire size and ack tracker all agree.
+    // Position, output, force flag, later sizes and all ack handling stay native.
+    reinterpret_cast<configure_fn>(configure_hook->m_original)(self, requested_box, std::move(monitor), force);
 }
 } // namespace
 
 void init(HANDLE handle, hooks& registry) {
-    const auto source = find_function(handle, "scheduleStateApplication", "CXDGToplevelResource::scheduleStateApplication()");
-    schedule_hook = registry.add(source, reinterpret_cast<void*>(&on_schedule));
+    const auto source = find_function(handle, "configure",
+        "Desktop::View::CWaylandBackend::configure(Hyprutils::Math::CBox const&, Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>, bool)");
+    configure_hook = registry.add(source, reinterpret_cast<void*>(&on_configure));
 
     // State-only transitions can otherwise skip sendWindowSize's identical-size
     // guard. This event is AFTER native placement, so use its final size and let
     // sendWindowSize record its own ack, rather than calling setSize directly.
     floating_listener = Event::bus()->m_events.window.floating.listen([](PHLWINDOW window) {
-        if (window && window->m_isMapped && !window->m_isX11)
+        if (window && window->mapped() && !window->backend().isX11())
             window->sendWindowSize(true);
     });
 }
@@ -76,9 +88,9 @@ void reset() {
         // unload. Do not reset sizes or forget the user's native floating size.
         set_tiled_states(resource->m_pendingApply.states, entry.tiled_supported);
         const auto window = resource->m_window.lock();
-        if (window && window->m_isMapped && !window->m_isX11)
+        if (window && window->mapped() && !window->backend().isX11())
             window->sendWindowSize(true);
     }
-    schedule_hook = nullptr;
+    configure_hook = nullptr;
 }
 } // namespace extras::geometry

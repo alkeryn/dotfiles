@@ -147,10 +147,13 @@ function M.move_workspace_rel(step)
 	if target then M.move_to_workspace(target) end
 end
 
+local workspace_identity = require("lua/extensions/bspwm_workspace")
+local workspace_key = workspace_identity.key
+
 function M.swap_with_workspace(selector)
 	local current = hl.get_active_workspace()
 	local target = hl.get_workspace(selector)
-	if not current or not target or current.id == target.id then return end
+	if not current or not target or workspace_key(current) == workspace_key(target) then return end
 	-- bspwm swaps desktop objects: their windows travel with them, then focus
 	-- follows the outgoing desktop. Re-focus its window in the destination slot.
 	local focused = hl.get_active_window()
@@ -159,8 +162,8 @@ function M.swap_with_workspace(selector)
 		print(tostring(result))
 		return
 	end
-	local destination = target.id > 0 and target.id or "name:" .. target.name
-	if focused and focused.workspace and focused.workspace.id == target.id then
+	local destination = workspace_identity.selector(target)
+	if focused and focused.workspace and workspace_key(focused.workspace) == workspace_key(target) then
 		local focus_result = hl.dispatch(hl.dsp.focus({ window = focused }))
 		if focus_result and focus_result.ok ~= false then return end
 	end
@@ -178,9 +181,9 @@ function M.relative_workspace(step)
 			workspaces[#workspaces + 1] = workspace
 		end
 	end
-	table.sort(workspaces, function(a, b) return a.id < b.id end)
+	table.sort(workspaces, function(a, b) return workspace_identity.less(workspace_key(a), workspace_key(b)) end)
 	for i, workspace in ipairs(workspaces) do
-		if workspace.id == current.id then
+		if workspace_key(workspace) == workspace_key(current) then
 			return workspaces[((i - 1 + step) % #workspaces) + 1]
 		end
 	end

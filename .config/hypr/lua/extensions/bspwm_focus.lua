@@ -3,6 +3,7 @@
 -- Copyright (c) 2012, Bastien Dejean. BSD-2-Clause; see bspwm_focus.LICENSE.
 local geometry = require("lua/extensions/bspwm_geometry")
 local tree = require("lua/extensions/bspwm_tree")
+local workspace_key = require("lua/extensions/bspwm_workspace").key
 local M = {}
 
 -- Return the facing-edge distance, or nil when outside the directional range.
@@ -56,7 +57,7 @@ function M.focus(dir, states)
 		if not active.mapped or active.hidden then return end
 		source = window_box(active)
 		excluded[active.stable_id] = true
-		local st = active.workspace and states[active.workspace.id]
+		local st = active.workspace and states[workspace_key(active.workspace)]
 		local selected = st and st.selected
 		if selected and not active.floating and st.selected_focus_id == active.stable_id
 			and tree.find_path(st.tree, selected) and tree.find_path(selected, active.stable_id) then
@@ -78,7 +79,7 @@ function M.focus(dir, states)
 		local id, ws = window.stable_id, window.workspace
 		local pinned = window.pinned and window.floating and same_monitor(window.monitor, mon)
 		if not window.mapped or window.hidden or excluded[id] or not ws
-			or not ((workspace and ws.id == workspace.id) or pinned) then return end
+			or not ((workspace and workspace_key(ws) == workspace_key(workspace)) or pinned) then return end
 		seen[id] = true
 		local box = window_box(window)
 		local distance = box and M.distance(source, box, dir)
@@ -96,7 +97,7 @@ function M.focus(dir, states)
 			-- Scratchpads have no bspwm counterpart. Treat an open special
 			-- workspace as that monitor's current desktop, without closing it.
 			local ws = mon.active_special_workspace or mon.active_workspace
-			local st = ws and states[ws.id]
+			local st = ws and states[workspace_key(ws)]
 			if st then
 				for _, node in ipairs(tree.leaves(st.tree)) do consider(by_id[node.id], ws, mon) end
 			end

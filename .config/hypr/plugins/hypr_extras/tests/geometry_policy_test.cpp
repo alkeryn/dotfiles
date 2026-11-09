@@ -1,6 +1,7 @@
 #include "../src/geometry_policy.hpp"
 #include <cassert>
 #include <iostream>
+#include <optional>
 
 using namespace extras::geometry;
 using Hyprutils::Math::Vector2D;
@@ -34,6 +35,49 @@ int main() {
                         assert(states == once); // coalesced/repeated configures are idempotent
                     }
 
+    // 0.57 regression: CWaylandBackend caches the input and associates that
+    // same input with the serial after setSize returns. Patching only the wire
+    // state afterward lies to both the ack tracker and its equal-size guard.
+    struct backend_model {
+        std::optional<Vector2D> cached;
+        Vector2D wire_size, ack_size;
+        int configure_count = 0;
+        bool configure(Vector2D requested) {
+            if (cached == requested)
+                return false;
+            cached = requested;
+            wire_size = ack_size = requested;
+            ++configure_count;
+            return true;
+        }
+    };
+    const Vector2D predicted{3824, 2144}, first_buffer{729, 456};
+    const auto is_small = [](Vector2D acked, Vector2D buffer) {
+        return acked.x > buffer.x + 1 || acked.y > buffer.y + 1;
+    };
+    backend_model old;
+    old.configure(predicted);
+    old.wire_size = {}; // the old scheduleStateApplication hook's late rewrite
+    assert(old.ack_size != old.wire_size && is_small(old.ack_size, first_buffer));
+    assert(!old.configure(predicted)); // the first tile resize can be skipped too!
+
+    backend_model fixed;
+    Vector2D requested = predicted;
+    std::vector initial_states(tiled_states.begin(), tiled_states.end());
+    prepare_configure(requested, initial_states, true, false, false, true);
+    assert(fixed.configure(requested)); // policy applies BEFORE the native cache/ack
+    assert(fixed.wire_size == Vector2D{} && fixed.ack_size == fixed.wire_size);
+    assert(!is_small(fixed.ack_size, first_buffer));
+    assert(!fixed.configure(requested)); // native coalescing/dedup still applies
+    const Vector2D saved_float_size = first_buffer;
+    requested = predicted;
+    prepare_configure(requested, initial_states, false, true, false, true);
+    assert(fixed.configure(requested)); // even if final tile equals the prediction
+    assert(fixed.configure_count == 2 && fixed.wire_size == predicted && fixed.ack_size == predicted);
+    assert(!is_small(fixed.ack_size, predicted));
+    assert(saved_float_size == first_buffer); // natural size remains independent
+    std::cout << "PASS initial wire/cache/ack agreement and first-tile resize regression model\n";
+
     // Model the relevant winit/Hyprland sequence, not a live Wayland test:
     // winit accepts Alacritty's grid resize only when initially unconstrained;
     // Hyprland records that first committed size before arranging the tile.
@@ -45,7 +89,7 @@ int main() {
         const Vector2D natural_size{729, 456}; // sample 81x24 grid, not a hardcoded application policy
         Vector2D saved_float_size = natural_size;
         Vector2D current_size = born_floating ? natural_size : Vector2D{1908, 2144};
-        states.push_back(XDG_TOPLEVEL_STATE_MAXIMIZED); // native post-map CSD suppression
+        states.push_back(XDG_TOPLEVEL_STATE_MAXIMIZED); // preserve any explicit covering hint
         prepare_configure(current_size, states, false, true, born_floating, true);
         assert(current_size == (born_floating ? natural_size : Vector2D{1908, 2144}));
         assert(saved_float_size == natural_size);

@@ -11,14 +11,14 @@
 class CInputManager;
 
 // Call-site semantics must be rechecked on upgrades, not just recompiled blindly.
-static_assert(std::string_view(GIT_COMMIT_HASH) == "efb50993780079460b0cbed1363e2166a2de1d9f",
+static_assert(std::string_view(GIT_COMMIT_HASH) == "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9",
               "Review the focus hooks for this Hyprland revision before updating this guard");
 static_assert(sizeof(void*) == 8);
 
 namespace extras::focus {
 namespace {
 using refocus_fn = void (*)(CInputManager*, std::optional<Vector2D>);
-using mouse_move_fn = void (*)(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>);
+using mouse_move_fn = void (*)(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>, bool);
 using monitor_focus_fn = void (*)(Desktop::CFocusState*, PHLMONITOR);
 
 CFunctionHook* refocus_hook = nullptr;
@@ -86,13 +86,15 @@ void on_refocus(CInputManager* self, std::optional<Vector2D> position) {
         reinterpret_cast<refocus_fn>(refocus_hook->m_original)(self, position);
 }
 
-void on_mouse_move(CInputManager* self, uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> position) {
+void on_mouse_move(CInputManager* self, uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> position, bool pointer_only) {
     const auto caller = __builtin_extract_return_addr(__builtin_return_address(0));
     // GCC inlines refocus() in refocusLastWindow(). It also tail-calls this
     // function from refocus(). Cover both without blocking real mouse motion.
-    if (refocus && (restore_after_unlock() || suppress_fallback(caller)))
+    // 0.57 adds pointer-only refreshes: never suppress them or consume the
+    // pending keyboard restoration while only updating pointer focus.
+    if (!pointer_only && refocus && (restore_after_unlock() || suppress_fallback(caller)))
         return;
-    reinterpret_cast<mouse_move_fn>(mouse_move_hook->m_original)(self, time, refocus, mouse, position);
+    reinterpret_cast<mouse_move_fn>(mouse_move_hook->m_original)(self, time, refocus, mouse, position, pointer_only);
 }
 
 void on_monitor_focus(Desktop::CFocusState* self, PHLMONITOR monitor) {
@@ -124,7 +126,7 @@ void init(HANDLE handle, hooks& registry) {
     };
     const auto refocus_source = find_function(handle, "refocus", "CInputManager::refocus(std::optional<Hyprutils::Math::Vector2D>)");
     mouse_move_source = find_function(handle, "mouseMoveUnified",
-        "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>)");
+        "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>, bool)");
     const auto monitor_source = find_function(handle, "rawMonitorFocus",
         "Desktop::CFocusState::rawMonitorFocus(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)");
 

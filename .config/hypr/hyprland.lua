@@ -1,4 +1,4 @@
--- hyprland.lua -- alkeryn's bspwm-style rice, ported to Hyprland v0.56.2
+-- hyprland.lua -- alkeryn's bspwm-style rice, updated for Hyprland v0.57.1
 -- ============================================================================
 -- Entry point: config, monitors, env, autostart.
 --   require("lua/vars")     -- machine detection + shared constants
@@ -18,13 +18,20 @@
 --   python3 python-gobject python-cairo gtk-layer-shell (script-only feedback)
 -- ============================================================================
 
--- Native extras: build if missing; config reload picks up changed binaries.
--- Build, testing, and rollback instructions: plugins/hypr_extras/README.md
+-- Native extras: each compositor revision needs its own binary. Keep the old
+-- library available if the package was upgraded without restarting the session.
+-- Build/review notes: plugins/hypr_extras/README.md and doc/upgrade-0.57.1.md.
 local extras_dir = os.getenv("HOME") .. "/.config/hypr/plugins/hypr_extras"
-require("lua/plugins").load(extras_dir .. "/build/hypr_extras.so", {
-	source_dir = extras_dir,
-	target = "hypr_extras",
-})
+local instance = os.getenv("HYPRLAND_INSTANCE_SIGNATURE") or ""
+if instance:match("^efb50993780079460b0cbed1363e2166a2de1d9f_") then
+	-- Never rebuild 0.56.2 with the new headers/sources.
+	require("lua/plugins").load(extras_dir .. "/build/hypr_extras.so")
+else
+	require("lua/plugins").load(extras_dir .. "/build-0.57.1/hypr_extras.so", {
+		source_dir = extras_dir,
+		target = "hypr_extras",
+	})
+end
 
 local bspwm = require("lua/extensions/bspwm") -- registers the "lua:bspwm" layout
 require("lua/extensions/presel_feedback").setup(bspwm)

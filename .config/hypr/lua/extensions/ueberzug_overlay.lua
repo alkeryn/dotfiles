@@ -9,6 +9,7 @@
 -- lower() also clears fullscreenPolicy().allowedOverFullscreen(), so internal
 -- fullscreen hides the overlay natively; raise() restores it above the
 -- terminal. Overlays keep `no_focus`, so z-order changes do not affect input.
+local workspace_key = require("lua/extensions/bspwm_workspace").key
 local M = {}
 
 local function is_overlay(window)
@@ -23,7 +24,7 @@ local function workspace_has_fullscreen(workspace)
 	if not workspace then return false end
 	for _, window in ipairs(hl.get_windows() or {}) do
 		local other = window.workspace
-		if other and other.name == workspace.name and window.mapped and not window.hidden and is_fullscreen(window) then
+		if other and workspace_key(other) == workspace_key(workspace) and window.mapped and not window.hidden and is_fullscreen(window) then
 			return true
 		end
 	end

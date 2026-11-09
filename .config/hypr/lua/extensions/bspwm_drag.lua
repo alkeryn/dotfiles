@@ -2,6 +2,7 @@
 -- v0.56.2 exposes cursor queries/timers but no Lua pointer-motion event.
 -- Sample only during a grab, at bspwm's default pointer_motion_interval (17ms).
 local pseudo = require("lua/extensions/bspwm_pseudo")
+local workspace_key = require("lua/extensions/bspwm_workspace").key
 local M = {}
 local MOTION_INTERVAL_MS = 17
 local STOP_EVENTS = { "config.reloaded", "keybinds.submap", "monitor.removed", "hyprland.shutdown" }
@@ -31,7 +32,7 @@ local function pointer_window(pos, monitor)
 	local best, best_level, best_rank
 	for _, w in ipairs(hl.get_windows()) do
 		if w.mapped and not w.hidden and w.visible ~= false and w.workspace
-			and (w.workspace.id == ws.id or (w.pinned and w.floating)) and contains(pos, w.at, w.size) then
+			and (workspace_key(w.workspace) == workspace_key(ws) or (w.pinned and w.floating)) and contains(pos, w.at, w.size) then
 			-- Floating windows occlude tiles; fullscreen occludes normal floats.
 			-- Native focus history resolves overlapping floats/monocle windows.
 			local level = stacking_level(w)
@@ -61,7 +62,7 @@ function M.new(layout, action)
 		local active = hl.get_active_window()
 		if not grabbed or not layout.drag_valid(grabbed) or not active
 			or (resizing and (pseudo.is_pseudo(grabbed) or active.stable_id ~= grabbed.stable_id
-				or grabbed.workspace.id ~= resize_grab.workspace_id)) then
+				or workspace_key(grabbed.workspace) ~= resize_grab.workspace_id)) then
 			drag.stop()
 			return
 		end

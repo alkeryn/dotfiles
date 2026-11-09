@@ -9,7 +9,7 @@ def run(*args):
 
 
 binary = sys.argv[1]
-revision = "efb50993780079460b0cbed1363e2166a2de1d9f"
+revision = "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9"
 assert revision in run(binary, "--version"), "unreviewed Hyprland version"
 
 symbols = {}
@@ -20,7 +20,7 @@ for line in run("nm", "-D", "-S", "-C", "--defined-only", binary).splitlines():
         symbols[name] = (int(address, 16), int(size, 16))
 
 refocus = "CInputManager::refocus(std::optional<Hyprutils::Math::Vector2D>)"
-mouse = "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>)"
+mouse = "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>, bool)"
 monitor = "Desktop::CFocusState::rawMonitorFocus(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"
 window = "Desktop::View::CWindow::unmapWindow()"
 layer = "Desktop::View::CLayerSurface::onUnmap()"
@@ -71,9 +71,9 @@ unlock_assembly = disassemble(unlock_callbacks[0])
 assert unlock_assembly.index("CSignalBase::emitInternal") < unlock_assembly.index("<" + refocus + ">")
 print("PASS installed-binary close/unlock call sites, inline coverage and explicit window focus")
 
-# The geometry hook must see the predicted size AFTER setSize writes it, and
-# BEFORE the native deferred configure is queued. These calls may not be inlined
-# away on an upgraded build. We do not hook the predicted layout itself.
+# Geometry now hooks the backend's configure INPUT, before its cache and ack
+# record are written. The old schedule hook ran between setSize and ack.add:
+# changing only pendingApply there made wire and recorded sizes disagree.
 schedule = "CXDGToplevelResource::scheduleStateApplication()"
 set_size = "CXDGToplevelResource::setSize(Hyprutils::Math::Vector2D const&)"
 surface_schedule = "CXDGSurfaceResource::scheduleConfigure()"
@@ -81,12 +81,17 @@ set_size_calls = calls(set_size)
 assert set_size_calls.count(schedule) == 1
 assert set_size_calls.count(surface_schedule) == 1
 assert set_size_calls.index(schedule) < set_size_calls.index(surface_schedule)
-assert calls("Desktop::View::CWindow::commitWindow()").count(set_size) == 1
-assert calls("Desktop::View::CWindow::sendWindowSize(bool)").count(set_size) == 1
+# 0.57 moves protocol size/ack ownership from CWindow to its Wayland backend.
+configure = "Desktop::View::CWaylandBackend::configure(Hyprutils::Math::CBox const&, Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>, bool)"
+configure_calls = calls(configure)
+ack_add = "Desktop::View::CWindowConfigureAckTracker::add(unsigned int, Hyprutils::Math::Vector2D const&)"
+assert configure_calls.count(set_size) == 1
+assert configure_calls.count(ack_add) == 1
+assert configure_calls.index(set_size) < configure_calls.index(ack_add), "backend configure/ack ordering changed"
 for setter in ("setMaximized", "setFullscreen", "setActive", "setResizing"):
-    assert calls(f"CXDGToplevelResource::{setter}(bool)").count(schedule) == 1, f"{setter} bypasses geometry hook"
+    assert calls(f"CXDGToplevelResource::{setter}(bool)").count(schedule) == 1, f"{setter} state scheduling changed"
 # setSuspeneded inlines scheduling in this binary. It only changes SUSPENDED,
-# not size/tiling; leave it native. Floating changes force the setSize path.
+# not size/tiling; leave it native. Floating changes force the configure path.
 assert set_size not in calls("CXDGToplevelResource::setSuspeneded(bool)")
 assert any(name.startswith("CEventLoopManager::doLaterLock(") for name in calls(schedule))
-print("PASS installed-binary initial-size/state scheduling hook and native configure/ack paths")
+print("PASS installed-binary backend configure hook, ack recording order and native state scheduling")

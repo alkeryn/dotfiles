@@ -73,5 +73,22 @@ assert(#spawned == 1, "existing plugins must never be rebuilt automatically")
 file_exists, file_errno = false, 13
 assert(not pcall(load_local), "permission errors must not be treated as missing binaries")
 assert(#spawned == 1)
+-- Exercise the real entry point's upgrade path selection without loading the
+-- rest of the compositor configuration or starting a build.
+local entry = assert(original_open("hyprland.lua", "r"))
+local plugin_config = assert(entry:read("*a"):match("^(.-)\nlocal bspwm ="))
+entry:close()
+local selected_path, selected_build
+package.loaded["lua/plugins"] = { load = function(path, options) selected_path, selected_build = path, options end }
+local run_entry = assert((loadstring or load)(plugin_config))
+for _, signature in ipairs({ "efb50993780079460b0cbed1363e2166a2de1d9f_1_2", "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9_3_4", "" }) do
+	instance = signature ~= "" and signature or nil
+	run_entry()
+	if signature:match("^efb509") then
+		assert(selected_path:match("/build/hypr_extras%.so$") and selected_build == nil)
+	else
+		assert(selected_path:match("/build%-0%.57%.1/hypr_extras%.so$") and selected_build.target == "hypr_extras")
+	end
+end
 os.getenv, io.popen, io.open = original_getenv, original_popen, original_open
-print("PASS plugin declarations: first builds, reload convergence, quoting, errors and config verification")
+print("PASS plugin declarations: first builds, reload convergence, quoting, errors, config verification and revision isolation")

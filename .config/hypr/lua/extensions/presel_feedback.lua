@@ -1,6 +1,7 @@
 -- Predict the next bordered tile, then export output-local logical coordinates
 -- to a Python/GTK renderer. No application titles/content are exported.
 local geometry = require("lua/extensions/bspwm_geometry")
+local workspace_key = require("lua/extensions/bspwm_workspace").key
 local M = {}
 local round = geometry.round
 
@@ -63,13 +64,13 @@ function M.rectangles(states, workspaces, windows, options)
 	options = options or {}
 	local live, result = {}, {}
 	for _, w in ipairs(windows) do
-		if w.mapped and not w.floating and w.workspace then live[w.stable_id] = w.workspace.id end
+		if w.mapped and not w.floating and w.workspace then live[w.stable_id] = workspace_key(w.workspace) end
 	end
 	local occupied = {}
 	local function mark_occupied(node, ws)
 		if not node then return false end
 		if node.t == "leaf" then
-			occupied[node] = not node.vacant and live[node.id] == ws.id
+			occupied[node] = not node.vacant and live[node.id] == workspace_key(ws)
 		else
 			local first, second = mark_occupied(node.a, ws), mark_occupied(node.b, ws)
 			occupied[node] = first or second
@@ -96,12 +97,12 @@ function M.rectangles(states, workspaces, windows, options)
 		end
 	end
 	for _, ws in ipairs(workspaces) do
-		local st, mon = states[ws.id], ws.monitor
+		local st, mon = states[workspace_key(ws)], ws.monitor
 		local special = mon and mon.active_special_workspace
 		if st and mon and mon.name and st.mode ~= "monocle" and ws.visible and not ws.has_fullscreen
 			and (ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b")
 			and mon.dpms_status ~= false
-			and (not special or special.id == ws.id) then
+			and (not special or workspace_key(special) == workspace_key(ws)) then
 			local area = M.future_area(st, ws, options.gaps_out)
 			if area and area.w > 0 and area.h > 0 then
 				mark_occupied(st.tree, ws)

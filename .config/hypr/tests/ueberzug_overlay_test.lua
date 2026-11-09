@@ -58,10 +58,14 @@ events["window.fullscreen"](viewer)
 assert(#dispatched == 2 and dispatched[2].window == preview and dispatched[2].mode == "top", "raise after unfullscreen")
 assert(preview.allowed_over_fullscreen, "raised overlay is allowed over fullscreen again")
 
+-- 0.57 display names need not identify the workspace: use addressable names.
+ws1.name, ws2.name = "same display", "same display"
+ws1.addressable_name, ws2.addressable_name = "code", "chat"
 -- Client-side fullscreen behaves the same.
 viewer.fullscreen_client = 1
 events["window.fullscreen"](viewer)
 assert(#dispatched == 3 and dispatched[3].window == preview and dispatched[3].mode == "bottom", "hide under client fullscreen")
+assert(other.allowed_over_fullscreen, "equal display names must not alias different workspaces")
 
 -- A new overlay opened while the viewer is fullscreen is lowered too.
 local late = window({ class = "ueberzugpp_latepreview", workspace = ws1 })

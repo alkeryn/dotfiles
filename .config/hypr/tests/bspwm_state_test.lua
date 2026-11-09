@@ -324,12 +324,45 @@ function tests.remembered_pull_source_round_trips_without_visual_selection()
 	local tree = { t="split", axis="h", ratio=0.37, pull_focus_id=2, pull_ids={ [1]=true, [2]=true },
 		a={ t="leaf", id=1, n=1 }, b={ t="leaf", id=2, n=2 } }
 	local text = codec.encode({ [1]={ tree=tree, seq=2, mode="tiled" } })
-	assert(text:match("^BSPWM_LAYOUT_V3"))
+	assert(text:match("^BSPWM_LAYOUT_V4"))
 	local decoded = assert(codec.decode(text))
 	local st = decoded.states[1]
 	assert(not st.selected and st.tree.pull_focus_id == 2)
 	assert(st.tree.pull_ids[1] and st.tree.pull_ids[2])
 	assert(codec.encode(decoded.states) == text)
+end
+
+function tests.hex_ids_round_trip_without_precision_loss_or_type_changes()
+	local ids = { "a", "10", "20000000000001", "ffffffffffffffff" }
+	for _, id in ipairs(ids) do
+		local node = { t="leaf", id=id, n=1 }
+		local st = { tree=node, seq=1, mode="tiled", selected=node, selected_focus_id=id,
+			insertion_anchor=node, insertion_window_id=id }
+		local text = codec.encode({ [1]=st })
+		local result = assert(codec.decode(text)).states[1]
+		assert(result.tree.id == id and result.selected_focus_id == id and result.insertion_window_id == id)
+		assert(result.selected == result.tree and result.insertion_anchor == result.tree)
+		assert(codec.encode({ [1]=result }) == text)
+	end
+	local node = { t="split", axis="h", ratio=0.4, pull_focus_id=ids[4],
+		a={ t="leaf", id=ids[3], n=1 }, b={ t="leaf", id=ids[4], n=2 } }
+	local result = assert(codec.decode(codec.encode({ [1]={ tree=node, mode="tiled", seq=2 } }))).states[1]
+	assert(result.tree.pull_focus_id == ids[4] and result.tree.pull_ids[ids[3]] and result.tree.pull_ids[ids[4]])
+end
+
+function tests.malformed_hex_ids_are_rejected()
+	local prefix = "BSPWM_LAYOUT_V4\nP - -\nW 1 1 tiled - - - -\nL x"
+	for _, id in ipairs({ "", "-1", "00", "01", "ABC", "g", "10000000000000000", "1;os.exit()" }) do
+		assert(not codec.decode(prefix .. id .. " 1 - - -\n"), "accepted invalid ID " .. id)
+	end
+	assert(not codec.decode("BSPWM_LAYOUT_V4\nP - -\nW 1 2 tiled - - - -\nS h 0.5 - - -\nL xa 1 - - -\nL xa 2 - - -\n"))
+end
+
+function tests.legacy_v3_keeps_numeric_ids_and_float_geometry()
+	local text = "BSPWM_LAYOUT_V3\nP - -\nW 1 1 tiled . 10 - -\nL 10 1 - - R 5 6 700 400 -\n"
+	local st = assert(codec.decode(text)).states[1]
+	assert(st.tree.id == 10 and st.selected_focus_id == 10 and st.tree.floating_geometry.w == 700)
+	assert(codec.decode(codec.encode({ [1]=st })))
 end
 
 function tests.legacy_v1_checkpoint_remains_readable()
@@ -339,7 +372,7 @@ function tests.legacy_v1_checkpoint_remains_readable()
 	assert(st.selected == st.tree and st.selected_focus_id == 2 and st.tree.ratio == 0.37)
 	assert(not st.tree.pull_focus_id)
 	local upgraded = codec.encode(decoded.states)
-	assert(upgraded:match("^BSPWM_LAYOUT_V3") and codec.decode(upgraded))
+	assert(upgraded:match("^BSPWM_LAYOUT_V4") and codec.decode(upgraded))
 end
 
 function tests.legacy_v2_keeps_pull_sources_without_floating_geometry()

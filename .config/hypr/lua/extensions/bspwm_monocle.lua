@@ -1,6 +1,7 @@
 -- Full-monitor monocle without Hyprland fullscreen (which hides other tiles).
 -- Scoped, reversible rules leave floating windows and other workspaces alone.
 local geometry = require("lua/extensions/bspwm_geometry")
+local workspace_identity = require("lua/extensions/bspwm_workspace")
 local M = {}
 
 function M.monitor_box(window, fallback)
@@ -14,20 +15,21 @@ function M.new()
 	local instance = {}
 
 	function instance.sync(ws, enabled)
-		local entry = rules[ws.id]
+		local key = workspace_identity.key(ws)
+		local entry = rules[key]
 		if not entry then
 			if not enabled then return end
 			-- Numeric monitor/persistence rules use "N" in helpers.lua. Use an
 			-- equivalent but distinct selector: workspace_rule merges identical
 			-- selectors, and disabling such a merged rule would disable theirs too.
-			-- Named/special workspaces have negative IDs; ranges only accept >0.
-			local selector = ws.id > 0 and string.format("r[%d-%d]", ws.id, ws.id)
-				or "name:" .. ws.name
+			-- Named/special workspaces have no ID in 0.57 (negative in 0.56).
+			local selector = ws.id and ws.id > 0 and string.format("r[%d-%d]", ws.id, ws.id)
+				or workspace_identity.selector(ws)
 			entry = { enabled = true }
-			rules[ws.id] = entry -- publish before rule updates can recalculate
+			rules[key] = entry -- publish before rule updates can recalculate
 			entry.gaps = hl.workspace_rule({ workspace = selector, gaps_in = 0, gaps_out = 0 })
 			entry.windows = hl.window_rule({
-				name = "bspwm-monocle-" .. ws.id,
+				name = "bspwm-monocle-" .. key,
 				match = { workspace = selector, float = false },
 				border_size = 0,
 				rounding = 0,
@@ -47,7 +49,7 @@ function M.new()
 
 	function instance.remove(ws)
 		instance.sync(ws, false)
-		rules[ws.id] = nil
+		rules[workspace_identity.key(ws)] = nil
 	end
 
 	function instance.raise(window)

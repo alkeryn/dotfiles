@@ -4,7 +4,9 @@ A small native home for changes that the Lua config cannot make. No daemon,
 plugin framework, polling, or extra config language. Currently: the focus fix
 from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998),
 restoring the pre-lock window and monitor after session unlock, and preserving
-application-chosen initial floating dimensions (v0.3.0).
+application-chosen initial floating dimensions. Current version: **v0.4.1**,
+for Hyprland **0.57.1**. See [the upgrade audit](../../doc/upgrade-0.57.1.md) and
+[the terminal first-frame sizing fix](../../doc/terminal_initial_size.md).
 
 **Automatic first builds, loading, and changed-binary reloading are enabled.**
 Startup or `hyprctl reload` builds a missing library; existing binaries are not
@@ -19,13 +21,17 @@ the plugin yet. This avoids blocking the compositor or exceeding its 1.5-second
 Lua config timeout. Startup/reload continues without the plugin until it is ready.
 
 The worker configures CMake with **Clang**, Ninja, Release, and tests disabled;
-builds only the requested target with two jobs in `build/.autobuild-hypr_extras`;
+builds only the requested target with two jobs in `build-0.57.1/.autobuild-hypr_extras`;
 and atomically publishes the finished `.so`. It then requests a reload of the
 **exact instance that started it**, which loads the normal immutable snapshot.
 There is no persistent daemon. Concurrent requests share one build; repeated
 requests from the same instance are deduplicated.
 
-Build output and errors: `plugins/hypr_extras/build/hypr_extras.so.build.log`.
+Build output and errors: `plugins/hypr_extras/build-0.57.1/hypr_extras.so.build.log`.
+The config selects `build-0.57.1/hypr_extras.so` for the new compositor. A still-running
+0.56.2 session keeps the existing `build/hypr_extras.so` instead, without rebuilding
+it. **Do not overwrite that old binary with a 0.57.1 build.** Restart Hyprland to
+activate the new compositor and plugin together.
 Failures do not trigger reload loops: fix the problem, then reload to retry.
 Required build dependencies must already be installed; nothing is auto-installed.
 An existing but stale/incompatible binary is not automatically rebuilt. Source
@@ -41,9 +47,9 @@ From `~/.config/hypr` (see the one-time migration note below if the original
 build-path library is still loaded directly):
 
 ```sh
-cmake -S plugins/hypr_extras -B plugins/hypr_extras/build -G Ninja
-cmake --build plugins/hypr_extras/build
-ctest --test-dir plugins/hypr_extras/build --output-on-failure
+cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-0.57.1 -G Ninja
+cmake --build plugins/hypr_extras/build-0.57.1
+ctest --test-dir plugins/hypr_extras/build-0.57.1 --output-on-failure
 hyprctl reload
 ```
 
@@ -54,11 +60,11 @@ an explicit `-DCMAKE_CXX_COMPILER=...` overrides it. It uses **libstdc++**, matc
 the installed GCC-built compositor, not libc++. The plugin itself is built with
 Clang; linking GCC's runtime does not mean compiling it with GCC.
 
-Output: `build/hypr_extras.so`. No installation step or background service.
+Output: `build-0.57.1/hypr_extras.so`. No installation step or background service.
 `-DBUILD_TESTING=OFF` omits the test harness.
 
-Supported target: **Linux x86-64, Hyprland v0.56.2**, commit
-`efb50993780079460b0cbed1363e2166a2de1d9f`. The focus module deliberately fails to
+Supported source target: **Linux x86-64, Hyprland v0.57.1**, commit
+`acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9`. The focus module deliberately fails to
 compile against an unreviewed revision. The plugin also rejects a runtime ABI
 string mismatch before installing hooks. These checks reduce risk; they are not
 a guarantee of compiler/ABI compatibility. Recheck and rebuild after upgrades.
@@ -72,7 +78,7 @@ config's autostart). Find that session's exact instance signature with
 ```sh
 # Set this to the DISPOSABLE session's signature, never your daily session.
 test_instance='REPLACE_WITH_TEST_SESSION_SIGNATURE'
-hyprctl -i "$test_instance" plugin load "$PWD/plugins/hypr_extras/build/hypr_extras.so"
+hyprctl -i "$test_instance" plugin load "$PWD/plugins/hypr_extras/build-0.57.1/hypr_extras.so"
 hyprctl -i "$test_instance" plugin list
 ```
 
@@ -98,7 +104,7 @@ On two outputs, test:
 Unload from that same session with:
 
 ```sh
-hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build/hypr_extras.so"
+hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build-0.57.1/hypr_extras.so"
 ```
 
 The `require("lua/plugins").load(...)` declaration near the start of `hyprland.lua`
@@ -137,8 +143,8 @@ separately and atomically replace the original instead:
 cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-next -G Ninja
 cmake --build plugins/hypr_extras/build-next
 ctest --test-dir plugins/hypr_extras/build-next --output-on-failure
-cp plugins/hypr_extras/build-next/hypr_extras.so plugins/hypr_extras/build/hypr_extras.so.new
-mv plugins/hypr_extras/build/hypr_extras.so.new plugins/hypr_extras/build/hypr_extras.so
+cp plugins/hypr_extras/build-next/hypr_extras.so plugins/hypr_extras/build-0.57.1/hypr_extras.so.new
+mv plugins/hypr_extras/build-0.57.1/hypr_extras.so.new plugins/hypr_extras/build-0.57.1/hypr_extras.so
 ```
 
 Then run `hyprctl reload` **while unlocked**, and check `hyprctl plugin list`.
@@ -167,6 +173,8 @@ The focus module uses three native hooks:
    `input:follow_mouse != 1`.
 2. `CInputManager::mouseMoveUnified`: cover inlined/tail-called versions of the
    same fallback. Real mouse motion (`refocus == false`) is not suppressed.
+   The new 0.57 `pointerOnly` argument is forwarded; pointer-only refreshes neither
+   get suppressed nor consume pending keyboard-focus restoration.
 3. `CFocusState::rawMonitorFocus`: apply the PR's monitor condition only to the
    direct call from `mouseMoveUnified`. Focus calls from `rawWindowFocus` and
    dispatchers remain untouched, so legitimate clicks still select their monitor.
@@ -200,21 +208,23 @@ bspwm saves the client's original X11 rectangle before arranging its tile.
 Hyprland already has equivalent **size** storage (`rememberFloatingSize` in
 `CLayoutManager::newTarget`), but its initial Wayland configure can replace the
 client's natural size with the layout's prediction. The Lua layout predicts the
-whole work area. In addition, v0.56.2 unconditionally advertises all four tiled
+whole work area. In addition, v0.57.1 still unconditionally advertises all four tiled
 edges, even for floats. Alacritty 0.17 / winit 0.30 then ignores Alacritty's
 post-creation request for the configured 81x24-cell grid, leaving either winit's
 800x600 default or the compositor's predicted work-area size.
 
-The geometry module adds **one** native hook,
-`CXDGToplevelResource::scheduleStateApplication()`:
+The geometry module uses **one** native hook,
+`CWaylandBackend::configure()` (replacing the earlier scheduling hook):
 
-- During an ordinary initial configure, after `setSize` has written its
-  prediction but before anything is sent, replace it with `0x0` (client chooses)
-  and remove tiled-edge states. Explicit fullscreen/maximized states are not
-  removed and their requested configure sizes are not changed.
+- During an ordinary initial configure, replace the input box's size with `0x0`
+  (client chooses), before the native backend caches it or records it against a
+  configure serial. Remove tiled-edge states. Explicit fullscreen/maximized
+  states are not removed and their requested configure sizes are not changed.
 - Subsequent configures retain native sizes. Tiled edges are present for mapped
-  tiled windows, absent for floating/unmapped windows. Other states, including
-  Hyprland's separate post-map MAXIMIZED hint for CSD suppression, stay native.
+  tiled windows, absent for floating/unmapped windows. Other states stay native.
+  Hyprland 0.57 no longer emits the old forced post-map MAXIMIZED hint; the plugin
+  does not add it back. Size/configure acknowledgements belong to the Wayland
+  backend and now record the same size that the client actually receives.
 - The first committed client geometry is saved by the **existing native**
   layout manager before arranging the actual tile. No temporary float-then-tile
   dispatcher, second size cache, app-class table, font formula or delayed resize.
@@ -222,10 +232,12 @@ The geometry module adds **one** native hook,
   covering equal-size transitions. Native serial/ack bookkeeping, size rules,
   min/max limits and subsequent user resizing remain authoritative.
 
-The hook runs even when native scheduling is already coalesced: the queued
-callback reads the final pending state. No wire events or serials are generated
-by the hook itself. `setSuspeneded` inlines scheduling in this binary, but changes
-neither geometry nor tiled edges; it stays native.
+The hook adjusts state before native configure's equal-size check. Initial and
+map-time sizes differ, so the first tile resize is not accidentally skipped.
+Floating-state transitions force a configure even at equal sizes. Native code
+still owns coalescing, wire events, serials and acknowledgements. Activation,
+fullscreen, maximized, resizing and suspended setters stay unhooked; they do not
+change tiled edges themselves.
 
 Weak toplevel records remember whether the constructor advertised tiled edges
 (protocol v2+), so v1 clients never receive unsupported states. Expired records
@@ -246,7 +258,7 @@ not changed; at scale 1, the existing Alacritty 11pt override is only an
 approximation of 9pt at Xft.dpi=120.
 
 After building, reload **while unlocked** and verify `hyprctl plugin list` shows
-`hypr_extras` v0.3.0. Prefer the disposable-session procedure above. Open **new**
+`hypr_extras` v0.4.1. Prefer the disposable-session procedure above. Open **new**
 windows for all checks:
 
 1. Open Alacritty directly floating, then separately tiled and switch it to
@@ -267,6 +279,14 @@ windows for all checks:
 
 ## Validation status
 
+Rechecked on **0.57.1**: Release and ASan/UBSan builds, all three CTest suites
+(including the installed binary's call sites and private unlock callback), all
+config Python/Lua/LuaJIT suites, and config verification for both machine profiles
+pass. The actual desktop/trampolines remain untested in this sandbox. The coverage
+below still applies; the v0.4.1 tests also model initial wire/cache/ack agreement,
+the first-tile equal-size guard, and check inert-backend argument forwarding.
+
+
 - Clang build succeeds; the actual `.so` loads into the isolated test executable.
   Both Release and AddressSanitizer/UndefinedBehaviorSanitizer builds pass.
 - Tests exercise the real replacement functions and ELF caller matching against
@@ -286,13 +306,13 @@ windows for all checks:
   covers initial/later, mapped/unmapped, tiled/floating, protocol v1/v2,
   fullscreen/maximized and unrelated states, plus repeated/coalesced calls. A
   lifecycle model covers first-map size capture and manual float-size retention.
-  The real plugin harness covers the new hook's orphan-resource forwarding,
+  The real plugin harness covers the new hook's inert-backend forwarding,
   missing/ambiguous symbols, fourth-hook install failure, reverse unload and
-  listener cleanup. Installed-executable checks verify that initial-size,
-  resize, activation and covering-state setters reach the scheduling hook.
+  listener cleanup. Installed-executable checks verify native configure-to-setSize
+  and subsequent ack recording, plus untouched protocol state scheduling.
   These are mocks/policy tests, **not an end-to-end Wayland size negotiation**.
   All 43 config Python tests, all Lua suites under Lua and LuaJIT, and isolated
-  config verification also pass with v0.3.0 sources.
+  config verification also pass with v0.4.1 sources.
 - **Real trampoline installation and desktop behavior still need a live test.**
   The disposable headless attempt in this sandbox aborted at
   `CBackend::create() failed!`, before plugin initialization. Neither the actual

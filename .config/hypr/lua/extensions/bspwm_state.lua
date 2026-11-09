@@ -1,8 +1,10 @@
 -- Session-only layout checkpoints. Data-only, bounded parser: never load/eval
 -- a state file as Lua. Tiled geometry/userdata are rebuilt by the compositor.
 local collect_ids = require("lua/extensions/bspwm_tree").collect_ids
+local workspace_less = require("lua/extensions/bspwm_workspace").less
 local M = {}
-local HEADER = "BSPWM_LAYOUT_V3"
+local HEADER = "BSPWM_LAYOUT_V4"
+local V3_HEADER = "BSPWM_LAYOUT_V3"
 local V2_HEADER, LEGACY_HEADER = "BSPWM_LAYOUT_V2", "BSPWM_LAYOUT_V1"
 local MAX_BYTES, MAX_NODES, MAX_DEPTH, MAX_WORKSPACES = 1048576, 8192, 128, 256
 local MAX_INTEGER = 9007199254740991
@@ -45,8 +47,28 @@ local function floating_tokens(box)
 	return box_tokens(box) .. (box and " " .. box_tokens(box.monitor) or "")
 end
 
+-- 0.57 stable_id is a uint64 hex STRING, not a decimal Lua number. Never
+-- pass it through tonumber/float formatting (LuaJIT loses high bits). Tag new
+-- IDs so all-digit hex strings remain distinct from pre-0.57 numeric IDs.
+local function id_token(value)
+	if type(value) == "string" then
+		assert(#value <= 16 and value:match("^[0-9a-f]+$")
+			and (#value == 1 or value:sub(1, 1) ~= "0"), "invalid window ID")
+		return "x" .. value
+	end
+	return string.format("%.0f", integer(value, 1))
+end
+
+local function workspace_token(value)
+	if type(value) ~= "string" then return string.format("%.0f", integer(value, -MAX_INTEGER)) end
+	assert(#value <= 4096 and not value:find("%z")
+		and (value:match("^name:.+") or value:match("^special:.+")), "invalid workspace key")
+	-- Encode bytes, not Lua source: names may contain spaces or non-ASCII text.
+	return "s" .. value:gsub(".", function(byte) return string.format("%02x", byte:byte()) end)
+end
+
 local function focus_token(path, value)
-	return path == "-" and "-" or string.format("%.0f", integer(value, 1))
+	return path == "-" and "-" or id_token(value)
 end
 
 -- Workspace records are sorted; nodes are written in preorder. Selected nodes
@@ -54,9 +76,9 @@ end
 function M.encode(states, pending)
 	local lines = { HEADER, "P " .. presel_tokens(pending) }
 	local ids = {}
-	for id in pairs(states) do ids[#ids + 1] = integer(id, -MAX_INTEGER) end
+	for id in pairs(states) do workspace_token(id); ids[#ids + 1] = id end
 	assert(#ids <= MAX_WORKSPACES, "too many workspaces")
-	table.sort(ids)
+	table.sort(ids, workspace_less)
 	local total = 0
 	for _, id in ipairs(ids) do
 		local st, paths, rows, seen_ids = states[id], {}, {}, {}
@@ -70,14 +92,14 @@ function M.encode(states, pending)
 			assert(total <= MAX_NODES and not paths[node], "invalid/oversized tree")
 			paths[node] = path
 			if node.t == "leaf" then
-				integer(node.id, 1)
+				local token = id_token(node.id)
 				assert(not seen_ids[node.id], "duplicate leaf")
 				seen_ids[node.id] = true
-				rows[#rows + 1] = string.format("L %.0f %.0f %s %s", node.id,
+				rows[#rows + 1] = string.format("L %s %.0f %s %s", token,
 					integer(node.n or 0, 0), presel_tokens(node.presel), floating_tokens(node.floating_geometry))
 			else
 				assert(node.t == "split" and node.a and node.b, "invalid split")
-				local pull_focus = node.pull_focus_id and string.format("%.0f", integer(node.pull_focus_id, 1)) or "-"
+				local pull_focus = node.pull_focus_id and id_token(node.pull_focus_id) or "-"
 				rows[#rows + 1] = string.format("S %s %.17g %s %s", node.axis == "h" and "h" or "v",
 					ratio(node.ratio), presel_tokens(node.presel), pull_focus)
 				visit(node.a, path .. "a", depth + 1)
@@ -88,7 +110,7 @@ function M.encode(states, pending)
 		local selected = paths[st.selected] or "-"
 		local insertion = paths[st.insertion_anchor] or "-"
 		assert(st.mode == "tiled" or st.mode == "monocle", "invalid mode")
-		lines[#lines + 1] = string.format("W %.0f %.0f %s %s %s %s %s", id,
+		lines[#lines + 1] = string.format("W %s %.0f %s %s %s %s %s", workspace_token(id),
 			integer(st.seq or 0, 0), st.mode, selected, focus_token(selected, st.selected_focus_id),
 			insertion, focus_token(insertion, st.insertion_window_id))
 		for _, row in ipairs(rows) do lines[#lines + 1] = row end
@@ -129,12 +151,30 @@ function M.decode(text)
 				w = coordinate(tonumber(next_token()), 1), h = coordinate(tonumber(next_token()), 1) }
 		end
 		local header = next_token()
-		assert(header == HEADER or header == V2_HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
+		assert(header == HEADER or header == V3_HEADER or header == V2_HEADER or header == LEGACY_HEADER, "unsupported checkpoint version")
+		local function read_id(token)
+			if header == HEADER and token:sub(1, 1) == "x" then
+				local id = token:sub(2)
+				id_token(id) -- validate without numeric conversion
+				return id
+			end
+			return integer(tonumber(token), 1)
+		end
 		assert(next_token() == "P", "missing pending preselection")
 		local result = { states = {}, pending = read_presel() }
 		while pos < #tokens do
 			assert(next_token() == "W", "invalid workspace record")
-			local id, seq, mode = read_integer(-MAX_INTEGER), read_integer(0), next_token()
+			local token = next_token()
+			local id
+			if header == HEADER and token:sub(1, 1) == "s" then
+				local bytes = token:sub(2)
+				assert(#bytes <= 8192 and #bytes % 2 == 0 and bytes:match("^[0-9a-f]+$"), "invalid workspace token")
+				id = bytes:gsub("..", function(byte) return string.char(tonumber(byte, 16)) end)
+				workspace_token(id)
+			else
+				id = integer(tonumber(token), -MAX_INTEGER)
+			end
+			local seq, mode = read_integer(0), next_token()
 			assert(not result.states[id] and (mode == "tiled" or mode == "monocle"), "invalid workspace")
 			workspaces = workspaces + 1
 			assert(workspaces <= MAX_WORKSPACES, "too many workspaces")
@@ -147,11 +187,11 @@ function M.decode(text)
 				total = total + 1
 				assert(total <= MAX_NODES, "too many nodes")
 				if kind == "L" then
-					local leaf_id, age = read_integer(1), read_integer(0)
+					local leaf_id, age = read_id(next_token()), read_integer(0)
 					assert(not seen_ids[leaf_id], "duplicate leaf")
 					seen_ids[leaf_id] = true
 					local node = { t = "leaf", id = leaf_id, n = age, presel = read_presel() }
-					if header == HEADER then
+					if header == HEADER or header == V3_HEADER then
 						node.floating_geometry = read_box()
 						if node.floating_geometry then node.floating_geometry.monitor = read_box() end
 					end
@@ -165,7 +205,7 @@ function M.decode(text)
 				node.a, node.b = read_node(depth + 1), read_node(depth + 1)
 				assert(node.a and node.b, "split missing child")
 				if pull_focus ~= "-" then
-					node.pull_focus_id, node.pull_ids = integer(tonumber(pull_focus), 1), {}
+					node.pull_focus_id, node.pull_ids = read_id(pull_focus), {}
 					collect_ids(node, node.pull_ids)
 					assert(node.pull_ids[node.pull_focus_id], "pull representative outside subtree")
 				end
@@ -181,7 +221,7 @@ function M.decode(text)
 				local node = tree
 				for child in path:sub(2):gmatch(".") do node = node and node[child] end
 				assert(node, "missing selected node")
-				return node, integer(tonumber(focus), 1)
+				return node, read_id(focus)
 			end
 			local st = { tree = tree, seq = seq, mode = mode, boxes = {}, highlighted = {} }
 			st.selected, st.selected_focus_id = resolve(selected, focused)

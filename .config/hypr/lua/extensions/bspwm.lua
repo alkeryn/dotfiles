@@ -24,7 +24,7 @@
 --   pratio <0.1..0.9>
 --   preselect cancel | preselect clear
 --   swap <l|r|u|d>          move <l|r|u|d>
---   pointer_swap <source stable_id> <target stable_id> (decimal, same workspace)
+--   pointer_swap <source stable_id> <target stable_id> (opaque IDs, same workspace)
 --   pointer_resize <stable_id> <l|r> <ratio> <u|d> <ratio> (grabbed leaf, -1 = no fence)
 --   grow <l|r|u|d> <px>     shrink <l|r|u|d> <px>
 --   rotate <90|270>         flip <h|v>
@@ -47,6 +47,8 @@ local state_store, store_error = require("lua/extensions/bspwm_state").open_sess
 local restored, restore_error
 if state_store then restored, restore_error = state_store:load() end
 if store_error or restore_error then print("bspwm checkpoint: " .. tostring(store_error or restore_error)) end
+local workspace_identity = require("lua/extensions/bspwm_workspace")
+local workspace_key = workspace_identity.key
 local states = restored and restored.states or {}
 local pending_presel = restored and restored.pending or nil
 local rehydrating = state_store ~= nil
@@ -216,8 +218,8 @@ end
 local function workspace_id(ctx)
 	for _, t in ipairs(ctx.targets) do
 		local w = t.window
-		if w and w.workspace and w.workspace.id then
-			return w.workspace.id
+		if w and w.workspace then
+			return workspace_key(w.workspace)
 		end
 	end
 	return nil
@@ -238,7 +240,7 @@ end
 local function workspace_members(wsid)
 	local members, tiled = {}, {}
 	for _, w in ipairs(hl.get_windows()) do
-		if w.mapped and not closing[w.stable_id] and w.workspace and w.workspace.id == wsid then
+		if w.mapped and not closing[w.stable_id] and w.workspace and workspace_key(w.workspace) == wsid then
 			members[w.stable_id] = true
 			if not w.floating and not w.hidden then tiled[w.stable_id] = true end
 		end
@@ -246,22 +248,18 @@ local function workspace_members(wsid)
 	return members, tiled
 end
 
-local function workspace_selector(ws)
-	-- Negative IDs are parsed as relative moves; named/special desktops need
-	-- an absolute name selector even when a workspace object is available.
-	return ws.id > 0 and ws.id or "name:" .. ws.name
-end
+local workspace_selector = workspace_identity.selector
 
 local function compatible_workspace(ws)
 	return ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b"
 end
 
 local function move_window(window, workspace)
-	if window.workspace and window.workspace.id == workspace.id then return true end
+	if window.workspace and workspace_key(window.workspace) == workspace_key(workspace) then return true end
 	local result = hl.dispatch(hl.dsp.window.move({
 		window = window, workspace = workspace_selector(workspace), follow = false,
 	}))
-	return not (result and result.ok == false) and window.workspace and window.workspace.id == workspace.id
+	return not (result and result.ok == false) and window.workspace and workspace_key(window.workspace) == workspace_key(workspace)
 end
 
 local function take_preselection(anchor)
@@ -337,7 +335,7 @@ hl.window_rule({
 
 on_event("window.active", function(w, reason)
 	if rehydrating or transferring then return end
-	local st = w and w.workspace and states[w.workspace.id]
+	local st = w and w.workspace and states[workspace_key(w.workspace)]
 	if st and st.mode == "monocle" then monocle.raise(w) end
 	if selection_focus then return end
 	-- Re-notification of the same keyboard-focused representative is not a
@@ -406,7 +404,7 @@ on_event("window.move_to_workspace", function(w, ws)
 	if not w or rehydrating or transferring then return end
 	ws = ws or w.workspace
 	for id, st in pairs(states) do
-		if not ws or id ~= ws.id then
+		if not ws or id ~= workspace_key(ws) then
 			detach_node(st, w.stable_id)
 			st.boxes[w.stable_id] = nil
 			tree.update_vacancy(st.tree)
@@ -418,7 +416,7 @@ end)
 -- return transition the tiled target has not been added yet.
 on_event("window.update_rules", function(w)
 	if not w or not w.floating or rehydrating or transferring then return end
-	local st = w.workspace and states[w.workspace.id]
+	local st = w.workspace and states[workspace_key(w.workspace)]
 	local path = st and find_path(st.tree, w.stable_id)
 	if not path or path[#path].vacant then return end
 	path[#path].vacant = true
@@ -429,10 +427,10 @@ end)
 on_event("window.fullscreen", window_leaves_selection)
 on_event("workspace.removed", function(ws)
 	if ws then monocle.remove(ws) end
-	local st = ws and states[ws.id]
+	local st = ws and states[workspace_key(ws)]
 	if st then
 		clear_selection(st)
-		states[ws.id] = nil
+		states[workspace_key(ws)] = nil
 	end
 end)
 on_event("config.reloaded", function()
@@ -460,7 +458,7 @@ on_event("config.props_refreshed", function()
 	local windows, live, tiled, targets = hl.get_windows(), {}, {}, {}
 	for _, w in ipairs(windows) do
 		if w.mapped and not closing[w.stable_id] and w.workspace then
-			local id = w.workspace.id
+			local id = workspace_key(w.workspace)
 			live[id], tiled[id], targets[id] = live[id] or {}, tiled[id] or {}, targets[id] or {}
 			live[id][w.stable_id] = true
 			if not w.floating and not w.hidden then
@@ -486,7 +484,7 @@ on_event("config.props_refreshed", function()
 		end
 		highlight_selection(st, targets[id] or {})
 	end
-	local active_state = active and active.workspace and states[active.workspace.id]
+	local active_state = active and active.workspace and states[workspace_key(active.workspace)]
 	if active_state and active_state.mode == "monocle" then monocle.raise(active) end
 	publish_feedback()
 end)
@@ -652,6 +650,15 @@ local layout_impl = {
 			return false
 		end
 
+		-- Resolve wire tokens against live IDs. 0.57 uses hex strings (including
+		-- letters and full uint64 values); old running sessions use numbers.
+		local function message_id(token)
+			for _, t in ipairs(ctx.targets) do
+				local id = t.window and t.window.stable_id
+				if id and tostring(id) == token then return id end
+			end
+		end
+
 		local fw = focused()
 		local fid = fw and fw.stable_id or nil
 		if st and st.selected and (st.selected_focus_id ~= fid or not find_path(st.tree, st.selected)) then
@@ -688,14 +695,14 @@ local layout_impl = {
 
 		if cmd == "pointer_swap" then
 			if rehydrating or transferring or st.mode ~= "tiled" then return true end
-			local source, target = tonumber(parts[2]), tonumber(parts[3])
+			local source, target = message_id(parts[2]), message_id(parts[3])
 			if source ~= fid or not fw.active or source == target then return true end
 			if target and swap_nodes(st, source, target) then clear_selection(st) end
 			return true
 
 		elseif cmd == "pointer_resize" then
 			if rehydrating or transferring or st.mode ~= "tiled" or not fw.active
-				or tonumber(parts[2]) ~= fid or fw.floating or fw.hidden or fw.group
+				or message_id(parts[2]) ~= fid or fw.floating or fw.hidden or fw.group
 				or (fw.fullscreen or 0) ~= 0 then return true end
 			-- Mouse gestures always target the grabbed leaf, not a keyboard
 			-- subtree selection. Both axes commit in one layout recalculation.
@@ -798,7 +805,7 @@ local function replay_transfer_contexts(contexts)
 		local targets = {}
 		for _, target in ipairs(context.targets) do
 			local w = target.window
-			if w and w.mapped and not w.floating and w.workspace and w.workspace.id == wsid then
+			if w and w.mapped and not w.floating and w.workspace and workspace_key(w.workspace) == wsid then
 				targets[#targets + 1] = target
 			end
 		end
@@ -814,7 +821,7 @@ pull = function(st, node, focused, context)
 	local candidates, windows = {}, {}
 	for _, w in ipairs(hl.get_windows()) do
 		local ws = w.workspace
-		local state = ws and states[ws.id]
+		local state = ws and states[workspace_key(ws)]
 		local layout = ws and ws.tiled_layout
 		local path = state and find_path(state.tree, w.stable_id)
 		if w.mapped and not w.floating and not w.hidden and not w.group and path
@@ -877,10 +884,10 @@ pull = function(st, node, focused, context)
 		moving[#moving + 1] = windows[child.id]
 	end
 	local source_ws, dest_ws = from.window.workspace, to.window.workspace
-	local cross_workspace = source_ws.id ~= dest_ws.id
+	local cross_workspace = workspace_key(source_ws) ~= workspace_key(dest_ws)
 	-- Keep the calling workspace's native targets even for a local transplant:
 	-- no native window.move callback will otherwise reflow it before follow.
-	local contexts, failure = { [focused.workspace.id] = context }, nil
+	local contexts, failure = { [workspace_key(focused.workspace)] = context }, nil
 	-- Border-tag updates can synchronously recalculate on the SAME desktop,
 	-- too. Suppress intermediate selection events/checkpoints for both paths.
 	transferring, transfer_contexts = true, contexts
@@ -891,7 +898,7 @@ pull = function(st, node, focused, context)
 		local ok, err = pcall(function()
 			for _, w in ipairs(moving) do
 				local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
-				if (result and result.ok == false) or not w.workspace or w.workspace.id ~= dest_ws.id then
+				if (result and result.ok == false) or not w.workspace or workspace_key(w.workspace) ~= workspace_key(dest_ws) then
 					failure = "pull: could not move window " .. w.stable_id
 					break
 				end
@@ -905,7 +912,7 @@ pull = function(st, node, focused, context)
 			-- Commit only after native moves succeeded. Reuse the node so split
 			-- ratios, ages and its own preselections travel with it.
 			detach_node(from.st, from.node)
-			local dest_area = contexts[dest_ws.id] and contexts[dest_ws.id].area or context.area
+			local dest_area = contexts[workspace_key(dest_ws)] and contexts[workspace_key(dest_ws)].area or context.area
 			place(to.st.tree, dest_area, {})
 			local pre = to.node.presel
 			to.node.presel = nil
@@ -916,7 +923,7 @@ pull = function(st, node, focused, context)
 		if to.st ~= from.st then clear_selection(to.st) end
 		-- Prune before replay/checkpointing: an empty source produces no native
 		-- callback, and a partially failed move must not leave duplicate leaves.
-		local live = workspace_members(source_ws.id)
+		local live = workspace_members(workspace_key(source_ws))
 		from.st.tree = prune_tree(from.st.tree, live)
 		if not from.st.tree then from.st.boxes = {} end
 		transfer_contexts = nil
@@ -987,7 +994,7 @@ function M.set_floating(window, floating)
 	local function node_for_window()
 		if rehydrating or transferring then return nil end
 		local ws = window.workspace
-		local st = ws and compatible_workspace(ws) and states[ws.id]
+		local st = ws and compatible_workspace(ws) and states[workspace_key(ws)]
 		local path = st and find_path(st.tree, window.stable_id)
 		return path and path[#path]
 	end
@@ -1013,10 +1020,10 @@ function M.move_to_workspace(selector)
 	local active = hl.get_active_window()
 	if not active or not active.mapped or not active.workspace then return true end
 	local source = active.workspace
-	local from = states[source.id]
+	local from = states[workspace_key(source)]
 	local node = from and from.selected
 	local dest = hl.get_workspace(selector)
-	if dest and dest.id == source.id then return true end
+	if dest and workspace_key(dest) == workspace_key(source) then return true end
 	if not node or node.t ~= "split" or active.floating or from.selected_focus_id ~= active.stable_id
 		or not find_path(from.tree, node) then
 		local path = from and find_path(from.tree, active.stable_id)
@@ -1043,7 +1050,7 @@ function M.move_to_workspace(selector)
 	for _, child in ipairs(leaves(node)) do
 		local w = windows[child.id]
 		if not w or not w.mapped or w.floating or w.hidden or w.group
-			or not w.workspace or w.workspace.id ~= source.id then
+			or not w.workspace or workspace_key(w.workspace) ~= workspace_key(source) then
 			return "workspace move: selected subtree contains an unavailable window"
 		end
 		moving[#moving + 1] = w
@@ -1056,7 +1063,7 @@ function M.move_to_workspace(selector)
 	for _, w in ipairs(moving) do moving_ids[w.stable_id] = true end
 	for _, w in pairs(windows) do
 		if w.mapped and not w.hidden and not closing[w.stable_id] and not moving_ids[w.stable_id]
-			and w.workspace and w.workspace.id == source.id then
+			and w.workspace and workspace_key(w.workspace) == workspace_key(source) then
 			local rank = w.focus_history_id
 			if not rank or rank < 0 then rank = math.huge end
 			if not source_focus or rank < best_rank or (rank == best_rank and w.stable_id < source_focus.stable_id) then
@@ -1067,7 +1074,7 @@ function M.move_to_workspace(selector)
 	local source_focus_requested = false
 	local function focus_source()
 		if not source_focus or not source_focus.mapped or source_focus.hidden
-			or not source_focus.workspace or source_focus.workspace.id ~= source.id or source_focus.active then return end
+			or not source_focus.workspace or workspace_key(source_focus.workspace) ~= workspace_key(source) or source_focus.active then return end
 		source_focus_requested = true
 		local result = hl.dispatch(hl.dsp.focus({ window = source_focus }))
 		local current = hl.get_active_window()
@@ -1078,7 +1085,7 @@ function M.move_to_workspace(selector)
 	local to, anchor
 	local function set_destination(ws)
 		if not compatible_workspace(ws) then error("selected subtree requires the bspwm layout", 0) end
-		to = state_for(ws.id)
+		to = state_for(workspace_key(ws))
 		local path = ws.last_window and find_path(to.tree, ws.last_window.stable_id)
 		anchor = to.selected or (path and path[#path]) or last_leaf(to.tree)
 	end
@@ -1096,7 +1103,7 @@ function M.move_to_workspace(selector)
 				-- A numbered/named desktop may not exist yet. Let the first native
 				-- move create it, then pin every remaining move to its absolute ID.
 				local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
-				if w.workspace and w.workspace.id ~= source.id then
+				if w.workspace and workspace_key(w.workspace) ~= workspace_key(source) then
 					dest = w.workspace
 					set_destination(dest)
 				end
@@ -1121,7 +1128,7 @@ function M.move_to_workspace(selector)
 	local replay_ok, replay_error = pcall(function()
 		if ok then
 			detach_node(from, node)
-			local context = contexts[dest.id]
+			local context = contexts[workspace_key(dest)]
 			if context then place(to.tree, context.area, {}) end
 			-- Every send, including a return, uses the destination focus
 			-- snapshotted before native moves could change its history.
@@ -1130,7 +1137,7 @@ function M.move_to_workspace(selector)
 			for _, child in ipairs(leaves(node)) do to.seq = math.max(to.seq, child.n) end
 		end
 		for _, ws in ipairs(dest and { source, dest } or { source }) do
-			local st, live = states[ws.id], {}
+			local st, live = states[workspace_key(ws)], {}
 			for _, w in ipairs(ws:get_windows() or {}) do
 				if w.mapped and not closing[w.stable_id] then live[w.stable_id] = true end
 			end
@@ -1158,7 +1165,7 @@ function M.move_to_workspace(selector)
 			for _, w in ipairs(moving) do targets[#targets + 1] = { window = w } end
 			highlight_selection(to, targets)
 		end
-	elseif not ok and source_focus_requested and active.mapped and active.workspace and active.workspace.id == source.id then
+	elseif not ok and source_focus_requested and active.mapped and active.workspace and workspace_key(active.workspace) == workspace_key(source) then
 		-- A rejected/rolled-back move must not leave our preparatory source
 		-- focus behind. Do not follow a window whose rollback did not succeed.
 		local restored_focus, result = pcall(function() return hl.dispatch(hl.dsp.focus({ window = active })) end)
@@ -1177,10 +1184,10 @@ end
 -- The native API only moves individual windows; defer its intermediate layout
 -- callbacks, exchange the intact states, then replay both final target lists.
 function M.swap_workspaces(cur, tgt)
-	if cur.id == tgt.id then return true end
+	if workspace_key(cur) == workspace_key(tgt) then return true end
 	if rehydrating or transferring then return "workspace swap: layout is busy" end
 	local contexts, moves = {}, {}
-	local cur_state, tgt_state = state_for(cur.id), state_for(tgt.id)
+	local cur_state, tgt_state = state_for(workspace_key(cur)), state_for(workspace_key(tgt))
 	-- Snapshot BOTH sides before any window (or native group) changes ownership.
 	for _, pair in ipairs({ { tgt, cur }, { cur, tgt } }) do
 		for _, w in ipairs(pair[1]:get_windows() or {}) do
@@ -1199,7 +1206,7 @@ function M.swap_workspaces(cur, tgt)
 	if ok then
 		-- Ratios, orientation, ages, preselections and tiled/monocle mode travel
 		-- with the desktop. Geometry is recomputed for the destination monitor.
-		states[cur.id], states[tgt.id] = tgt_state, cur_state
+		states[workspace_key(cur)], states[workspace_key(tgt)] = tgt_state, cur_state
 	else
 		-- Best-effort rollback keeps a rejected move from partially exchanging
 		-- desktops. If rollback also fails, reconcile actual ownership below.
@@ -1211,14 +1218,14 @@ function M.swap_workspaces(cur, tgt)
 	end
 
 	local replay_ok, replay_error = pcall(function()
-		local live = { [cur.id] = {}, [tgt.id] = {} }
+		local live = { [workspace_key(cur)] = {}, [workspace_key(tgt)] = {} }
 		for _, w in ipairs(hl.get_windows()) do
-			local ids = w.workspace and live[w.workspace.id]
+			local ids = w.workspace and live[workspace_key(w.workspace)]
 			if ids and w.mapped and not closing[w.stable_id] then ids[w.stable_id] = true end
 		end
 		for _, ws in ipairs({ cur, tgt }) do
-			local st = states[ws.id]
-			st.tree = prune_tree(st.tree, live[ws.id])
+			local st = states[workspace_key(ws)]
+			st.tree = prune_tree(st.tree, live[workspace_key(ws)])
 			st.boxes = {}
 			-- Selection is transient; per-node preselection stays in the tree.
 			clear_selection(st)
@@ -1240,7 +1247,7 @@ end
 -- it temporarily floats/removes the source instead of doing bspwm pointer swaps.
 function M.drag_valid(w)
 	local ws = w and w.workspace
-	local st = ws and states[ws.id]
+	local st = ws and states[workspace_key(ws)]
 	return ws ~= nil and st ~= nil and not rehydrating and not transferring and w.mapped and not w.floating
 		and not w.hidden and w.visible ~= false and not w.group and (w.fullscreen or 0) == 0
 		and ws.visible ~= false and (ws.tiled_layout == "lua:bspwm" or ws.tiled_layout == "lua:bspwm_b")
@@ -1251,12 +1258,12 @@ end
 -- forwards the corner/delta to Lua. Snapshot the two visible fences ourselves.
 function M.resize_begin(w, pos)
 	if not M.drag_valid(w) or not w.at or not w.size then return nil end
-	local st = states[w.workspace.id]
+	local st = states[workspace_key(w.workspace)]
 	local path = find_path(st.tree, w.stable_id)
 	local box = st.tree._box
 	if not box then return nil end
 	local grab = {
-		workspace_id = w.workspace.id, leaf = path[#path],
+		workspace_id = workspace_key(w.workspace), leaf = path[#path],
 		origin = { x = pos.x, y = pos.y },
 		area = { x = box.x, y = box.y, w = box.w, h = box.h }, fences = {},
 	}
@@ -1277,8 +1284,8 @@ function M.resize_begin(w, pos)
 end
 
 function M.resize_motion(w, grab, pos)
-	if not grab or not M.drag_valid(w) or not w.active or w.workspace.id ~= grab.workspace_id then return false end
-	local st = states[w.workspace.id]
+	if not grab or not M.drag_valid(w) or not w.active or workspace_key(w.workspace) ~= grab.workspace_id then return false end
+	local st = states[workspace_key(w.workspace)]
 	local path = find_path(st.tree, w.stable_id)
 	if path[#path] ~= grab.leaf then return false end
 	local box, area = st.tree._box, grab.area
@@ -1300,13 +1307,13 @@ function M.resize_motion(w, grab, pos)
 		end
 	end
 	if not changed then return true end
-	local result = hl.dispatch(hl.dsp.layout(string.format("pointer_resize %d %s %.17g %s %.17g",
-		w.stable_id, grab.fences[1].dir, ratios[1], grab.fences[2].dir, ratios[2])))
+	local result = hl.dispatch(hl.dsp.layout(string.format("pointer_resize %s %s %.17g %s %.17g",
+		tostring(w.stable_id), grab.fences[1].dir, ratios[1], grab.fences[2].dir, ratios[2])))
 	return not result or result.ok ~= false
 end
 
 function M.drag_swap(w, other)
-	if not M.drag_valid(w) or not M.drag_valid(other) or w.workspace.id ~= other.workspace.id then return false end
+	if not M.drag_valid(w) or not M.drag_valid(other) or workspace_key(w.workspace) ~= workspace_key(other.workspace) then return false end
 	if not w.active then hl.dispatch(hl.dsp.focus({ window = w })) end
 	if not w.active then return false end
 	local result = hl.dispatch(hl.dsp.layout("pointer_swap " .. w.stable_id .. " " .. other.stable_id))
@@ -1316,10 +1323,10 @@ end
 -- bspwm window.c:move_client transfers (rather than swaps) when crossing a
 -- monitor boundary, then subsequent motion swaps in the destination desktop.
 function M.drag_transfer(w, dest)
-	if not M.drag_valid(w) or not dest or dest.id == w.workspace.id or dest.visible == false
+	if not M.drag_valid(w) or not dest or workspace_key(dest) == workspace_key(w.workspace) or dest.visible == false
 		or (dest.tiled_layout ~= "lua:bspwm" and dest.tiled_layout ~= "lua:bspwm_b") then return false end
 	local source = w.workspace
-	local from, to = states[source.id], state_for(dest.id)
+	local from, to = states[workspace_key(source)], state_for(workspace_key(dest))
 	local path = find_path(from.tree, w.stable_id)
 	local node = path[#path]
 	local anchor = dest.last_window and dest.last_window.stable_id
@@ -1327,18 +1334,18 @@ function M.drag_transfer(w, dest)
 	local function move_to(ws)
 		local selector = workspace_selector(ws)
 		local result = hl.dispatch(hl.dsp.window.move({ window = w, workspace = selector, follow = false }))
-		return not (result and result.ok == false) and w.workspace and w.workspace.id == ws.id
+		return not (result and result.ok == false) and w.workspace and workspace_key(w.workspace) == workspace_key(ws)
 	end
 	transferring, transfer_contexts = true, contexts
 	local ok, moved = pcall(move_to, dest)
 	local success = ok and moved
-	if not success and w.workspace and w.workspace.id ~= source.id then pcall(move_to, source) end
+	if not success and w.workspace and workspace_key(w.workspace) ~= workspace_key(source) then pcall(move_to, source) end
 	local replay_ok, replay_error = pcall(function()
 		if success then
 			detach_node(from, node)
 			local anchor_path = anchor and find_path(to.tree, anchor)
 			local anchor_node = anchor_path and anchor_path[#anchor_path] or last_leaf(to.tree)
-			local context = contexts[dest.id]
+			local context = contexts[workspace_key(dest)]
 			if context then place(to.tree, context.area, {}) end
 			local pre = take_preselection(anchor_node)
 			insert_adjacent(to, node, anchor_node, pre and pre.dir, pre and pre.ratio)
@@ -1347,7 +1354,7 @@ function M.drag_transfer(w, dest)
 		-- Reconcile even after a failed native move/rollback. Empty sources
 		-- have no callback, so must be pruned explicitly before checkpointing.
 		for _, ws in ipairs({ source, dest }) do
-			local st, live = states[ws.id], {}
+			local st, live = states[workspace_key(ws)], {}
 			for _, window in ipairs(ws:get_windows() or {}) do
 				if window.mapped and not closing[window.stable_id] then live[window.stable_id] = true end
 			end
@@ -1378,7 +1385,7 @@ end
 
 function M.close_selected()
 	local active = hl.get_active_window()
-	local st = active and active.workspace and states[active.workspace.id]
+	local st = active and active.workspace and states[workspace_key(active.workspace)]
 	if not st or not st.selected or st.selected.t ~= "split" or active.floating
 		or st.selected_focus_id ~= active.stable_id or not find_path(st.tree, st.selected) then return false end
 
@@ -1388,7 +1395,7 @@ function M.close_selected()
 	collect_ids(st.selected, ids)
 	for _, w in ipairs(hl.get_windows()) do
 		if ids[w.stable_id] and w.mapped and not w.floating
-			and w.workspace and w.workspace.id == active.workspace.id then windows[#windows + 1] = w end
+			and w.workspace and workspace_key(w.workspace) == workspace_key(active.workspace) then windows[#windows + 1] = w end
 	end
 	if #windows < 2 then return false end
 	clear_selection(st)
@@ -1419,7 +1426,7 @@ function M.has_neighbor(dir)
 	if rehydrating or transferring then return false end
 	local w = hl.get_active_window()
 	if not w or not w.mapped or w.floating or w.hidden or not w.workspace then return false end
-	local st = states[w.workspace.id]
+	local st = states[workspace_key(w.workspace)]
 	if not st then return false end
 	local node = st.selected
 	if not node or st.selected_focus_id ~= w.stable_id or not find_path(st.tree, node) then

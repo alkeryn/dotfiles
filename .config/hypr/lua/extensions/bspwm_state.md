@@ -1,6 +1,6 @@
 # Keeping the bspwm layout across config reloads
 
-Hyprland 0.56.2 destroys the Lua state on a successful reload. `lua/extensions/bspwm.lua` now
+Hyprland 0.56.2 and 0.57.1 destroy the Lua state on a successful reload. `lua/extensions/bspwm.lua` now
 loads a checkpoint **before registering its layout providers** and checkpoints
 layout commands, recalculations and selection events. `Super+Escape` flushes the
 checkpoint and still runs the real `hyprctl reload`; automatic file reloads are
@@ -40,8 +40,8 @@ The existing two-provider workaround remains: it replaces stale provider
 instances without throwing away the tree. Fullscreen is preserved separately by
 [`bspwm_fullscreen_reload.lua`](bspwm_fullscreen_reload.md): static window tags retain the two
 fullscreen modes across native layout replacement, and Lua restores lost modes
-at the refresh barrier before tree checkpointing resumes. The disk checkpoint
-format is unchanged; no native fullscreen hook is needed.
+at the refresh barrier before tree checkpointing resumes. Fullscreen modes remain
+outside the disk checkpoint; no native fullscreen hook is needed.
 
 ## Storage and safety
 
@@ -55,8 +55,15 @@ data tokens, **never executes Lua from a state file**, and rejects corruption,
 invalid nodes, duplicate leaves, excessive depth or oversized input. Errors are
 logged with `bspwm checkpoint:`; persistence failure does not disable tiling.
 
-V3 adds an optional floating rectangle and monitor bounds to leaf records. V2
-introduced an optional pull-source representative on splits. V1 and V2 files
+V4 supports Hyprland 0.57 identities: window IDs are exact hexadecimal strings,
+not numbers; named/special workspaces use absolute addressable selectors because
+`.id` is now nil. Hex window tokens have an `x` prefix; string workspace keys use
+`s` followed by hex-encoded bytes so spaces/UTF-8 cannot break tokenization. Numeric
+IDs remain supported for still-running 0.56 sessions. Checkpoints are session-local,
+so old numeric window IDs are never guessed to be new hexadecimal identities.
+
+V3 added an optional floating rectangle and monitor bounds to leaf records. V2
+introduced an optional pull-source representative on splits. V1–V3 files
 are still accepted and upgraded on the next save without rebuilding their trees.
 Floating coordinates are bounded integers and rectangle dimensions must be positive.
 The decoder verifies each remembered representative belongs to its subtree and

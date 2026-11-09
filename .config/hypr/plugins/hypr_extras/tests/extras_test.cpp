@@ -6,6 +6,7 @@
 #include <hyprland/src/managers/SessionLockManager.hpp>
 #include <hyprland/src/protocols/XDGShell.hpp>
 #include <hyprland/src/helpers/cm/ColorManagement.hpp>
+#include <hyprland/src/desktop/view/window/WaylandBackend.hpp>
 #include <algorithm>
 #include <cassert>
 #include <dlfcn.h>
@@ -23,6 +24,9 @@ class CWindow {
     PHLMONITORREF monitor;
     bool pinned = false;
     void sendWindowSize(bool);
+    bool mapped() const;
+    bool isFloating() const;
+    IWindowBackend& backend();
 };
 }
 PPLUGIN_API_VERSION_FUNC plugin_api_version;
@@ -30,9 +34,9 @@ PPLUGIN_INIT_FUNC plugin_init;
 PPLUGIN_EXIT_FUNC plugin_exit;
 
 using refocus_fn = void (*)(CInputManager*, std::optional<Vector2D>);
-using mouse_fn = void (*)(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>);
+using mouse_fn = void (*)(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>, bool);
 using monitor_fn = void (*)(Desktop::CFocusState*, PHLMONITOR);
-using schedule_fn = void (*)(CXDGToplevelResource*);
+using configure_fn = void (*)(Desktop::View::CWaylandBackend*, const CBox&, PHLMONITOR, bool);
 
 namespace fixture {
 Config::INTEGER follow = 2;
@@ -41,7 +45,7 @@ void* follow_ptr = &follow;
 void* monitor_ptr = &mouse_monitor;
 int mouse_calls = 0, monitor_calls = 0, cleanup_calls = 0;
 uint32_t last_time = 0;
-bool last_refocus = false, last_mouse = false, focus_window = false;
+bool last_refocus = false, last_mouse = false, last_pointer_only = false, focus_window = false;
 std::optional<Vector2D> last_position;
 std::string abi;
 std::string missing, ambiguous;
@@ -51,7 +55,11 @@ std::vector<void*> removed;
 bool session_locked = false;
 PHLMONITOR current_monitor, cursor_monitor;
 PHLWINDOWREF remembered_window, keyboard_window;
-int restore_calls = 0, surface_clear_calls = 0, schedule_calls = 0;
+int restore_calls = 0, surface_clear_calls = 0, configure_calls = 0;
+Desktop::View::CWaylandBackend* configured_backend = nullptr;
+CBox configured_box;
+PHLMONITOR configured_monitor;
+bool configured_force = false;
 
 void clear_counts() {
     mouse_calls = monitor_calls = cleanup_calls = 0;
@@ -64,10 +72,16 @@ void clear_counts() {
 // Named, exported, non-inlined functions provide real ELF bounds/return addresses.
 #define NATIVE extern "C" __attribute__((noinline))
 NATIVE void native_refocus(CInputManager*, std::optional<Vector2D>);
-NATIVE void native_mouse(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>);
+NATIVE void native_mouse(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>, bool);
 NATIVE void native_monitor(Desktop::CFocusState*, PHLMONITOR);
-NATIVE void native_schedule(CXDGToplevelResource*) { ++fixture::schedule_calls; }
-schedule_fn schedule_entry = native_schedule;
+NATIVE void native_configure(Desktop::View::CWaylandBackend* backend, const CBox& box, PHLMONITOR monitor, bool force) {
+    ++fixture::configure_calls;
+    fixture::configured_backend = backend;
+    fixture::configured_box = box;
+    fixture::configured_monitor = monitor;
+    fixture::configured_force = force;
+}
+configure_fn configure_entry = native_configure;
 refocus_fn refocus_entry = native_refocus;
 mouse_fn mouse_entry = native_mouse;
 monitor_fn monitor_entry = native_monitor;
@@ -77,19 +91,22 @@ NATIVE void native_monitor(Desktop::CFocusState*, PHLMONITOR monitor) {
     ++fixture::monitor_calls;
     fixture::current_monitor = monitor;
 }
-NATIVE void native_mouse(CInputManager*, uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> position) {
-    ++fixture::mouse_calls;
+NATIVE void native_mouse(CInputManager*, uint32_t time, bool refocus, bool mouse, std::optional<Vector2D> position, bool pointer_only) {
     fixture::last_time = time;
     fixture::last_refocus = refocus;
     fixture::last_mouse = mouse;
     fixture::last_position = position;
+    fixture::last_pointer_only = pointer_only;
+    if (pointer_only)
+        return;
+    ++fixture::mouse_calls;
     if (fixture::mouse_monitor || refocus)
         monitor_entry(nullptr, fixture::cursor_monitor);
     if (fixture::focus_window)
         native_window_focus();
 }
 NATIVE void native_refocus(CInputManager* self, std::optional<Vector2D> position) {
-    mouse_entry(self, 0, true, false, position);
+    mouse_entry(self, 0, true, false, position, false);
 }
 NATIVE void native_explicit_refocus() { refocus_entry(nullptr, {}); }
 NATIVE void native_unmap(bool inlined, bool candidate, bool callback) {
@@ -98,35 +115,39 @@ NATIVE void native_unmap(bool inlined, bool candidate, bool callback) {
     if (candidate)
         native_window_focus();
     else if (inlined)
-        mouse_entry(nullptr, 0, true, false, {});
+        mouse_entry(nullptr, 0, true, false, {}, false);
     else
         refocus_entry(nullptr, {});
     ++fixture::cleanup_calls;
 }
 NATIVE void native_layer_unmap(bool inlined) {
     if (inlined)
-        mouse_entry(nullptr, 0, true, false, {});
+        mouse_entry(nullptr, 0, true, false, {}, false);
     else
         refocus_entry(nullptr, {});
     ++fixture::cleanup_calls;
     // The real layer unmap also simulates ordinary mouse motion afterward.
-    mouse_entry(nullptr, 91, false, true, {});
+    mouse_entry(nullptr, 91, false, true, {}, false);
 }
 NATIVE bool native_last_window(bool inlined, bool candidate) {
     if (candidate)
         native_window_focus();
     else if (inlined)
-        mouse_entry(nullptr, 0, true, false, {});
+        mouse_entry(nullptr, 0, true, false, {}, false);
     else
         refocus_entry(nullptr, {});
     return true;
 }
 
 // Minimal native-service shims, compiled against the installed headers.
-// Geometry uses real CWindow fields; these opaque focus fixtures must NEVER be
-// passed to it. Its policy has separate tests; here we test lifecycle, symbol
-// binding and the real hook's orphan-resource pass-through only.
+// These opaque focus windows must NEVER be passed to geometry. Its policy has
+// separate tests; here the real geometry hook receives a native-shaped inert
+// backend (wayland_backend_stub.cpp) to check lifecycle/argument forwarding.
 void Desktop::View::CWindow::sendWindowSize(bool) { assert(false && "not a real window fixture"); }
+bool Desktop::View::CWindow::mapped() const { throw std::logic_error("not a real window fixture"); }
+bool Desktop::View::CWindow::isFloating() const { throw std::logic_error("not a real window fixture"); }
+Desktop::View::IWindowBackend& Desktop::View::CWindow::backend() { throw std::logic_error("not a real window fixture"); }
+bool Desktop::View::IWindowBackend::isX11() const { throw std::logic_error("not a real backend fixture"); }
 CXDGToplevelResource::CXDGToplevelResource(SP<CXdgToplevel>, SP<CXDGSurfaceResource>) {}
 CXDGToplevelResource::~CXDGToplevelResource() = default;
 CSessionLockManager::CSessionLockManager() = default;
@@ -192,9 +213,9 @@ APICALL std::vector<SFunctionMatch> HyprlandAPI::findFunctionsByName(HANDLE, con
         {(void*)&native_layer_unmap, "onUnmap", "Desktop::View::CLayerSurface::onUnmap()"},
         {(void*)&native_last_window, "refocusLastWindow", "CInputManager::refocusLastWindow(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"},
         {(void*)&native_refocus, "refocus", "CInputManager::refocus(std::optional<Hyprutils::Math::Vector2D>)"},
-        {(void*)&native_mouse, "mouseMoveUnified", "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>)"},
+        {(void*)&native_mouse, "mouseMoveUnified", "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>, bool)"},
         {(void*)&native_monitor, "rawMonitorFocus", "Desktop::CFocusState::rawMonitorFocus(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"},
-        {(void*)&native_schedule, "scheduleStateApplication", "CXDGToplevelResource::scheduleStateApplication()"},
+        {(void*)&native_configure, "configure", "Desktop::View::CWaylandBackend::configure(Hyprutils::Math::CBox const&, Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>, bool)"},
     };
     std::vector<SFunctionMatch> result;
     for (const auto& entry : all) {
@@ -215,7 +236,7 @@ bool CFunctionHook::hook() {
     if (m_source == (void*)&native_refocus) refocus_entry = (refocus_fn)m_destination;
     else if (m_source == (void*)&native_mouse) mouse_entry = (mouse_fn)m_destination;
     else if (m_source == (void*)&native_monitor) monitor_entry = (monitor_fn)m_destination;
-    else if (m_source == (void*)&native_schedule) schedule_entry = (schedule_fn)m_destination;
+    else if (m_source == (void*)&native_configure) configure_entry = (configure_fn)m_destination;
     else assert(false);
     return true;
 }
@@ -223,7 +244,7 @@ bool CFunctionHook::unhook() {
     if (m_source == (void*)&native_refocus) refocus_entry = native_refocus;
     if (m_source == (void*)&native_mouse) mouse_entry = native_mouse;
     if (m_source == (void*)&native_monitor) monitor_entry = native_monitor;
-    if (m_source == (void*)&native_schedule) schedule_entry = native_schedule;
+    if (m_source == (void*)&native_configure) configure_entry = native_configure;
     fixture::removed.push_back(m_source);
     return true;
 }
@@ -253,8 +274,12 @@ void unlock_session(bool inlined = false) {
     const auto before = fixture::restore_calls;
     g_pSessionLockManager->m_events.unlock.emit();
     assert(fixture::restore_calls == before); // never restore inside the signal
+    // Pointer-only work must neither restore keyboard focus nor consume the
+    // pending restoration before the following native forced refocus.
+    mouse_entry(nullptr, 0, true, false, {}, true);
+    assert(fixture::last_pointer_only && fixture::restore_calls == before);
     if (inlined)
-        mouse_entry(nullptr, 0, true, false, {});
+        mouse_entry(nullptr, 0, true, false, {}, false);
     else
         refocus_entry(nullptr, {});
 }
@@ -363,7 +388,7 @@ void assert_unloaded() {
     assert(fixture::live_hooks.empty());
     assert(CConfigValueBase::registry().empty());
     assert(refocus_entry == native_refocus && mouse_entry == native_mouse && monitor_entry == native_monitor);
-    assert(schedule_entry == native_schedule);
+    assert(configure_entry == native_configure);
 }
 void expect_init_failure() {
     bool threw = false;
@@ -387,7 +412,7 @@ int main(int argc, char** argv) {
     fixture::abi = __hyprland_api_get_client_hash();
     expect_init_failure(); // no session lock manager yet
     g_pSessionLockManager = makeUnique<CSessionLockManager>();
-    for (const auto& name : {"unmapWindow", "onUnmap", "refocusLastWindow", "refocus", "mouseMoveUnified", "rawMonitorFocus", "scheduleStateApplication"}) {
+    for (const auto& name : {"unmapWindow", "onUnmap", "refocusLastWindow", "refocus", "mouseMoveUnified", "rawMonitorFocus", "configure"}) {
         fixture::missing = name;
         expect_init_failure();
         fixture::missing.clear();
@@ -408,17 +433,21 @@ int main(int argc, char** argv) {
     std::cout << "PASS ABI, symbol validation and partial-install rollback\n";
 
     const auto description = plugin_init((HANDLE)1);
-    assert(description.name == "hypr_extras" && description.version == "0.3.0" && fixture::live_hooks.size() == 4);
+    assert(description.name == "hypr_extras" && description.version == "0.4.1" && fixture::live_hooks.size() == 4);
     {
-        CXDGToplevelResource orphan({}, {});
-        orphan.m_pendingApply.size = {123, 456};
-        orphan.m_pendingApply.states = {XDG_TOPLEVEL_STATE_TILED_LEFT};
-        schedule_entry(&orphan);
-        assert(fixture::schedule_calls == 1);
-        assert(orphan.m_pendingApply.size == Vector2D(123, 456));
-        assert(orphan.m_pendingApply.states == std::vector{XDG_TOPLEVEL_STATE_TILED_LEFT});
+        Desktop::View::CWaylandBackend orphan({});
+        const CBox box{17, 29, 123, 456};
+        auto monitor = makeShared<Monitor::CMonitor>();
+        for (bool force : {false, true}) {
+            configure_entry(&orphan, box, monitor, force);
+            assert(fixture::configured_backend == &orphan && fixture::configured_force == force);
+            assert(fixture::configured_box.pos() == box.pos() && fixture::configured_box.size() == box.size());
+            assert(fixture::configured_monitor == monitor);
+        }
+        assert(fixture::configure_calls == 2);
+        fixture::configured_monitor.reset();
     }
-    std::cout << "PASS real geometry hook orphan-resource pass-through\n";
+    std::cout << "PASS real geometry hook inert-backend argument forwarding\n";
     for (int mode : {0, 1, 2, 3}) {
         fixture::follow = mode; // config values stay live without reinstalling hooks
         for (bool inlined : {false, true}) {
@@ -464,7 +493,7 @@ int main(int argc, char** argv) {
     std::cout << "PASS candidates, explicit/reentrant focus, clicks and mouse-focus opt-in\n";
 
     fixture::clear_counts();
-    mouse_entry(nullptr, 123, false, true, Vector2D{17, 29});
+    mouse_entry(nullptr, 123, false, true, Vector2D{17, 29}, false);
     assert(fixture::mouse_calls == 1 && fixture::monitor_calls == 0);
     assert(fixture::last_time == 123 && !fixture::last_refocus && fixture::last_mouse);
     assert(fixture::last_position && fixture::last_position->x == 17 && fixture::last_position->y == 29);
@@ -486,7 +515,7 @@ int main(int argc, char** argv) {
     fixture::removed.clear();
     plugin_exit();
     assert_unloaded();
-    assert((fixture::removed == std::vector<void*>{(void*)&native_schedule, (void*)&native_monitor, (void*)&native_mouse, (void*)&native_refocus}));
+    assert((fixture::removed == std::vector<void*>{(void*)&native_configure, (void*)&native_monitor, (void*)&native_mouse, (void*)&native_refocus}));
     fixture::clear_counts();
     native_explicit_refocus();
     assert(fixture::restore_calls == 0); // pending work was discarded
