@@ -3,6 +3,8 @@
 Follow-up: [terminal initial-size fix](terminal_initial_size.md), `hypr_extras`
 v0.4.1, corrects a wire/cache/ack mismatch in the initial v0.4.0 port described
 below. The geometry hook now runs before backend configure bookkeeping.
+[HDR feedback compatibility](hdr_feedback.md) in v0.4.2 additionally restores
+pre-0.57 preferred-format negotiation without disabling automatic HDR.
 
 ## Upstream references
 
@@ -125,7 +127,7 @@ unlock need the desktop checks below. No live reload, logout or restart was issu
    `Hyprland --version` (installed binary). If still on 0.56.2, log out and back in;
    reloading configuration cannot upgrade the executable.
 2. While unlocked, `hyprctl reload`. Check `hyprctl configerrors` and
-   `hyprctl plugin list`; expect no config errors and `hypr_extras` v0.4.1.
+   `hyprctl plugin list`; expect no config errors and `hypr_extras` v0.4.2.
 3. Test Super+mouse drag/resize, Super+b selection, Super+y pull, workspace
    sends/swaps, monocle and Super+Escape reload. Check that tree ratios,
    preselections, floating rectangles and fullscreen video survive reload.

@@ -81,7 +81,7 @@ hyprctl plugin list
 hyprctl configerrors
 ```
 
-Expect `hypr_extras` **v0.4.1**. Open new terminals on an empty workspace, beside
+Expect `hypr_extras` **v0.4.1 or later** (v0.4.2 also adds [HDR feedback compatibility](hdr_feedback.md)). Open new terminals on an empty workspace, beside
 existing tiles, and directly floating (Super+Alt+Space). Also check float/tile
 round-trips and fullscreen video. If the flash remains, report whether it occurs
 in all three cases and whether the rectangle starts at the top-left or centre;

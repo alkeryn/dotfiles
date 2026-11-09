@@ -37,6 +37,8 @@ using refocus_fn = void (*)(CInputManager*, std::optional<Vector2D>);
 using mouse_fn = void (*)(CInputManager*, uint32_t, bool, bool, std::optional<Vector2D>, bool);
 using monitor_fn = void (*)(Desktop::CFocusState*, PHLMONITOR);
 using configure_fn = void (*)(Desktop::View::CWaylandBackend*, const CBox&, PHLMONITOR, bool);
+using hdr_offer = std::optional<NColorManagement::PImageDescription>;
+using hdr_offer_fn = hdr_offer (*)(Monitor::CMonitor*, const SP<CWLSurfaceResource>&);
 
 namespace fixture {
 Config::INTEGER follow = 2;
@@ -60,6 +62,8 @@ Desktop::View::CWaylandBackend* configured_backend = nullptr;
 CBox configured_box;
 PHLMONITOR configured_monitor;
 bool configured_force = false;
+bool native_offers_hdr = true;
+int hdr_offer_calls = 0;
 
 void clear_counts() {
     mouse_calls = monitor_calls = cleanup_calls = 0;
@@ -81,6 +85,15 @@ NATIVE void native_configure(Desktop::View::CWaylandBackend* backend, const CBox
     fixture::configured_monitor = monitor;
     fixture::configured_force = force;
 }
+NATIVE hdr_offer native_hdr_offer(Monitor::CMonitor*, const SP<CWLSurfaceResource>&) {
+    ++fixture::hdr_offer_calls;
+    // An engaged optional is the native HDR-offer sentinel in this fixture;
+    // no actual monitor or colour profile is constructed by the test.
+    if (fixture::native_offers_hdr)
+        return NColorManagement::PImageDescription{};
+    return std::nullopt;
+}
+hdr_offer_fn hdr_offer_entry = native_hdr_offer;
 configure_fn configure_entry = native_configure;
 refocus_fn refocus_entry = native_refocus;
 mouse_fn mouse_entry = native_mouse;
@@ -216,6 +229,7 @@ APICALL std::vector<SFunctionMatch> HyprlandAPI::findFunctionsByName(HANDLE, con
         {(void*)&native_mouse, "mouseMoveUnified", "CInputManager::mouseMoveUnified(unsigned int, bool, bool, std::optional<Hyprutils::Math::Vector2D>, bool)"},
         {(void*)&native_monitor, "rawMonitorFocus", "Desktop::CFocusState::rawMonitorFocus(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"},
         {(void*)&native_configure, "configure", "Desktop::View::CWaylandBackend::configure(Hyprutils::Math::CBox const&, Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>, bool)"},
+        {(void*)&native_hdr_offer, "getAutoHDRImageDescription", "Monitor::CMonitor::getAutoHDRImageDescription(Hyprutils::Memory::CSharedPointer<CWLSurfaceResource> const&)"},
     };
     std::vector<SFunctionMatch> result;
     for (const auto& entry : all) {
@@ -237,6 +251,7 @@ bool CFunctionHook::hook() {
     else if (m_source == (void*)&native_mouse) mouse_entry = (mouse_fn)m_destination;
     else if (m_source == (void*)&native_monitor) monitor_entry = (monitor_fn)m_destination;
     else if (m_source == (void*)&native_configure) configure_entry = (configure_fn)m_destination;
+    else if (m_source == (void*)&native_hdr_offer) hdr_offer_entry = (hdr_offer_fn)m_destination;
     else assert(false);
     return true;
 }
@@ -245,6 +260,7 @@ bool CFunctionHook::unhook() {
     if (m_source == (void*)&native_mouse) mouse_entry = native_mouse;
     if (m_source == (void*)&native_monitor) monitor_entry = native_monitor;
     if (m_source == (void*)&native_configure) configure_entry = native_configure;
+    if (m_source == (void*)&native_hdr_offer) hdr_offer_entry = native_hdr_offer;
     fixture::removed.push_back(m_source);
     return true;
 }
@@ -384,11 +400,40 @@ void test_unlock_focus() {
     std::cout << "PASS unlock focus, pinned/closed windows, relock, monitor removal and lock guard\n";
 }
 
+void test_hdr_feedback() {
+    Monitor::CMonitor monitor; // the hook must not dereference it
+    enum class profile { sdr, hdr, hdr_edid, icc };
+    const auto preferred = [&](profile current, bool force_hdr, bool has_monitor) {
+        // Model the caller's existing forced-HDR and no-monitor early returns,
+        // then its getAutoHDRImageDescription(...).value_or(current) fallback.
+        if (force_hdr)
+            return profile::hdr;
+        if (!has_monitor)
+            return current;
+        return hdr_offer_entry(&monitor, {}).has_value() ? profile::hdr : current;
+    };
+    const auto calls_before = fixture::hdr_offer_calls;
+    for (bool native_offer : {false, true}) {
+        fixture::native_offers_hdr = native_offer;
+        for (const auto current : {profile::sdr, profile::hdr, profile::hdr_edid, profile::icc}) {
+            for (int query = 0; query < 3; ++query)
+                assert(preferred(current, false, true) == current);
+            assert(preferred(current, true, true) == profile::hdr); // explicit quirk unchanged
+            assert(preferred(current, false, false) == current); // compositor fallback unchanged
+        }
+        assert(!hdr_offer_entry(nullptr, {}).has_value()); // not an engaged-but-empty weak pointer
+    }
+    assert(fixture::hdr_offer_calls == calls_before); // native unsolicited offer was bypassed
+    fixture::native_offers_hdr = true;
+    std::cout << "PASS real HDR feedback hook and current SDR/HDR/ICC preference fallback model\n";
+}
+
 void assert_unloaded() {
     assert(fixture::live_hooks.empty());
     assert(CConfigValueBase::registry().empty());
     assert(refocus_entry == native_refocus && mouse_entry == native_mouse && monitor_entry == native_monitor);
     assert(configure_entry == native_configure);
+    assert(hdr_offer_entry == native_hdr_offer);
 }
 void expect_init_failure() {
     bool threw = false;
@@ -412,7 +457,7 @@ int main(int argc, char** argv) {
     fixture::abi = __hyprland_api_get_client_hash();
     expect_init_failure(); // no session lock manager yet
     g_pSessionLockManager = makeUnique<CSessionLockManager>();
-    for (const auto& name : {"unmapWindow", "onUnmap", "refocusLastWindow", "refocus", "mouseMoveUnified", "rawMonitorFocus", "configure"}) {
+    for (const auto& name : {"unmapWindow", "onUnmap", "refocusLastWindow", "refocus", "mouseMoveUnified", "rawMonitorFocus", "configure", "getAutoHDRImageDescription"}) {
         fixture::missing = name;
         expect_init_failure();
         fixture::missing.clear();
@@ -420,7 +465,7 @@ int main(int argc, char** argv) {
         expect_init_failure();
         fixture::ambiguous.clear();
     }
-    for (int i = 1; i <= 4; ++i) {
+    for (int i = 1; i <= 5; ++i) {
         fixture::hook_attempts = fixture::create_attempts = 0;
         fixture::fail_hook = i;
         expect_init_failure();
@@ -432,8 +477,10 @@ int main(int argc, char** argv) {
     }
     std::cout << "PASS ABI, symbol validation and partial-install rollback\n";
 
+    assert(hdr_offer_entry(nullptr, {}).has_value()); // unpatched control offers HDR
     const auto description = plugin_init((HANDLE)1);
-    assert(description.name == "hypr_extras" && description.version == "0.4.1" && fixture::live_hooks.size() == 4);
+    assert(description.name == "hypr_extras" && description.version == "0.4.2" && fixture::live_hooks.size() == 5);
+    test_hdr_feedback();
     {
         Desktop::View::CWaylandBackend orphan({});
         const CBox box{17, 29, 123, 456};
@@ -515,12 +562,14 @@ int main(int argc, char** argv) {
     fixture::removed.clear();
     plugin_exit();
     assert_unloaded();
-    assert((fixture::removed == std::vector<void*>{(void*)&native_configure, (void*)&native_monitor, (void*)&native_mouse, (void*)&native_refocus}));
+    assert((fixture::removed == std::vector<void*>{(void*)&native_hdr_offer, (void*)&native_configure, (void*)&native_monitor, (void*)&native_mouse, (void*)&native_refocus}));
+    assert(hdr_offer_entry(nullptr, {}).has_value()); // native preference restored on unload
     fixture::clear_counts();
     native_explicit_refocus();
     assert(fixture::restore_calls == 0); // pending work was discarded
     fixture::session_locked = true;
     plugin_init((HANDLE)1); // loading mid-lock must not focus an application
+    test_hdr_feedback();
     assert(fixture::restore_calls == 0);
     unlock_session();
     assert(fixture::restore_calls == 1);

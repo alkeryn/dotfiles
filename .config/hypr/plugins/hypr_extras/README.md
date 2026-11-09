@@ -3,10 +3,12 @@
 A small native home for changes that the Lua config cannot make. No daemon,
 plugin framework, polling, or extra config language. Currently: the focus fix
 from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998),
-restoring the pre-lock window and monitor after session unlock, and preserving
-application-chosen initial floating dimensions. Current version: **v0.4.1**,
-for Hyprland **0.57.1**. See [the upgrade audit](../../doc/upgrade-0.57.1.md) and
-[the terminal first-frame sizing fix](../../doc/terminal_initial_size.md).
+restoring the pre-lock window and monitor after session unlock, preserving
+application-chosen initial floating dimensions, and restoring pre-0.57 HDR
+preference feedback. Current version: **v0.4.2**, for Hyprland **0.57.1**.
+See [the upgrade audit](../../doc/upgrade-0.57.1.md),
+[the terminal first-frame sizing fix](../../doc/terminal_initial_size.md), and
+[HDR feedback compatibility](../../doc/hdr_feedback.md).
 
 **Automatic first builds, loading, and changed-binary reloading are enabled.**
 Startup or `hyprctl reload` builds a missing library; existing binaries are not
@@ -164,7 +166,9 @@ installation, lookup and rollback; `src/focus.cpp` contains the feature. To add 
 future change, add its source to CMake and call its `init`/cleanup from the entry
 point. Keep feature policy out of `hooks.*`. No module discovery machinery needed.
 `src/geometry.cpp` owns the initial-size/protocol-state feature, with its small
-state policy in `src/geometry_policy.hpp`.
+state policy in `src/geometry_policy.hpp`. `src/hdr_feedback.cpp` owns the
+preferred-HDR compatibility hook; it has no separate state or cleanup.
+There are five hooks total: three focus, one geometry, one HDR feedback.
 
 The focus module uses three native hooks:
 
@@ -258,7 +262,7 @@ not changed; at scale 1, the existing Alacritty 11pt override is only an
 approximation of 9pt at Xft.dpi=120.
 
 After building, reload **while unlocked** and verify `hyprctl plugin list` shows
-`hypr_extras` v0.4.1. Prefer the disposable-session procedure above. Open **new**
+`hypr_extras` v0.4.2. Prefer the disposable-session procedure above. Open **new**
 windows for all checks:
 
 1. Open Alacritty directly floating, then separately tiled and switch it to
@@ -276,6 +280,26 @@ windows for all checks:
    to a generic terminal size or have their fullscreen requests suppressed.
 5. Reload/unload/reload the plugin with windows open; close windows before
    unloading too. Existing sizes must not be reset. Recheck close/unlock focus.
+
+## Pre-0.57 HDR preference feedback (v0.4.2)
+
+`CMonitor::getAutoHDRImageDescription()` now returns **`std::nullopt`**, letting
+its native caller use the monitor's current image description. An SDR monitor
+therefore advertises SDR even to fullscreen windows; an HDR/ICC-configured monitor
+still advertises its actual profile. This removes only 0.57's unsolicited
+fullscreen HDR preference, not HDR capability or submitted-surface detection.
+
+`render:cm_auto_hdr = 1` stays enabled. No app lists, `no_auto_hdr` rules, renderer
+hook, forced SDR profile, or monitor mode change is added. `quirks:prefer_hdr`
+(including its gamescope exception), explicit HDR output, and colour-management
+protocol capabilities remain native. Unload restores the original helper through
+the shared hook registry.
+
+Exit fullscreen before reloading while unlocked, then re-enter it; reopen apps
+that cached their old output format. The hook does not forcibly reset existing
+HDR surfaces. Apps that require an advertised HDR preference may now stay SDR,
+just as before 0.57. An app explicitly submitting HDR-encoded SDR content can
+still trigger auto-HDR. See [the detailed notes](../../doc/hdr_feedback.md).
 
 ## Validation status
 
@@ -312,7 +336,13 @@ the first-tile equal-size guard, and check inert-backend argument forwarding.
   and subsequent ack recording, plus untouched protocol state scheduling.
   These are mocks/policy tests, **not an end-to-end Wayland size negotiation**.
   All 43 config Python tests, all Lua suites under Lua and LuaJIT, and isolated
-  config verification also pass with v0.4.1 sources.
+  config verification also pass with v0.4.2 sources.
+- HDR feedback: the actual replacement returns a disengaged optional and bypasses
+  the original unsolicited offer. A caller model checks SDR/HDR/EDID/ICC fallback,
+  repeated queries, forced-HDR and no-monitor paths. Five-hook install/create
+  failure rollback, native behavior after unload, and replacement after reload
+  pass. Installed-binary checks confirm the out-of-line preference helper and
+  independent native `isHDR()` detection. These do not test actual display modes.
 - **Real trampoline installation and desktop behavior still need a live test.**
   The disposable headless attempt in this sandbox aborted at
   `CBackend::create() failed!`, before plugin initialization. Neither the actual

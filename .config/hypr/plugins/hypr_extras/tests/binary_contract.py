@@ -95,3 +95,17 @@ for setter in ("setMaximized", "setFullscreen", "setActive", "setResizing"):
 assert set_size not in calls("CXDGToplevelResource::setSuspeneded(bool)")
 assert any(name.startswith("CEventLoopManager::doLaterLock(") for name in calls(schedule))
 print("PASS installed-binary backend configure hook, ack recording order and native state scheduling")
+
+# Only the unsolicited fullscreen preference is suppressed, not HDR capability
+# or the renderer's detection of actual submitted HDR-format surfaces. The
+# preferred-description call must remain out-of-line for the native hook.
+auto_hdr = "Monitor::CMonitor::getAutoHDRImageDescription(Hyprutils::Memory::CSharedPointer<CWLSurfaceResource> const&)"
+preferred = "CWLSurfaceResource::getPreferredImageDescription()"
+fullscreen_settings = "Render::IHyprRenderer::handleFullscreenSettings(Hyprutils::Memory::CSharedPointer<Monitor::CMonitor>)"
+assert symbols[auto_hdr][1] > 0, "missing HDR feedback hook target"
+assert calls(preferred).count(auto_hdr) == 1, "preferred HDR lookup moved/inlined: review hook"
+assert "CCompositor::getHDRImageDescription()" in calls(preferred), "explicit prefer_hdr quirk path changed"
+assert "CCompositor::getPreferredImageDescription()" in calls(preferred), "no-monitor fallback changed"
+assert auto_hdr not in calls(fullscreen_settings), "feedback lookup is now used to control HDR output"
+assert calls(fullscreen_settings).count("CColorManagementSurface::isHDR()") == 1, "native submitted-HDR detection changed"
+print("PASS installed-binary HDR preference hook and independent native HDR output detection")

@@ -94,7 +94,9 @@ end
 hl.config({
 	render = {
 		cm_enabled = true,
-		cm_auto_hdr = 1,      -- auto HDR when a fullscreen app requests it
+		cm_auto_hdr = 1,      -- retain auto-switching for submitted HDR surfaces
+		-- hypr_extras restores 0.56 preferred-format feedback: fullscreen alone
+		-- no longer advertises HDR while the output is SDR. See doc/hdr_feedback.md.
 		-- 1: fullscreen HDR passthrough. Compositing tone-mapped real HDR content
 		-- against a wrong target luminance -> grey/washed-out picture.
 		-- Known cost: stale frames can appear after closing fullscreen mpv.
