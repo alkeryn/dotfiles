@@ -8,7 +8,8 @@ alias rarchiv="rsync -azvAXUUP"
 alias dropcache="sync;sudo sysctl -w vm.drop_caches=3"
 alias ls='ls --color'
 alias vim='nvim'
-alias v='nvim' alias vz='nvim $(fzf)'
+alias v='nvim'
+alias vz='nvim $(fzf)'
 alias vs='nvim -S'
 alias visudo='sudo EDITOR=nvim visudo'
 alias vipw='sudo EDITOR=nvim vipw'
