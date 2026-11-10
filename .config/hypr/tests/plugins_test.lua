@@ -81,13 +81,19 @@ entry:close()
 local selected_path, selected_build
 package.loaded["lua/plugins"] = { load = function(path, options) selected_path, selected_build = path, options end }
 local run_entry = assert((loadstring or load)(plugin_config))
-for _, signature in ipairs({ "efb50993780079460b0cbed1363e2166a2de1d9f_1_2", "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9_3_4", "" }) do
-	instance = signature ~= "" and signature or nil
+for _, case in ipairs({
+	{ signature = "efb50993780079460b0cbed1363e2166a2de1d9f_1_2", path = "/build/hypr_extras%.so$", build = false },
+	{ signature = "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9_3_4", path = "/build%-0%.57%.1/hypr_extras%.so$", build = false },
+	{ signature = "11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947_5_6", path = "/build%-0%.57%.2/hypr_extras%.so$", build = true },
+	{ signature = "", path = "/build%-0%.57%.2/hypr_extras%.so$", build = true },
+}) do
+	instance = case.signature ~= "" and case.signature or nil
 	run_entry()
-	if signature:match("^efb509") then
-		assert(selected_path:match("/build/hypr_extras%.so$") and selected_build == nil)
+	assert(selected_path:match(case.path), "unexpected library for " .. (case.signature ~= "" and case.signature or "verify-config"))
+	if case.build then
+		assert(selected_build and selected_build.target == "hypr_extras")
 	else
-		assert(selected_path:match("/build%-0%.57%.1/hypr_extras%.so$") and selected_build.target == "hypr_extras")
+		assert(selected_build == nil, "older revisions must never be rebuilt")
 	end
 end
 os.getenv, io.popen, io.open = original_getenv, original_popen, original_open

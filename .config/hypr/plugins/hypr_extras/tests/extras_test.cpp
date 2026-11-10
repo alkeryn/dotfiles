@@ -479,7 +479,7 @@ int main(int argc, char** argv) {
 
     assert(hdr_offer_entry(nullptr, {}).has_value()); // unpatched control offers HDR
     const auto description = plugin_init((HANDLE)1);
-    assert(description.name == "hypr_extras" && description.version == "0.4.2" && fixture::live_hooks.size() == 5);
+    assert(description.name == "hypr_extras" && description.version == "0.4.3" && fixture::live_hooks.size() == 5);
     test_hdr_feedback();
     {
         Desktop::View::CWaylandBackend orphan({});

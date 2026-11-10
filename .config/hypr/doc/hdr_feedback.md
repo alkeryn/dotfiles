@@ -1,6 +1,6 @@
 # Restore pre-0.57 automatic HDR negotiation
 
-Implemented by `hypr_extras` **v0.4.2** for Hyprland **0.57.1**.
+Implemented by `hypr_extras` **v0.4.3** for Hyprland **0.57.2**.
 
 ## What changed upstream
 
@@ -66,7 +66,7 @@ hyprctl plugin list
 hyprctl configerrors
 ```
 
-Expect `hypr_extras` **v0.4.2**. Check:
+Expect `hypr_extras` **v0.4.3**. Check:
 
 1. Start from an SDR desktop. Fullscreen an affected SDR app: entering fullscreen
    should no longer encourage it to switch its output to HDR.

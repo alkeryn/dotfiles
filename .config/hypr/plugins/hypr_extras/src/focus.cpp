@@ -11,7 +11,7 @@
 class CInputManager;
 
 // Call-site semantics must be rechecked on upgrades, not just recompiled blindly.
-static_assert(std::string_view(GIT_COMMIT_HASH) == "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9",
+static_assert(std::string_view(GIT_COMMIT_HASH) == "11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947",
               "Review the focus hooks for this Hyprland revision before updating this guard");
 static_assert(sizeof(void*) == 8);
 

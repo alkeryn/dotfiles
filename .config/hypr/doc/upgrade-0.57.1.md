@@ -1,5 +1,8 @@
 # Hyprland 0.56.2 → 0.57.1 audit
 
+Superseded for the current target by [the 0.57.2 audit](upgrade-0.57.2.md)
+(`hypr_extras` v0.4.3); this document stays as the history of the 0.57 port.
+
 Follow-up: [terminal initial-size fix](terminal_initial_size.md), `hypr_extras`
 v0.4.1, corrects a wire/cache/ack mismatch in the initial v0.4.0 port described
 below. The geometry hook now runs before backend configure bookkeeping.

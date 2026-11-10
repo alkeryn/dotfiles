@@ -9,7 +9,7 @@ def run(*args):
 
 
 binary = sys.argv[1]
-revision = "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9"
+revision = "11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947"
 assert revision in run(binary, "--version"), "unreviewed Hyprland version"
 
 symbols = {}

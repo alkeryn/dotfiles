@@ -5,8 +5,9 @@ plugin framework, polling, or extra config language. Currently: the focus fix
 from [Hyprland PR #12998](https://github.com/hyprwm/Hyprland/pull/12998),
 restoring the pre-lock window and monitor after session unlock, preserving
 application-chosen initial floating dimensions, and restoring pre-0.57 HDR
-preference feedback. Current version: **v0.4.2**, for Hyprland **0.57.1**.
-See [the upgrade audit](../../doc/upgrade-0.57.1.md),
+preference feedback. Current version: **v0.4.3**, for Hyprland **0.57.2**.
+See [the 0.57.2 audit](../../doc/upgrade-0.57.2.md) and
+[the 0.57.1 upgrade audit](../../doc/upgrade-0.57.1.md),
 [the terminal first-frame sizing fix](../../doc/terminal_initial_size.md), and
 [HDR feedback compatibility](../../doc/hdr_feedback.md).
 
@@ -23,17 +24,19 @@ the plugin yet. This avoids blocking the compositor or exceeding its 1.5-second
 Lua config timeout. Startup/reload continues without the plugin until it is ready.
 
 The worker configures CMake with **Clang**, Ninja, Release, and tests disabled;
-builds only the requested target with two jobs in `build-0.57.1/.autobuild-hypr_extras`;
+builds only the requested target with two jobs in `build-0.57.2/.autobuild-hypr_extras`;
 and atomically publishes the finished `.so`. It then requests a reload of the
 **exact instance that started it**, which loads the normal immutable snapshot.
 There is no persistent daemon. Concurrent requests share one build; repeated
 requests from the same instance are deduplicated.
 
-Build output and errors: `plugins/hypr_extras/build-0.57.1/hypr_extras.so.build.log`.
-The config selects `build-0.57.1/hypr_extras.so` for the new compositor. A still-running
-0.56.2 session keeps the existing `build/hypr_extras.so` instead, without rebuilding
-it. **Do not overwrite that old binary with a 0.57.1 build.** Restart Hyprland to
-activate the new compositor and plugin together.
+Build output and errors: `plugins/hypr_extras/build-0.57.2/hypr_extras.so.build.log`.
+The config selects `build-0.57.2/hypr_extras.so` for the new compositor. A still-running
+0.56.2 session keeps the existing `build/hypr_extras.so`, and a still-running 0.57.1
+session keeps `build-0.57.1/hypr_extras.so`, without rebuilding either.
+**Do not overwrite those older binaries with a 0.57.2 build.** Its runtime ABI hash
+differs, so a mismatched library would be rejected instead of loaded. Restart
+Hyprland to activate the new compositor and plugin together.
 Failures do not trigger reload loops: fix the problem, then reload to retry.
 Required build dependencies must already be installed; nothing is auto-installed.
 An existing but stale/incompatible binary is not automatically rebuilt. Source
@@ -49,9 +52,9 @@ From `~/.config/hypr` (see the one-time migration note below if the original
 build-path library is still loaded directly):
 
 ```sh
-cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-0.57.1 -G Ninja
-cmake --build plugins/hypr_extras/build-0.57.1
-ctest --test-dir plugins/hypr_extras/build-0.57.1 --output-on-failure
+cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-0.57.2 -G Ninja
+cmake --build plugins/hypr_extras/build-0.57.2
+ctest --test-dir plugins/hypr_extras/build-0.57.2 --output-on-failure
 hyprctl reload
 ```
 
@@ -62,10 +65,10 @@ an explicit `-DCMAKE_CXX_COMPILER=...` overrides it. It uses **libstdc++**, matc
 the installed GCC-built compositor, not libc++. The plugin itself is built with
 Clang; linking GCC's runtime does not mean compiling it with GCC.
 
-Output: `build-0.57.1/hypr_extras.so`. No installation step or background service.
+Output: `build-0.57.2/hypr_extras.so`. No installation step or background service.
 `-DBUILD_TESTING=OFF` omits the test harness.
 
-Supported source target: **Linux x86-64, Hyprland v0.57.1**, commit
+Supported source target: **Linux x86-64, Hyprland v0.57.2**, commit
 `acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9`. The focus module deliberately fails to
 compile against an unreviewed revision. The plugin also rejects a runtime ABI
 string mismatch before installing hooks. These checks reduce risk; they are not
@@ -80,7 +83,7 @@ config's autostart). Find that session's exact instance signature with
 ```sh
 # Set this to the DISPOSABLE session's signature, never your daily session.
 test_instance='REPLACE_WITH_TEST_SESSION_SIGNATURE'
-hyprctl -i "$test_instance" plugin load "$PWD/plugins/hypr_extras/build-0.57.1/hypr_extras.so"
+hyprctl -i "$test_instance" plugin load "$PWD/plugins/hypr_extras/build-0.57.2/hypr_extras.so"
 hyprctl -i "$test_instance" plugin list
 ```
 
@@ -106,7 +109,7 @@ On two outputs, test:
 Unload from that same session with:
 
 ```sh
-hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build-0.57.1/hypr_extras.so"
+hyprctl -i "$test_instance" plugin unload "$PWD/plugins/hypr_extras/build-0.57.2/hypr_extras.so"
 ```
 
 The `require("lua/plugins").load(...)` declaration near the start of `hyprland.lua`
@@ -145,8 +148,8 @@ separately and atomically replace the original instead:
 cmake -S plugins/hypr_extras -B plugins/hypr_extras/build-next -G Ninja
 cmake --build plugins/hypr_extras/build-next
 ctest --test-dir plugins/hypr_extras/build-next --output-on-failure
-cp plugins/hypr_extras/build-next/hypr_extras.so plugins/hypr_extras/build-0.57.1/hypr_extras.so.new
-mv plugins/hypr_extras/build-0.57.1/hypr_extras.so.new plugins/hypr_extras/build-0.57.1/hypr_extras.so
+cp plugins/hypr_extras/build-next/hypr_extras.so plugins/hypr_extras/build-0.57.2/hypr_extras.so.new
+mv plugins/hypr_extras/build-0.57.2/hypr_extras.so.new plugins/hypr_extras/build-0.57.2/hypr_extras.so
 ```
 
 Then run `hyprctl reload` **while unlocked**, and check `hyprctl plugin list`.
@@ -178,7 +181,10 @@ The focus module uses three native hooks:
 2. `CInputManager::mouseMoveUnified`: cover inlined/tail-called versions of the
    same fallback. Real mouse motion (`refocus == false`) is not suppressed.
    The new 0.57 `pointerOnly` argument is forwarded; pointer-only refreshes neither
-   get suppressed nor consume pending keyboard-focus restoration.
+   get suppressed nor consume pending keyboard-focus restoration. 0.57.2 switches
+   `CLayerSurface::onMap` from `simulateMouseMovement` to `refocusPointer`, i.e. to a
+   pointer-only refresh, so layer map/unmap no longer perturbs the cursor-floored
+   state or triggers the keyboard-focus fallback at all.
 3. `CFocusState::rawMonitorFocus`: apply the PR's monitor condition only to the
    direct call from `mouseMoveUnified`. Focus calls from `rawWindowFocus` and
    dispatchers remain untouched, so legitimate clicks still select their monitor.
@@ -212,7 +218,7 @@ bspwm saves the client's original X11 rectangle before arranging its tile.
 Hyprland already has equivalent **size** storage (`rememberFloatingSize` in
 `CLayoutManager::newTarget`), but its initial Wayland configure can replace the
 client's natural size with the layout's prediction. The Lua layout predicts the
-whole work area. In addition, v0.57.1 still unconditionally advertises all four tiled
+whole work area. In addition, 0.57.1 and 0.57.2 still advertise all four tiled
 edges, even for floats. Alacritty 0.17 / winit 0.30 then ignores Alacritty's
 post-creation request for the configured 81x24-cell grid, leaving either winit's
 800x600 default or the compositor's predicted work-area size.
@@ -262,7 +268,7 @@ not changed; at scale 1, the existing Alacritty 11pt override is only an
 approximation of 9pt at Xft.dpi=120.
 
 After building, reload **while unlocked** and verify `hyprctl plugin list` shows
-`hypr_extras` v0.4.2. Prefer the disposable-session procedure above. Open **new**
+`hypr_extras` v0.4.3. Prefer the disposable-session procedure above. Open **new**
 windows for all checks:
 
 1. Open Alacritty directly floating, then separately tiled and switch it to
@@ -303,7 +309,7 @@ still trigger auto-HDR. See [the detailed notes](../../doc/hdr_feedback.md).
 
 ## Validation status
 
-Rechecked on **0.57.1**: Release and ASan/UBSan builds, all three CTest suites
+Rechecked on **0.57.2**: Release and ASan/UBSan builds, all three CTest suites
 (including the installed binary's call sites and private unlock callback), all
 config Python/Lua/LuaJIT suites, and config verification for both machine profiles
 pass. The actual desktop/trampolines remain untested in this sandbox. The coverage
@@ -336,7 +342,7 @@ the first-tile equal-size guard, and check inert-backend argument forwarding.
   and subsequent ack recording, plus untouched protocol state scheduling.
   These are mocks/policy tests, **not an end-to-end Wayland size negotiation**.
   All 43 config Python tests, all Lua suites under Lua and LuaJIT, and isolated
-  config verification also pass with v0.4.2 sources.
+  config verification also pass with v0.4.3 sources.
 - HDR feedback: the actual replacement returns a disengaged optional and bypasses
   the original unsolicited offer. A caller model checks SDR/HDR/EDID/ICC fallback,
   repeated queries, forced-HDR and no-monitor paths. Five-hook install/create

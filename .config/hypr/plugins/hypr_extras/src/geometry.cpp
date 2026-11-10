@@ -7,7 +7,7 @@
 #include <hyprland/src/protocols/core/Compositor.hpp>
 #include <utility>
 
-static_assert(std::string_view(GIT_COMMIT_HASH) == "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9",
+static_assert(std::string_view(GIT_COMMIT_HASH) == "11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947",
               "Review initial configure, floating-size capture and protocol states before updating this guard");
 static_assert(sizeof(void*) == 8);
 

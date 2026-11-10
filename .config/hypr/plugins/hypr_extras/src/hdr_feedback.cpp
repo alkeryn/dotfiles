@@ -6,7 +6,7 @@
 
 // Recheck both the preferred-description fallback and the independent renderer
 // HDR detection path on upgrades. Never replace this with a generic HDR ban.
-static_assert(std::string_view(GIT_COMMIT_HASH) == "acc1aa0bfd4bd575dcb0f76c35ccf12b660a1ab9",
+static_assert(std::string_view(GIT_COMMIT_HASH) == "11cbc6c577b84ffb1edf4df3fc5b6128c3ae6947",
               "Review preferred HDR feedback and fullscreen HDR detection before updating this guard");
 static_assert(sizeof(void*) == 8);
 
